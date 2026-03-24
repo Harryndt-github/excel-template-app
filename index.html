@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExcelMapper - Ghép Dữ Liệu Excel Vào Template</title>
+  <meta name="description" content="Ứng dụng nhận dữ liệu từ file Excel và ghép vào template chuẩn, xuất PDF chuyên nghiệp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/spreadsheet.css">
+</head>
+<body>
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect x="2" y="2" width="10" height="10" rx="2" fill="#6366f1"/>
+            <rect x="16" y="2" width="10" height="10" rx="2" fill="#8b5cf6" opacity="0.7"/>
+            <rect x="2" y="16" width="10" height="10" rx="2" fill="#22d3ee" opacity="0.7"/>
+            <rect x="16" y="16" width="10" height="10" rx="2" fill="#6366f1" opacity="0.4"/>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>ExcelMapper</h1>
+          <span>Template Engine</span>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard" id="nav-dashboard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        <span>Tổng quan</span>
+      </a>
+      <a href="#" class="nav-item" data-page="templates" id="nav-templates">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <span>Quản lý Template</span>
+      </a>
+      <a href="#" class="nav-item" data-page="editor" id="nav-editor">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        <span>Tạo Template</span>
+      </a>
+      <a href="#" class="nav-item" data-page="generate" id="nav-generate">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <span>Ghép & Xuất PDF</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="version-info">
+        <span>v1.0.0</span>
+        <span class="dot">•</span>
+        <span>Made with ❤️</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content" id="mainContent">
+    <!-- ========== DASHBOARD PAGE ========== -->
+    <section id="page-dashboard" class="page active">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Tổng quan</h2>
+          <p class="page-subtitle">Chào mừng bạn đến với ExcelMapper</p>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="stat-templates">0</span>
+            <span class="stat-label">Templates đã tạo</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background: linear-gradient(135deg, #22d3ee, #06b6d4);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="stat-exports">0</span>
+            <span class="stat-label">PDF đã xuất</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">8</span>
+            <span class="stat-label">Loại file hỗ trợ</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-actions">
+        <h3>Thao tác nhanh</h3>
+        <div class="actions-grid">
+          <button class="action-card" onclick="App.navigateTo('editor')">
+            <div class="action-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+            </div>
+            <span class="action-title">Tạo Template mới</span>
+            <span class="action-desc">Thiết kế template với trình soạn thảo trực quan</span>
+          </button>
+          <button class="action-card" onclick="App.navigateTo('generate')">
+            <div class="action-icon accent">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <span class="action-title">Ghép dữ liệu & Xuất PDF</span>
+            <span class="action-desc">Upload Excel, mapping và xuất PDF ngay</span>
+          </button>
+          <button class="action-card" onclick="App.navigateTo('templates')">
+            <div class="action-icon success">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+            </div>
+            <span class="action-title">Quản lý Templates</span>
+            <span class="action-desc">Xem, sửa, xóa các template đã tạo</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="file-types-info">
+        <h3>Các loại file Excel được hỗ trợ</h3>
+        <div class="file-types-grid">
+          <div class="file-type-card">
+            <span class="file-badge">1</span>
+            <strong>thong_tin_vay</strong>
+            <p>Cột A: Chỉ tiêu | Cột B: Giá trị</p>
+          </div>
+          <div class="file-type-card">
+            <span class="file-badge">2</span>
+            <strong>tai_san</strong>
+            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
+          </div>
+          <div class="file-type-card">
+            <span class="file-badge">3</span>
+            <strong>chu_tai_san</strong>
+            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
+          </div>
+          <div class="file-type-card">
+            <span class="file-badge">4</span>
+            <strong>tai_san_ctt</strong>
+            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
+          </div>
+          <div class="file-type-card">
+            <span class="file-badge">5</span>
+            <strong>thong_tin_chuyen_tien</strong>
+            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
+          </div>
+          <div class="file-type-card">
+            <span class="file-badge">6</span>
+            <strong>thu_phi_tnth</strong>
+            <p>Dòng 1: Header | Dòng 2-4: Giá trị</p>
+          </div>
+          <div class="file-type-card">
+            <span class="file-badge">7</span>
+            <strong>han_muc</strong>
+            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
+          </div>
+          <div class="file-type-card">
+            <span class="file-badge">8</span>
+            <strong>tai_tai_tro</strong>
+            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== TEMPLATES LIST PAGE ========== -->
+    <section id="page-templates" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Quản lý Template</h2>
+          <p class="page-subtitle">Danh sách các template đã tạo</p>
+        </div>
+        <button class="btn btn-primary" onclick="App.navigateTo('editor')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Tạo mới
+        </button>
+      </div>
+
+      <div id="templates-list" class="templates-grid">
+        <!-- Templates will be rendered here -->
+      </div>
+      <div id="no-templates" class="empty-state" style="display:none;">
+        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <h3>Chưa có template nào</h3>
+        <p>Hãy tạo template đầu tiên để bắt đầu</p>
+        <button class="btn btn-primary" onclick="App.navigateTo('editor')">Tạo Template</button>
+      </div>
+    </section>
+
+    <!-- ========== TEMPLATE EDITOR PAGE ========== -->
+    <section id="page-editor" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title" id="editor-title">Tạo Template mới</h2>
+          <p class="page-subtitle">Thiết kế bảng dữ liệu Excel-style — kéo thả, gộp ô, chèn trường</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-outline" onclick="App.navigateTo('templates')">← Quay lại</button>
+          <button class="btn btn-primary" onclick="TemplateBuilder.save()" id="btn-save-template">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+            </svg>
+            Lưu Template
+          </button>
+        </div>
+      </div>
+
+      <div class="editor-layout">
+        <!-- Template Name -->
+        <div class="editor-name-bar">
+          <label for="template-name">Tên Template:</label>
+          <input type="text" id="template-name" placeholder="Nhập tên template..." class="input">
+        </div>
+
+        <!-- Spreadsheet Editor -->
+        <div class="spreadsheet-editor-wrap">
+          <!-- Formula Bar -->
+          <div class="ss-formula-bar-wrap">
+            <div class="ss-cell-ref-label" id="ss-cell-ref">A1</div>
+            <input type="text" class="ss-formula-input" id="ss-formula-bar" placeholder="Nội dung ô..." 
+              onchange="Spreadsheet.setCellValue(this.value)">
+          </div>
+
+          <!-- Spreadsheet Toolbar -->
+          <div class="ss-toolbar">
+            <button class="ss-tool-btn" id="ss-bold-btn" onclick="Spreadsheet.toggleBold()" title="In đậm (Ctrl+B)"><b>B</b></button>
+            <button class="ss-tool-btn" id="ss-italic-btn" onclick="Spreadsheet.toggleItalic()" title="In nghiêng (Ctrl+I)"><i>I</i></button>
+            <div class="tool-divider"></div>
+            <button class="ss-tool-btn ss-align-btn" data-align="left" onclick="Spreadsheet.setAlign('left')" title="Căn trái">⫷</button>
+            <button class="ss-tool-btn ss-align-btn" data-align="center" onclick="Spreadsheet.setAlign('center')" title="Căn giữa">☰</button>
+            <button class="ss-tool-btn ss-align-btn" data-align="right" onclick="Spreadsheet.setAlign('right')" title="Căn phải">⫸</button>
+            <div class="tool-divider"></div>
+            <select class="ss-tool-select" id="ss-font-size" onchange="Spreadsheet.setFontSize(this.value)" title="Cỡ chữ">
+              <option value="10">10px</option>
+              <option value="11">11px</option>
+              <option value="12">12px</option>
+              <option value="13" selected>13px</option>
+              <option value="14">14px</option>
+              <option value="16">16px</option>
+              <option value="18">18px</option>
+              <option value="20">20px</option>
+              <option value="24">24px</option>
+            </select>
+            <div class="tool-divider"></div>
+            <input type="color" class="ss-tool-color" id="ss-bg-color" value="#ffffff" onchange="Spreadsheet.setBgColor(this.value)" title="Màu nền">
+            <input type="color" class="ss-tool-color" id="ss-text-color" value="#1a1a2e" onchange="Spreadsheet.setTextColor(this.value)" title="Màu chữ">
+            <div class="tool-divider"></div>
+            <button class="ss-tool-btn accent" onclick="Spreadsheet.mergeCells()" title="Gộp ô (chọn nhiều ô bằng Shift+Click)">⊞</button>
+            <button class="ss-tool-btn" onclick="Spreadsheet.unmergeCells()" title="Tách ô">⊟</button>
+            <div class="tool-divider"></div>
+            <button class="ss-tool-btn accent" onclick="Spreadsheet.setCellAsPlaceholder()" title="Chèn trường dữ liệu vào ô">⧉ Field</button>
+            <div class="tool-divider"></div>
+            <button class="ss-tool-btn" onclick="Spreadsheet.insertRowBelow()" title="Thêm hàng">＋↓</button>
+            <button class="ss-tool-btn" onclick="Spreadsheet.insertColRight()" title="Thêm cột">＋→</button>
+            <div class="tool-divider"></div>
+            <button class="ss-tool-btn" onclick="Spreadsheet.undo()" title="Hoàn tác (Ctrl+Z)">↩</button>
+            <button class="ss-tool-btn" onclick="Spreadsheet.redo()" title="Làm lại (Ctrl+Y)">↪</button>
+          </div>
+
+          <!-- The Grid -->
+          <div id="spreadsheet-container" tabindex="0"></div>
+
+          <!-- Quick Actions -->
+          <div class="ss-quick-actions">
+            <button class="ss-add-row-btn" onclick="Spreadsheet.insertRowBelow()">
+              ＋ Thêm hàng mới
+            </button>
+            <button class="ss-add-col-btn" onclick="Spreadsheet.insertColRight()">
+              ＋ Thêm cột mới
+            </button>
+            <span class="ss-status" id="ss-status">Sẵn sàng</span>
+          </div>
+        </div>
+
+        <!-- Data Sources Upload Panel -->
+        <div class="data-sources-panel">
+          <div class="ds-panel-header" onclick="DataSources.togglePanel()">
+            <h4>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              Nguồn dữ liệu
+              <span class="ds-badge" id="ds-file-count">0</span>
+            </h4>
+            <span class="ds-toggle-icon" id="ds-toggle-icon">▼</span>
+          </div>
+          <div class="ds-panel-body" id="ds-panel-body">
+            <p class="ds-hint">Upload file Excel để lấy danh sách trường dữ liệu cho template</p>
+            <div class="ds-upload-zone" id="ds-upload-zone"
+                 ondragover="event.preventDefault(); this.classList.add('dragover')"
+                 ondragleave="this.classList.remove('dragover')"
+                 ondrop="event.preventDefault(); this.classList.remove('dragover'); DataSources.handleDrop(event)">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <p>Kéo thả file Excel vào đây</p>
+              <span>hoặc</span>
+              <label class="ds-browse-btn">
+                Chọn file
+                <input type="file" accept=".xlsx,.xls,.csv" multiple hidden
+                       onchange="DataSources.handleFiles(this.files)">
+              </label>
+            </div>
+            <div id="ds-files-list" class="ds-files-list"></div>
+          </div>
+        </div>
+
+        <!-- Placeholders Panel -->
+        <div class="placeholders-panel">
+          <h4>Các trường đã chèn</h4>
+          <div id="placeholders-list" class="placeholders-list">
+            <p class="text-muted">Chưa có trường dữ liệu nào</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== GENERATE PAGE ========== -->
+    <section id="page-generate" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Ghép dữ liệu & Xuất PDF</h2>
+          <p class="page-subtitle">Upload Excel, mapping dữ liệu và xuất PDF</p>
+        </div>
+      </div>
+
+      <!-- Step Indicator -->
+      <div class="steps-indicator">
+        <div class="step active" data-step="1">
+          <div class="step-number">1</div>
+          <span>Chọn Template</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" data-step="2">
+          <div class="step-number">2</div>
+          <span>Upload Excel</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" data-step="3">
+          <div class="step-number">3</div>
+          <span>Mapping</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" data-step="4">
+          <div class="step-number">4</div>
+          <span>Xuất PDF</span>
+        </div>
+      </div>
+
+      <!-- Step 1: Select Template -->
+      <div id="gen-step-1" class="gen-step active">
+        <div class="step-card">
+          <h3>Bước 1: Chọn Template</h3>
+          <p>Chọn template mà bạn muốn sử dụng để ghép dữ liệu</p>
+          <select id="select-template" class="input select-full">
+            <option value="">-- Chọn template --</option>
+          </select>
+          <div id="template-preview-mini" class="template-preview-mini" style="display:none;">
+            <h4>Xem trước template:</h4>
+            <div id="template-preview-content" class="preview-content"></div>
+          </div>
+          <div class="step-actions">
+            <button class="btn btn-primary" onclick="Generator.goToStep(2)" id="btn-step1-next" disabled>
+              Tiếp theo →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Upload Excel Files -->
+      <div id="gen-step-2" class="gen-step">
+        <div class="step-card">
+          <h3>Bước 2: Upload file Excel</h3>
+          <p>Upload các file Excel tương ứng với từng loại dữ liệu</p>
+          
+          <div class="upload-grid" id="upload-grid">
+            <!-- Upload slots created by JS -->
+          </div>
+          
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="Generator.goToStep(1)">← Quay lại</button>
+            <button class="btn btn-primary" onclick="Generator.extractAllData()" id="btn-extract">
+              Trích xuất dữ liệu & Tiếp tục →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Mapping -->
+      <div id="gen-step-3" class="gen-step">
+        <div class="step-card">
+          <h3>Bước 3: Mapping dữ liệu</h3>
+          <p>Ghép các trường dữ liệu từ Excel vào các vị trí trong template</p>
+          
+          <div id="mapping-container" class="mapping-container">
+            <!-- Mapping rows created by JS -->
+          </div>
+
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="Generator.goToStep(2)">← Quay lại</button>
+            <button class="btn btn-primary" onclick="Generator.preview()">
+              Xem trước →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Preview & Export -->
+      <div id="gen-step-4" class="gen-step">
+        <div class="step-card">
+          <h3>Bước 4: Xem trước & Xuất PDF</h3>
+          <p>Kiểm tra kết quả và xuất file PDF</p>
+          
+          <div class="preview-wrapper">
+            <div id="pdf-preview" class="pdf-preview">
+              <!-- Preview content -->
+            </div>
+          </div>
+
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="Generator.goToStep(3)">← Quay lại</button>
+            <button class="btn btn-success" onclick="Generator.exportPDF()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Xuất PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: Insert Placeholder (Enhanced) -->
+  <div id="modal-placeholder" class="modal-overlay" style="display:none;">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3>📋 Chèn trường dữ liệu</h3>
+        <button class="modal-close" onclick="TemplateBuilder.closeModal('modal-placeholder')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Step 1: Select Source File -->
+        <div id="ph-step-source" class="ph-step">
+          <div class="ph-step-header">
+            <span class="ph-step-number">1</span>
+            <span class="ph-step-title">Chọn nguồn file Excel</span>
+            <span class="ph-step-hint">Chọn file chứa trường dữ liệu cần chèn</span>
+          </div>
+          <div id="ph-source-grid" class="ph-source-grid">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Step 2: Select Field from Headers -->
+        <div id="ph-step-fields" class="ph-step" style="display:none;">
+          <div class="ph-step-header">
+            <span class="ph-step-number">2</span>
+            <span class="ph-step-title">Chọn trường dữ liệu</span>
+            <span class="ph-step-hint" id="ph-selected-source-label"></span>
+          </div>
+
+          <!-- Search/filter -->
+          <div class="ph-search-bar">
+            <span class="ph-search-icon">🔍</span>
+            <input type="text" id="ph-field-search" class="input" placeholder="Tìm kiếm trường dữ liệu..."
+              oninput="TemplateBuilder.filterFields(this.value)">
+          </div>
+
+          <!-- Fields grid -->
+          <div id="ph-fields-grid" class="ph-fields-grid">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Custom field input -->
+          <div class="ph-custom-section">
+            <div class="ph-custom-divider">
+              <span>hoặc nhập tên trường tự do</span>
+            </div>
+            <div class="ph-custom-row">
+              <input type="text" id="ph-custom-name" class="input" placeholder="VD: Tên chỉ tiêu khác...">
+              <button class="btn btn-primary btn-sm" onclick="TemplateBuilder.insertCustomPlaceholder()">
+                ＋ Chèn
+              </button>
+            </div>
+          </div>
+
+          <button class="ph-back-btn" onclick="TemplateBuilder.showSourceStep()">
+            ← Chọn nguồn file khác
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="TemplateBuilder.closeModal('modal-placeholder')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Table Builder -->
+  <div id="modal-table" class="modal-overlay" style="display:none;">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3>🏗️ Tạo Bảng Template</h3>
+        <button class="modal-close" onclick="TemplateBuilder.closeModal('modal-table')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Step 1: Table Dimensions -->
+        <div class="tb-section">
+          <div class="tb-section-title">Kích thước bảng</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Số hàng:</label>
+              <input type="number" id="table-rows" class="input" value="3" min="1" max="30">
+            </div>
+            <div class="form-group">
+              <label>Số cột:</label>
+              <input type="number" id="table-cols" class="input" value="3" min="1" max="10">
+            </div>
+            <div class="form-group" style="justify-content:flex-end;">
+              <button class="btn btn-accent" onclick="TableBuilder.generateGrid()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+                Tạo lưới
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Interactive Grid -->
+        <div class="tb-section">
+          <div class="tb-section-title">
+            Cấu hình ô bảng
+            <span class="tb-hint">Nhấn vào ô để thiết lập: văn bản hoặc trường dữ liệu từ file Excel</span>
+          </div>
+          <div class="tb-legend">
+            <span class="tb-legend-item"><span class="tb-legend-dot text"></span> Văn bản</span>
+            <span class="tb-legend-item"><span class="tb-legend-dot header"></span> Tiêu đề</span>
+            <span class="tb-legend-item"><span class="tb-legend-dot placeholder"></span> Trường dữ liệu</span>
+          </div>
+          <div id="tb-grid-container" class="tb-grid-container">
+            <p class="text-muted" style="text-align:center;padding:30px;">Nhấn "Tạo lưới" để bắt đầu</p>
+          </div>
+        </div>
+
+        <!-- Cell Editor Panel (shown when clicking a cell) -->
+        <div id="tb-cell-editor" class="tb-cell-editor" style="display:none;">
+          <div class="tb-cell-editor-header">
+            <span>⚙️ Cấu hình ô <strong id="tb-cell-pos"></strong></span>
+            <button class="btn btn-sm btn-outline" onclick="TableBuilder.closeCellEditor()">Đóng</button>
+          </div>
+          <div class="tb-cell-editor-body">
+            <div class="form-group">
+              <label>Loại ô:</label>
+              <div class="tb-cell-type-btns">
+                <button class="tb-type-btn active" data-type="header" onclick="TableBuilder.setCellType('header')">
+                  <span class="tb-type-icon">Ⓗ</span> Tiêu đề
+                </button>
+                <button class="tb-type-btn" data-type="text" onclick="TableBuilder.setCellType('text')">
+                  <span class="tb-type-icon">Ⓣ</span> Văn bản
+                </button>
+                <button class="tb-type-btn" data-type="placeholder" onclick="TableBuilder.setCellType('placeholder')">
+                  <span class="tb-type-icon">⧉</span> Trường dữ liệu
+                </button>
+              </div>
+            </div>
+            <!-- Content for text/header -->
+            <div id="tb-text-input-group" class="form-group">
+              <label>Nội dung:</label>
+              <input type="text" id="tb-cell-text" class="input" placeholder="Nhập nội dung ô..." oninput="TableBuilder.updateCellContent()">
+            </div>
+            <!-- Content for placeholder -->
+            <div id="tb-placeholder-group" class="form-group" style="display:none;">
+              <label>Tên trường dữ liệu:</label>
+              <input type="text" id="tb-cell-placeholder-name" class="input" placeholder="VD: Tên khách hàng..." oninput="TableBuilder.updateCellContent()">
+              <label style="margin-top:8px;">Nguồn dữ liệu (File Excel):</label>
+              <select id="tb-cell-source-file" class="input" onchange="TableBuilder.updateCellContent()">
+                <option value="">-- Chọn file nguồn --</option>
+              </select>
+              <p class="hint">Chọn file Excel chứa dữ liệu cho trường này</p>
+            </div>
+          </div>
+          <div class="tb-cell-editor-footer">
+            <button class="btn btn-sm btn-primary" onclick="TableBuilder.applyCellConfig()">✓ Áp dụng</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="TemplateBuilder.closeModal('modal-table')">Hủy</button>
+        <button class="btn btn-primary" onclick="TableBuilder.insertConfiguredTable()" id="btn-insert-table">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg>
+          Chèn bảng vào Template
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spreadsheet Placeholder Modal -->
+  <div id="modal-ss-placeholder" class="ss-ph-modal" style="display:none;">
+    <div class="ss-ph-modal-body">
+      <div class="ss-ph-modal-header">
+        <h3>⧉ Chèn trường dữ liệu vào ô</h3>
+        <button class="ss-ph-close" onclick="Spreadsheet.closePhModal()">&times;</button>
+      </div>
+      <div class="ss-ph-modal-content">
+        <!-- Step 1: Select source -->
+        <div id="ss-ph-step-source">
+          <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">Chọn file nguồn chứa dữ liệu:</p>
+          <div class="ph-source-grid" id="ss-ph-source-grid">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+
+        <!-- Step 2: Select field -->
+        <div id="ss-ph-step-fields" style="display:none;">
+          <button class="ss-ph-back-btn" onclick="Spreadsheet.showPhSourceStep()">← Chọn nguồn file khác</button>
+          <div class="ss-ph-source-label" id="ss-ph-source-label"></div>
+
+          <div class="ss-ph-search-wrap">
+            <input type="text" class="ss-ph-search-input" id="ss-ph-field-search" 
+              placeholder="🔍 Tìm kiếm trường dữ liệu..." oninput="Spreadsheet.filterPhFields(this.value)">
+          </div>
+
+          <div class="ph-fields-grid" id="ss-ph-fields-grid">
+            <!-- Filled by JS -->
+          </div>
+
+          <div class="ss-ph-custom-wrap">
+            <input type="text" class="ss-ph-custom-input" id="ss-ph-custom-name" placeholder="Nhập tên trường tự do...">
+            <button class="ss-ph-custom-btn" onclick="Spreadsheet.insertPhCustom()">＋ Chèn</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Hidden PDF render area -->
+  <div id="pdf-render-area" style="position:absolute;left:-9999px;top:-9999px;"></div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="js/spreadsheet.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
