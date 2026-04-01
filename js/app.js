@@ -454,8 +454,10 @@ const DataSources = {
   async handleFiles(fileList) {
     for (const file of fileList) {
       const ext = file.name.split('.').pop().toLowerCase();
-      if (!['xlsx', 'xls', 'csv'].includes(ext)) {
-        App.toast(`"${file.name}" không phải file Excel/CSV`, 'warning');
+      const excelExts = ['xlsx', 'xls', 'csv'];
+      const wordExts = ['doc', 'docx'];
+      if (!excelExts.includes(ext) && !wordExts.includes(ext)) {
+        App.toast(`"${file.name}" không phải file Excel/CSV hoặc Word`, 'warning');
         continue;
       }
       // avoid duplicates
@@ -464,18 +466,25 @@ const DataSources = {
         continue;
       }
       try {
-        const fields = await this._readHeaders(file);
+        let fields;
+        const isWord = wordExts.includes(ext);
+        if (isWord) {
+          fields = await this._readWordFields(file);
+        } else {
+          fields = await this._readHeaders(file);
+        }
         const source = {
           id: 'ds_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
           name: file.name.replace(/\.[^.]+$/, ''),
           filename: file.name,
+          fileType: isWord ? 'word' : 'excel',
           fields
         };
         this._sources.push(source);
         App.toast(`Đã đọc ${fields.length} trường từ "${file.name}"`, 'success');
       } catch (err) {
         console.error(err);
-        App.toast(`Lỗi đọc file "${file.name}"`, 'error');
+        App.toast(`Lỗi đọc file "${file.name}": ${err.message}`, 'error');
       }
     }
     this._renderList();
@@ -562,20 +571,125 @@ const DataSources = {
     });
   },
 
+  /* ── read field names from Word document (.doc/.docx) using mammoth.js ── */
+  _readWordFields(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          if (typeof mammoth === 'undefined') {
+            reject(new Error('Thư viện mammoth.js chưa được tải. Vui lòng làm mới trang.'));
+            return;
+          }
+
+          const arrayBuffer = e.target.result;
+          
+          // Extract both HTML and raw text
+          const [htmlResult, textResult] = await Promise.all([
+            mammoth.convertToHtml({ arrayBuffer }),
+            mammoth.extractRawText({ arrayBuffer })
+          ]);
+
+          const fields = [];
+          const addField = (val) => {
+            const trimmed = val.trim();
+            if (trimmed && trimmed.length > 0 && trimmed.length < 200 && !fields.includes(trimmed)) {
+              fields.push(trimmed);
+            }
+          };
+
+          // === Strategy 1: Extract {{placeholder}} patterns ===
+          const placeholderRegex = /\{\{([^}]+)\}\}/g;
+          let match;
+          const fullText = textResult.value;
+          while ((match = placeholderRegex.exec(fullText)) !== null) {
+            addField(match[1].trim());
+          }
+
+          // === Strategy 2: Extract table headers from Word tables ===
+          const htmlStr = htmlResult.value;
+          if (htmlStr.includes('<table')) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlStr;
+            const tables = tempDiv.querySelectorAll('table');
+            tables.forEach(table => {
+              // Get headers from first row
+              const firstRow = table.querySelector('tr');
+              if (firstRow) {
+                const cells = firstRow.querySelectorAll('th, td');
+                cells.forEach(cell => {
+                  const text = cell.textContent.trim();
+                  if (text) addField(text);
+                });
+              }
+            });
+          }
+
+          // === Strategy 3: Extract key:value or key-value patterns ===
+          const lines = fullText.split('\n');
+          lines.forEach(line => {
+            const trimLine = line.trim();
+            if (!trimLine) return;
+            
+            // Pattern: "Key: Value" or "Key : Value"
+            const colonMatch = trimLine.match(/^([^:]{2,60})\s*:\s*(.+)/);
+            if (colonMatch) {
+              const key = colonMatch[1].trim();
+              // Skip if looks like a URL, time, or ratio
+              if (key && !key.match(/^(http|ftp|\d{1,2}|\d+\/\d+)/i) && key.length >= 2) {
+                addField(key);
+              }
+            }
+          });
+
+          // === Strategy 4: Extract labeled lines (Vietnamese patterns) ===
+          const labelPatterns = [
+            /^(?:Tên|Họ tên|Số|Mã số|Ngày|\u0110ịa chỉ|SĐT|Điện thoại|Email|CMND|CCCD|MST)\b/i,
+            /^[A-ZĐÀ-ỹ][a-zđà-ỹ]+(?:\s+[A-ZĐÀ-ỹa-zđà-ỹ]+){0,6}\s*$/
+          ];
+          lines.forEach(line => {
+            const trimLine = line.trim();
+            if (!trimLine || trimLine.length > 80 || trimLine.length < 2) return;
+            for (const pattern of labelPatterns) {
+              if (pattern.test(trimLine) && !fields.includes(trimLine)) {
+                // Only add if it looks like a field label, not a sentence
+                if (trimLine.split(/\s+/).length <= 8 && !trimLine.includes('.')) {
+                  addField(trimLine);
+                }
+                break;
+              }
+            }
+          });
+
+          resolve(fields);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  },
+
   /* ── render file list in editor panel ── */
   _renderList() {
-    const html = this._sources.length === 0 ? '' : this._sources.map(src => `
+    const html = this._sources.length === 0 ? '' : this._sources.map(src => {
+      const isWord = src.fileType === 'word';
+      const icon = isWord ? '📝' : '📊';
+      const typeLabel = isWord ? 'Word' : 'Excel';
+      return `
       <div class="ds-file-item">
         <div class="ds-file-info">
-          <span class="ds-file-icon">📊</span>
+          <span class="ds-file-icon">${icon}</span>
           <div>
             <div class="ds-file-name">${src.filename}</div>
-            <div class="ds-file-fields">${src.fields.length} trường: ${src.fields.slice(0, 4).join(', ')}${src.fields.length > 4 ? '…' : ''}</div>
+            <div class="ds-file-fields">${src.fields.length} trường (${typeLabel}): ${src.fields.slice(0, 4).join(', ')}${src.fields.length > 4 ? '…' : ''}</div>
           </div>
         </div>
         <button class="ds-file-remove" onclick="DataSources.removeSource('${src.id}')" title="Xóa">✕</button>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     // Render to both spreadsheet and word editor panels
     const container = document.getElementById('ds-files-list');
