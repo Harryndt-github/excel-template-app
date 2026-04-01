@@ -466,10 +466,12 @@ const DataSources = {
         continue;
       }
       try {
-        let fields;
+        let fields, htmlContent = null;
         const isWord = wordExts.includes(ext);
         if (isWord) {
-          fields = await this._readWordFields(file);
+          const result = await this._readWordFields(file);
+          fields = result.fields;
+          htmlContent = result.htmlContent;
         } else {
           fields = await this._readHeaders(file);
         }
@@ -478,10 +480,16 @@ const DataSources = {
           name: file.name.replace(/\.[^.]+$/, ''),
           filename: file.name,
           fileType: isWord ? 'word' : 'excel',
-          fields
+          fields,
+          htmlContent
         };
         this._sources.push(source);
         App.toast(`Đã đọc ${fields.length} trường từ "${file.name}"`, 'success');
+
+        // Auto-load Word content into editor if on Word editor page
+        if (isWord && htmlContent) {
+          this._promptLoadWordContent(source);
+        }
       } catch (err) {
         console.error(err);
         App.toast(`Lỗi đọc file "${file.name}": ${err.message}`, 'error');
@@ -500,7 +508,12 @@ const DataSources = {
 
   /* ── persist field metadata to localStorage (not the file blob) ── */
   _persistMeta() {
-    const meta = this._sources.map(s => ({ id: s.id, name: s.name, filename: s.filename, fields: s.fields }));
+    const meta = this._sources.map(s => ({
+      id: s.id, name: s.name, filename: s.filename,
+      fileType: s.fileType || 'excel',
+      fields: s.fields,
+      htmlContent: s.htmlContent || null
+    }));
     try { localStorage.setItem('excelmapper_datasources', JSON.stringify(meta)); } catch (_) { }
     // update badge
     const badge = document.getElementById('ds-file-count');
@@ -661,7 +674,7 @@ const DataSources = {
             }
           });
 
-          resolve(fields);
+          resolve({ fields, htmlContent: htmlStr });
         } catch (err) {
           reject(err);
         }
@@ -671,12 +684,122 @@ const DataSources = {
     });
   },
 
+  /* ── Prompt user to load Word content into the editor ── */
+  _promptLoadWordContent(source) {
+    const editor = document.getElementById('word-editor-area');
+    if (!editor) return; // not on Word editor page
+
+    // Check if editor page is visible
+    const editorPage = document.getElementById('page-word-editor');
+    if (!editorPage || !editorPage.classList.contains('active')) return;
+
+    const editorContent = editor.textContent.trim();
+    if (editorContent.length > 0) {
+      // Editor has content, ask before replacing
+      this._showLoadConfirmModal(source);
+    } else {
+      // Editor is empty, load directly
+      this.loadWordContentToEditor(source.id);
+    }
+  },
+
+  /* ── Show confirmation modal before loading Word content ── */
+  _showLoadConfirmModal(source) {
+    // Remove any existing modal
+    const existing = document.getElementById('modal-load-word-confirm');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'modal-load-word-confirm';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);';
+    modal.innerHTML = `
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px 32px;max-width:480px;width:90%;">
+        <h3 style="margin-bottom:12px;font-size:1.1rem;">📄 Tải nội dung Word vào Editor</h3>
+        <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:8px;">File: <strong>${source.filename}</strong></p>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:20px;">Editor hiện có nội dung. Bạn muốn:</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="DataSources.loadWordContentToEditor('${source.id}','replace');document.getElementById('modal-load-word-confirm').remove()">Thay thế toàn bộ</button>
+          <button class="btn btn-outline" onclick="DataSources.loadWordContentToEditor('${source.id}','append');document.getElementById('modal-load-word-confirm').remove()">Thêm vào cuối</button>
+          <button class="btn btn-outline" onclick="document.getElementById('modal-load-word-confirm').remove()" style="margin-left:auto;">Bỏ qua</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  /* ── Load Word HTML content into the Word editor ── */
+  loadWordContentToEditor(sourceId, mode = 'replace') {
+    const source = this._sources.find(s => s.id === sourceId);
+    if (!source || !source.htmlContent) {
+      App.toast('Không tìm thấy nội dung Word', 'warning');
+      return;
+    }
+
+    const editor = document.getElementById('word-editor-area');
+    if (!editor) {
+      App.toast('Vui lòng mở trang Tạo Word Template trước', 'info');
+      return;
+    }
+
+    // Sanitize and enhance the HTML from mammoth
+    let html = this._enhanceWordHtml(source.htmlContent);
+
+    if (mode === 'append') {
+      editor.innerHTML += '<hr style="margin:20px 0;border:1px dashed var(--border);">' + html;
+    } else {
+      editor.innerHTML = html;
+    }
+
+    // Update template name if empty
+    const nameInput = document.getElementById('word-template-name');
+    if (nameInput && !nameInput.value.trim()) {
+      nameInput.value = source.name;
+    }
+
+    App.toast(`Đã tải nội dung "${source.filename}" vào editor`, 'success');
+
+    // Update placeholders list
+    if (typeof WordEditor !== 'undefined') {
+      WordEditor.updatePlaceholdersList();
+    }
+  },
+
+  /* ── Enhance mammoth HTML output for better display in editor ── */
+  _enhanceWordHtml(rawHtml) {
+    // Create temp container to process
+    const temp = document.createElement('div');
+    temp.innerHTML = rawHtml;
+
+    // Style tables for better visibility
+    temp.querySelectorAll('table').forEach(table => {
+      table.style.cssText = 'width:100%;border-collapse:collapse;margin:10px 0;';
+    });
+    temp.querySelectorAll('th, td').forEach(cell => {
+      if (!cell.style.border) {
+        cell.style.cssText += 'border:1px solid #999;padding:6px 10px;';
+      }
+    });
+    temp.querySelectorAll('th').forEach(th => {
+      th.style.cssText += 'background:#f0f0f5;font-weight:600;';
+    });
+
+    // Ensure paragraphs have some spacing
+    temp.querySelectorAll('p').forEach(p => {
+      if (!p.style.margin) p.style.margin = '4px 0';
+    });
+
+    return temp.innerHTML;
+  },
+
   /* ── render file list in editor panel ── */
   _renderList() {
     const html = this._sources.length === 0 ? '' : this._sources.map(src => {
       const isWord = src.fileType === 'word';
       const icon = isWord ? '📝' : '📊';
       const typeLabel = isWord ? 'Word' : 'Excel';
+      const loadBtn = (isWord && src.htmlContent)
+        ? `<button class="ds-load-btn" onclick="event.stopPropagation();DataSources.loadWordContentToEditor('${src.id}')" title="Tải nội dung vào Editor">📥 Tải vào Editor</button>`
+        : '';
       return `
       <div class="ds-file-item">
         <div class="ds-file-info">
@@ -684,6 +807,7 @@ const DataSources = {
           <div>
             <div class="ds-file-name">${src.filename}</div>
             <div class="ds-file-fields">${src.fields.length} trường (${typeLabel}): ${src.fields.slice(0, 4).join(', ')}${src.fields.length > 4 ? '…' : ''}</div>
+            ${loadBtn}
           </div>
         </div>
         <button class="ds-file-remove" onclick="DataSources.removeSource('${src.id}')" title="Xóa">✕</button>

@@ -2211,6 +2211,30 @@ select.input option {
   margin-bottom: 8px;
 }
 
+/* Load to Editor button for Word sources */
+.ds-load-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.10);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.ds-load-btn:hover {
+  background: rgba(37, 99, 235, 0.20);
+  border-color: #2563eb;
+  transform: translateY(-1px);
+}
+
 /* Word Template Card accent */
 .word-tpl-card {
   border-left: 3px solid #2563eb;
