@@ -61,6 +61,29 @@
         </svg>
         <span>Ghép & Xuất PDF</span>
       </a>
+      <div class="nav-divider-label"><span>Word</span></div>
+      <a href="#" class="nav-item" data-page="word-templates" id="nav-word-templates">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/>
+        </svg>
+        <span>Word Templates</span>
+      </a>
+      <a href="#" class="nav-item" data-page="word-editor" id="nav-word-editor">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        <span>Tạo Word Template</span>
+      </a>
+      <a href="#" class="nav-item" data-page="word-generate" id="nav-word-generate">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span>Ghép & Xuất Word</span>
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -478,6 +501,201 @@
         </div>
       </div>
     </section>
+
+    <!-- ========== WORD TEMPLATES LIST PAGE ========== -->
+    <section id="page-word-templates" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Word Templates</h2>
+          <p class="page-subtitle">Quản lý các template Word đã tạo</p>
+        </div>
+        <button class="btn btn-primary" onclick="App.navigateTo('word-editor')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Tạo mới
+        </button>
+      </div>
+      <div id="word-templates-list" class="templates-grid"></div>
+      <div id="word-no-templates" class="empty-state" style="display:none;">
+        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <h3>Chưa có Word template nào</h3>
+        <p>Hãy tạo template Word đầu tiên</p>
+        <button class="btn btn-primary" onclick="App.navigateTo('word-editor')">Tạo Word Template</button>
+      </div>
+    </section>
+
+    <!-- ========== WORD TEMPLATE EDITOR PAGE ========== -->
+    <section id="page-word-editor" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title" id="word-editor-title">Tạo Template Word mới</h2>
+          <p class="page-subtitle">Soạn thảo văn bản Word — chèn trường dữ liệu từ file Excel</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-outline" onclick="App.navigateTo('word-templates')">← Quay lại</button>
+          <button class="btn btn-primary" onclick="WordEditor.save()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Lưu Template
+          </button>
+        </div>
+      </div>
+
+      <div class="word-editor-layout">
+        <!-- Template Name -->
+        <div class="editor-name-bar">
+          <label for="word-template-name">Tên Template:</label>
+          <input type="text" id="word-template-name" placeholder="Nhập tên template Word..." class="input">
+        </div>
+
+        <!-- Main editor area -->
+        <div class="word-editor-main">
+          <div class="word-editor-container">
+            <!-- Toolbar -->
+            <div class="we-toolbar">
+              <button class="we-tool-btn" onclick="WordEditor.toggleBold()" title="In đậm"><b>B</b></button>
+              <button class="we-tool-btn" onclick="WordEditor.toggleItalic()" title="In nghiêng"><i>I</i></button>
+              <button class="we-tool-btn" onclick="WordEditor.toggleUnderline()" title="Gạch chân"><u>U</u></button>
+              <button class="we-tool-btn" onclick="WordEditor.toggleStrike()" title="Gạch ngang"><s>S</s></button>
+              <div class="tool-divider"></div>
+              <select class="we-tool-select" onchange="WordEditor.setFontSize(this.value)" title="Cỡ chữ">
+                <option value="1">8pt</option><option value="2">10pt</option><option value="3" selected>12pt</option>
+                <option value="4">14pt</option><option value="5">18pt</option><option value="6">24pt</option><option value="7">36pt</option>
+              </select>
+              <input type="color" class="we-tool-color" value="#000000" onchange="WordEditor.setTextColor(this.value)" title="Màu chữ">
+              <input type="color" class="we-tool-color" value="#ffffff" onchange="WordEditor.setHighlight(this.value)" title="Tô nền">
+              <div class="tool-divider"></div>
+              <button class="we-tool-btn" onclick="WordEditor.setAlign('left')" title="Căn trái">⫷</button>
+              <button class="we-tool-btn" onclick="WordEditor.setAlign('center')" title="Căn giữa">☰</button>
+              <button class="we-tool-btn" onclick="WordEditor.setAlign('right')" title="Căn phải">⫸</button>
+              <button class="we-tool-btn" onclick="WordEditor.setAlign('justify')" title="Căn đều">☰</button>
+              <div class="tool-divider"></div>
+              <button class="we-tool-btn" onclick="WordEditor.insertList('ul')" title="Danh sách">• ≡</button>
+              <button class="we-tool-btn" onclick="WordEditor.insertList('ol')" title="Danh sách số">1. ≡</button>
+              <button class="we-tool-btn" onclick="WordEditor.indent()" title="Thụt vào">→|</button>
+              <button class="we-tool-btn" onclick="WordEditor.outdent()" title="Thụt ra">|←</button>
+              <div class="tool-divider"></div>
+              <button class="we-tool-btn accent" onclick="WordEditor.showTableDialog()" title="Chèn bảng">⊞ Bảng</button>
+              <button class="we-tool-btn accent" onclick="WordEditor.showPlaceholderModal()" title="Chèn trường dữ liệu">⧉ Field</button>
+              <div class="tool-divider"></div>
+              <button class="we-tool-btn" onclick="WordEditor.insertHR()" title="Đường kẻ ngang">―</button>
+              <button class="we-tool-btn" onclick="WordEditor.clearFormat()" title="Xóa định dạng">⌧</button>
+            </div>
+
+            <!-- Editor Area -->
+            <div id="word-editor-area" class="we-editor-area" contenteditable="true">
+              <p><br></p>
+            </div>
+          </div>
+
+          <!-- Right Panel: Data Sources & Placeholders -->
+          <div class="word-right-panel">
+            <!-- Data Sources Upload -->
+            <div class="word-ds-panel">
+              <h4>📂 Nguồn dữ liệu</h4>
+              <p class="ds-hint">Upload file Excel để lấy danh sách trường dữ liệu</p>
+              <div class="ds-upload-zone" id="word-ds-upload-zone"
+                ondragover="event.preventDefault(); this.classList.add('dragover')"
+                ondragleave="this.classList.remove('dragover')"
+                ondrop="event.preventDefault(); this.classList.remove('dragover'); DataSources.handleDrop(event)">
+                <p>Kéo thả file Excel hoặc</p>
+                <label class="ds-browse-btn">
+                  Chọn file
+                  <input type="file" accept=".xlsx,.xls,.csv" multiple hidden onchange="DataSources.handleFiles(this.files)">
+                </label>
+              </div>
+              <div id="word-ds-files-list" class="ds-files-list"></div>
+            </div>
+
+            <!-- Placeholders list -->
+            <div class="placeholders-panel">
+              <h4>⧉ Các trường đã chèn</h4>
+              <div id="word-placeholders-list" class="placeholders-list">
+                <p class="text-muted">Chưa có trường dữ liệu nào</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== WORD GENERATE PAGE ========== -->
+    <section id="page-word-generate" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Ghép dữ liệu & Xuất Word</h2>
+          <p class="page-subtitle">Upload Excel, mapping dữ liệu và xuất file Word (.doc)</p>
+        </div>
+      </div>
+
+      <div class="steps-indicator w-steps-indicator">
+        <div class="step active" data-step="1"><div class="step-number">1</div><span>Chọn Template</span></div>
+        <div class="step-line"></div>
+        <div class="step" data-step="2"><div class="step-number">2</div><span>Upload Excel</span></div>
+        <div class="step-line"></div>
+        <div class="step" data-step="3"><div class="step-number">3</div><span>Mapping</span></div>
+        <div class="step-line"></div>
+        <div class="step" data-step="4"><div class="step-number">4</div><span>Xuất Word</span></div>
+      </div>
+
+      <!-- Step 1 -->
+      <div id="wgen-step-1" class="wgen-step active">
+        <div class="step-card">
+          <h3>Bước 1: Chọn Template Word</h3>
+          <p>Chọn template Word mà bạn muốn sử dụng</p>
+          <select id="word-select-template" class="input select-full"><option value="">-- Chọn template --</option></select>
+          <div id="word-tpl-preview-mini" class="template-preview-mini" style="display:none;">
+            <h4>Xem trước template:</h4>
+            <div id="word-tpl-preview-content" class="preview-content"></div>
+          </div>
+          <div class="step-actions">
+            <button class="btn btn-primary" onclick="WordGenerator.goToStep(2)" id="btn-word-step1-next" disabled>Tiếp theo →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div id="wgen-step-2" class="wgen-step">
+        <div class="step-card">
+          <h3>Bước 2: Upload file Excel</h3>
+          <p>Upload các file Excel tương ứng với từng loại dữ liệu</p>
+          <div class="upload-grid" id="word-upload-grid"></div>
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="WordGenerator.goToStep(1)">← Quay lại</button>
+            <button class="btn btn-primary" onclick="WordGenerator.extractAllData()" id="btn-word-extract">Trích xuất & Tiếp tục →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div id="wgen-step-3" class="wgen-step">
+        <div class="step-card">
+          <h3>Bước 3: Mapping dữ liệu</h3>
+          <p>Ghép các trường dữ liệu từ Excel vào template Word</p>
+          <div id="word-mapping-container" class="mapping-container"></div>
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="WordGenerator.goToStep(2)">← Quay lại</button>
+            <button class="btn btn-primary" onclick="WordGenerator.preview()">Xem trước →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div id="wgen-step-4" class="wgen-step">
+        <div class="step-card">
+          <h3>Bước 4: Xem trước & Xuất Word</h3>
+          <p>Kiểm tra kết quả và xuất file Word (.doc)</p>
+          <div class="preview-wrapper">
+            <div id="word-preview" class="pdf-preview"></div>
+          </div>
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="WordGenerator.goToStep(3)">← Quay lại</button>
+            <button class="btn btn-success" onclick="WordGenerator.exportWord()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Xuất Word (.doc)
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- Modal: Insert Placeholder (Enhanced) -->
@@ -680,6 +898,67 @@
     </div>
   </div>
 
+  <!-- Modal: Word Placeholder -->
+  <div id="modal-word-placeholder" class="modal-overlay" style="display:none;">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3>⧉ Chèn trường dữ liệu (Word)</h3>
+        <button class="modal-close" onclick="WordEditor.closePlaceholderModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="word-ph-step-source">
+          <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">Chọn file nguồn chứa dữ liệu:</p>
+          <div class="ph-source-grid" id="word-ph-source-grid"></div>
+        </div>
+        <div id="word-ph-step-fields" style="display:none;">
+          <button class="ph-back-btn" onclick="WordEditor.showPhSourceStep()">← Chọn nguồn file khác</button>
+          <div class="ss-ph-source-label" id="word-ph-source-label" style="margin:10px 0;font-weight:600;"></div>
+          <div class="ph-search-bar">
+            <span class="ph-search-icon">🔍</span>
+            <input type="text" id="word-ph-field-search" class="input" placeholder="Tìm kiếm trường dữ liệu..." oninput="WordEditor.filterPhFields(this.value)" style="padding-left:40px;">
+          </div>
+          <div class="ph-fields-grid" id="word-ph-fields-grid"></div>
+          <div class="ph-custom-section">
+            <div class="ph-custom-divider"><span>hoặc nhập tên trường tự do</span></div>
+            <div class="ph-custom-row">
+              <input type="text" id="word-ph-custom-name" class="input" placeholder="VD: Tên chỉ tiêu khác...">
+              <button class="btn btn-primary btn-sm" onclick="WordEditor.insertPhCustom()">＋ Chèn</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="WordEditor.closePlaceholderModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Word Table Insert -->
+  <div id="modal-word-table" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>⊞ Chèn bảng vào Word Template</h3>
+        <button class="modal-close" onclick="WordEditor.closeTableDialog()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Số hàng:</label>
+            <input type="number" id="word-table-rows" class="input" value="3" min="1" max="30">
+          </div>
+          <div class="form-group">
+            <label>Số cột:</label>
+            <input type="number" id="word-table-cols" class="input" value="3" min="1" max="10">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="WordEditor.closeTableDialog()">Hủy</button>
+        <button class="btn btn-primary" onclick="WordEditor.insertTable()">Chèn bảng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast-container" class="toast-container"></div>
 
@@ -691,5 +970,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="js/spreadsheet.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/word-template.js"></script>
 </body>
 </html>

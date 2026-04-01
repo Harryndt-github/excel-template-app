@@ -1025,6 +1025,19 @@ select.input option {
   background: var(--success-light);
 }
 
+.upload-slot.has-error {
+  border-color: var(--danger);
+  border-style: solid;
+  background: var(--danger-light);
+  animation: shakeSlot 0.4s ease;
+}
+
+@keyframes shakeSlot {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
 .upload-slot-header {
   display: flex;
   align-items: center;
@@ -1962,4 +1975,284 @@ select.input option {
 .pdf-export-content table th {
   background: #e8e8ee;
   font-weight: 600;
+}
+
+/* ============================================
+   SIDEBAR NAV DIVIDER
+   ============================================ */
+.nav-divider-label {
+  padding: 18px 16px 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-divider-label span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  background: linear-gradient(90deg, #2563eb, #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.nav-divider-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border), transparent);
+}
+
+/* ============================================
+   WORD EDITOR — WYSIWYG
+   ============================================ */
+.word-editor-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.word-editor-main {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.word-editor-container {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #fff;
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Toolbar */
+.we-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 12px;
+  background: #f0f0f5;
+  border-bottom: 1px solid #ddd;
+  flex-wrap: wrap;
+}
+
+.we-tool-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #444;
+  font-family: inherit;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+
+.we-tool-btn:hover {
+  background: #e0e0ea;
+}
+
+.we-tool-btn.accent {
+  width: auto;
+  padding: 6px 12px;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.we-tool-btn.accent:hover {
+  background: rgba(99, 102, 241, 0.18);
+}
+
+.we-tool-select {
+  height: 34px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: white;
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: #444;
+  cursor: pointer;
+  outline: none;
+}
+
+.we-tool-color {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 2px;
+  cursor: pointer;
+  background: white;
+}
+
+/* Editor Area */
+.we-editor-area {
+  flex: 1;
+  min-height: 520px;
+  padding: 40px 50px;
+  background: white;
+  color: #1a1a2e;
+  font-family: 'Times New Roman', Georgia, serif;
+  font-size: 13pt;
+  line-height: 1.6;
+  outline: none;
+  overflow-y: auto;
+}
+
+.we-editor-area:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.we-editor-area table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+}
+
+.we-editor-area table td,
+.we-editor-area table th {
+  border: 1px solid #999;
+  padding: 6px 10px;
+  min-width: 60px;
+}
+
+.we-editor-area table th {
+  background: #f0f0f5;
+  font-weight: 600;
+}
+
+/* Placeholder Chips inside Word Editor */
+.word-placeholder-chip {
+  display: inline-block;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(124, 58, 237, 0.12));
+  border: 1.5px solid rgba(37, 99, 235, 0.4);
+  color: #2563eb;
+  padding: 2px 10px;
+  border-radius: 5px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  margin: 0 2px;
+  cursor: default;
+  user-select: all;
+  white-space: nowrap;
+  vertical-align: baseline;
+  transition: all 0.2s;
+}
+
+.word-placeholder-chip:hover {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(124, 58, 237, 0.2));
+  border-color: rgba(37, 99, 235, 0.6);
+}
+
+/* Right Panel */
+.word-right-panel {
+  width: 300px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.word-ds-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+
+.word-ds-panel h4 {
+  font-size: 0.92rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.word-ds-panel .ds-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.word-ds-panel .ds-upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.word-ds-panel .ds-upload-zone:hover,
+.word-ds-panel .ds-upload-zone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.word-ds-panel .ds-upload-zone p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+/* Word Template Card accent */
+.word-tpl-card {
+  border-left: 3px solid #2563eb;
+}
+
+.word-badge {
+  background: rgba(37, 99, 235, 0.12) !important;
+  color: #2563eb !important;
+}
+
+/* Word Generate Steps */
+.wgen-step {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.wgen-step.active {
+  display: block;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .word-editor-main {
+    flex-direction: column;
+  }
+  .word-right-panel {
+    width: 100%;
+    min-width: unset;
+    flex-direction: row;
+    gap: 16px;
+  }
+  .word-right-panel > * {
+    flex: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .word-right-panel {
+    flex-direction: column;
+  }
+  .we-editor-area {
+    padding: 20px;
+    min-height: 300px;
+  }
 }

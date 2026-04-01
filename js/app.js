@@ -3,7 +3,9 @@
    ============================================ */
 
 // ============================================
-// FILE TYPE CONFIGURATIONS
+// FILE TYPE CONFIGURATIONS (FIXED - DO NOT MODIFY)
+// These field definitions are locked. Uploaded files
+// must match these column names exactly for validation.
 // ============================================
 const FILE_TYPES = {
   thong_tin_vay: {
@@ -13,13 +15,45 @@ const FILE_TYPES = {
     description: 'Cột A: Chỉ tiêu chính | Cột B: Giá trị',
     required: false,
     fields: [
-      'Tên khách hàng', 'Số CIF', 'Số CMND/CCCD', 'Ngày cấp', 'Nơi cấp',
-      'Địa chỉ thường trú', 'Địa chỉ liên lạc', 'Số điện thoại', 'Email',
-      'Nghề nghiệp', 'Đơn vị công tác', 'Chức vụ',
-      'Số hợp đồng tín dụng', 'Ngày hợp đồng', 'Mục đích vay',
-      'Số tiền vay', 'Thời hạn vay', 'Lãi suất', 'Phương thức trả nợ',
-      'Ngày giải ngân', 'Ngày đáo hạn', 'Tài sản đảm bảo',
-      'Số tài khoản', 'Chi nhánh', 'Cán bộ tín dụng'
+      'Số hồ sơ Smartcredit', 'Sản phẩm vay', 'Chi nhánh', 'Hạng khách hàng', 'Xếp hạng khách hàng', 'CBNV TCB', 'Số tiền phê duyệt',
+      'Thời hạn vay', 'Ân hạn gốc phê duyệt', 'Chương trình vay', 'Phương án vay vốn', 'Giai đoạn giải ngân', 'Mục đích vay', 'Loại hình',
+      'Mã dự án vay vốn', 'Mã căn vay vốn', 'Tần suất trả nợ gốc', 'Tần suất trả nợ lãi', 'Phương thức trả nợ', 'LTD', 'Phương thức giải ngân',
+      'Phương thức giải ngân', 'Ngày phê duyệt', 'Ghi chú phê duyệt', 'Số HĐTD', 'Tổng số tiền vay', 'Số tiền giải ngân', 'Khế ước 1',
+      'Số tiền giải ngân', 'Thời gian vay', 'Người nhận nợ', 'Lựa chọn HTLS KU1', 'Lựa chọn cố định lãi suất',
+      'Áp dụng ân hạn gốc', 'Thời gian ân hạn gốc', 'Ân hạn gốc bổ sung', 'Mã chương trình', 'Ân hạn gốc bổ sung',
+      'Mã chương trình', 'Mã chính sách', 'Chính sách bán hàng', 'Ngày chặn HTLS', 'Tháng chặn HTLS', 'Lãi suất giai đoạn 1', 'Lãi suất cố định',
+      'Biên độ', 'Số kỳ trả nợ gốc', 'Số tiền trả gốc mỗi kỳ', 'Só tiền trả gốc kỳ cuối', 'Số tiền niên kim', 'Ngày trả lãi đầu tiên',
+      'Ngày trả gốc đầu tiên', 'Tài khoản trả nợ', 'Khế ước 2',
+      'Số tiền giải ngân', 'Thời gian vay', 'Người nhận nợ', 'Lựa chọn HTLS KU1', 'Lựa chọn cố định lãi suất',
+      'Áp dụng ân hạn gốc', 'Thời gian ân hạn gốc', 'Ân hạn gốc bổ sung', 'Mã chương trình', 'Ân hạn gốc bổ sung',
+      'Mã chương trình', 'Mã chính sách', 'Chính sách bán hàng', 'Ngày chặn HTLS', 'Tháng chặn HTLS', 'Lãi suất giai đoạn 1', 'Lãi suất cố định',
+      'Biên độ', 'Số kỳ trả nợ gốc', 'Số tiền trả gốc mỗi kỳ', 'Só tiền trả gốc kỳ cuối', 'Số tiền niên kim', 'Ngày trả lãi đầu tiên',
+      'Ngày trả gốc đầu tiên', 'Tài khoản trả nợ', 'Khế ước 3',
+      'Số tiền giải ngân', 'Thời gian vay', 'Người nhận nợ', 'Lựa chọn HTLS KU1', 'Lựa chọn cố định lãi suất',
+      'Áp dụng ân hạn gốc', 'Thời gian ân hạn gốc', 'Ân hạn gốc bổ sung', 'Mã chương trình', 'Ân hạn gốc bổ sung',
+      'Mã chương trình', 'Mã chính sách', 'Chính sách bán hàng', 'Ngày chặn HTLS', 'Tháng chặn HTLS', 'Lãi suất giai đoạn 1', 'Lãi suất cố định',
+      'Biên độ', 'Số kỳ trả nợ gốc', 'Số tiền trả gốc mỗi kỳ', 'Só tiền trả gốc kỳ cuối', 'Số tiền niên kim', 'Ngày trả lãi đầu tiên',
+      'Ngày trả gốc đầu tiên', 'Tài khoản trả nợ', 'Khế ước 4',
+      'Số tiền giải ngân', 'Thời gian vay', 'Người nhận nợ', 'Lựa chọn HTLS KU1', 'Lựa chọn cố định lãi suất',
+      'Áp dụng ân hạn gốc', 'Thời gian ân hạn gốc', 'Ân hạn gốc bổ sung', 'Mã chương trình', 'Ân hạn gốc bổ sung',
+      'Mã chương trình', 'Mã chính sách', 'Chính sách bán hàng', 'Ngày chặn HTLS', 'Tháng chặn HTLS', 'Lãi suất giai đoạn 1', 'Lãi suất cố định',
+      'Biên độ', 'Số kỳ trả nợ gốc', 'Số tiền trả gốc mỗi kỳ', 'Só tiền trả gốc kỳ cuối', 'Số tiền niên kim', 'Ngày trả lãi đầu tiên',
+      'Ngày trả gốc đầu tiên', 'Tài khoản trả nợ', 'Khế ước 5',
+      'Số tiền giải ngân', 'Thời gian vay', 'Người nhận nợ', 'Lựa chọn HTLS KU1', 'Lựa chọn cố định lãi suất',
+      'Áp dụng ân hạn gốc', 'Thời gian ân hạn gốc', 'Ân hạn gốc bổ sung', 'Mã chương trình', 'Ân hạn gốc bổ sung',
+      'Mã chương trình', 'Mã chính sách', 'Chính sách bán hàng', 'Ngày chặn HTLS', 'Tháng chặn HTLS', 'Lãi suất giai đoạn 1', 'Lãi suất cố định',
+      'Biên độ', 'Số kỳ trả nợ gốc', 'Số tiền trả gốc mỗi kỳ', 'Só tiền trả gốc kỳ cuối', 'Số tiền niên kim', 'Ngày trả lãi đầu tiên',
+      'Ngày trả gốc đầu tiên', 'Tài khoản trả nợ', 'Ngày dự kiến GN', 'Phương thức ký hợp đồng', 'Ghi chú soạn ĐVKD', 'Họ tên bên vay 1',
+      'Ngày sinh bên vay 1', 'Quốc tịch bên vay 1', 'Tình trạng hôn nhân bên vay 1', 'Địa chỉ thường trú bên vay 1', 'Đường/Địa chỉ chi tiết 1',
+      'Tỉnh/Thành phố 1', 'Quận/Huyện 1', 'Phường/Xã 1', 'Loại giấy tờ tuỳ thân bên vay 1', 'CMND bên vay 1', 'Ngày cấp bên vay 1', 'Nơi cấp bên vay 1',
+      'Số điện thoại khách hàng', 'Email khách hàng', 'Họ và tên bên vay 2', 'Ngày sinh bên vay 2', 'Quốc tịch bên vay 2', 'Tình trạng hôn nhân bên vay 2',
+      'Địa chỉ thường trú bên vay 2', 'Đường/Địa chỉ chi tiết 2', 'Tỉnh/Thành phố 2', 'Quận/Huyện 2', 'Phường/Xã 2', 'Loại giấy tờ tuỳ thân bên vay 2',
+      'CMND bên vay 2', 'Ngày cấp bên vay 2', 'Nơi cấp bên vay 2', 'Số điện thoại vợ/chồng khách hàng', 'Email vợ/chồng khách hàng',
+      'Uỷ quyền ký hợp đồng bên vay', 'Vợ/Chồng khách hàng có ký HSTD', 'Tài khoản CVKH1', 'Tài khoản CVKH2', 'Tài khoản CTV', 'Tổng giá trị tài sản',
+      'Tổng giá trị bảo đảm tối đa', 'Tên giải pháp cho vay', 'Hồ sơ liên quan', 'Giấy phép xây dựng', 'Loại xe mua', 'Nhãn hiệu xe', 'Tình trạng xe',
+      'Năm sản xuất', 'Nơi sản xuất', 'Ngày đăng ký xe lần đầu', 'Số đăng ký xe', 'Ngày hoá đơn GTGT/HĐMB/Phiếu kiểm tra xuất xưởng/GCN chất lượng',
+      'ID khách hàng', 'Khách hàng ETB/NTB', 'Số tháng HTLS đề xuất', 'Số kỳ điều chỉnh tăng gốc', 'Tỷ lệ tăng gốc', 'Nơi làm việc',
+      'Mã chiến dịch theo phê duyệt'
     ]
   },
   tai_san: {
@@ -29,11 +63,18 @@ const FILE_TYPES = {
     description: 'Dòng 1: Header | Dòng 2: Giá trị',
     required: false,
     fields: [
-      'Loại tài sản', 'Mô tả tài sản', 'Địa chỉ tài sản',
-      'Diện tích', 'Số tờ', 'Số thửa', 'Số Giấy CN QSDĐ',
-      'Ngày cấp GCN', 'Nơi cấp GCN', 'Mục đích sử dụng đất',
-      'Thời hạn sử dụng', 'Giá trị tài sản', 'Giá trị định giá',
-      'Tỷ lệ cho vay', 'Ghi chú tài sản'
+      'Số hồ sơ', 'Loại tài sản', 'Nguồn gốc tài sản', 'Đã thế chấp tại TCB', 'ID tài sản', 'Loại hình tài sản', 'Giá trị tài sản', 'Giá trị bảo đảm tối đa',
+      'LTV Max', 'Mã dự án', 'Mã căn', 'Trạng thái tài sản', 'Số phiếu định giá', 'Chi nhánh ký HSTS', 'Uỷ quyền cho sao Thuỷ', 'Người đại diện sao thuỷ',
+      'Người đại diện TCB', 'CMND', 'Địa chỉ', 'Cam kết tài sản riêng', 'Mua bảo hiểm tài sản', 'Bổ sung HĐTC song phương?', 'Số sổ đỏ', 'Số sổ tiết kiệm',
+      'Loại trái phiếu', 'Code trái phiếu', 'Số lượng trái phiếu', 'Khách hàng = Chủ tài sản', 'Chủ tài sản 1', 'Ngày sinh chủ tài sản 1', 'Quốc tịch chủ tài sản 1',
+      'Tình trạng hôn nhân chủ tài sản 1', 'Địa chỉ thường trú chủ tài sản 1', 'Đường/Địa chỉ chi tiết', 'Tỉnh/Thành phố', 'Quận/Huyện', 'Phường/Xã',
+      'CMND chủ tài sản 1', 'Vợ/Chồng chủ tài sản 1', 'Ngày sinh vợ/chồng chủ tài sản 1', 'Quốc tịch vợ/chồng chủ tài sản 1',
+      'Tình trạng hôn nhân chủ tài sản 1', 'Địa chỉ thường trú chủ tài sản 1', 'Đường/Địa chỉ chi tiết', 'Tỉnh/Thành phố', 'Quận/Huyện', 'Phường/Xã',
+      'CMND Vợ/chồng chủ tài sản 1', 'Uỷ quyền ký HSTS chủ tài sản 1', 'Nhãn hiệu xe', 'Model', 'Biển kiểm soát', 'Số khung', 'Số máy', 'Ngày định giá',
+      'Số đăng ký GDBĐ', 'Ngày đăng ký GDBĐ', 'Số bì nhập kho', 'Số hợp đồng bảo hiểm', 'Ngày bắt đầu', 'Ngày kết thúc', 'Giá trị bảo hiểm', 'Phí bảo hiểm',
+      'Công ty bảo hiểm', 'Ngày ký HĐTC', 'Thời gian khấu hao còn lại', 'Địa chị tài sản', 'Ngày cấp sổ', 'Nơi cấp sổ', 'Thửa đất', 'Tờ bản đồ', 'Diện tích',
+      'Số hợp đồng thế chấp', 'Hiện trạng tài sản', 'Hồ sơ TSĐB nhập tại kho', 'Ngoại lệ bảo hiểm', 'Tên công ty định giá', 'Mã phiếu định giá', 'Thông tin quy hoạch',
+      'Loại hình bảo hiểm', 'Văn phòng công chứng', 'Ngày hẹn DKGDBD'
     ]
   },
   chu_tai_san: {
@@ -43,9 +84,12 @@ const FILE_TYPES = {
     description: 'Dòng 1: Header | Dòng 2: Giá trị',
     required: false,
     fields: [
-      'Họ tên chủ tài sản', 'Số CMND/CCCD chủ TS', 'Ngày cấp chủ TS',
-      'Nơi cấp chủ TS', 'Địa chỉ chủ TS', 'Quan hệ với khách hàng',
-      'Số điện thoại chủ TS', 'Đồng sở hữu', 'Ghi chú chủ TS'
+      'Số hồ sơ', 'Loại tài sản', 'Đã thế chấp tại TCB', 'ID tài sản', 'Mã dự án', 'Mã căn', 'Số phiếu định giá', 'Số sổ đỏ', 'Số sổ tiết kiệm', 'Loại trái phiếu',
+      'Code trái phiếu', 'Số lượng trái phiếu', 'Khách hàng = Chủ tài sản', 'Chủ tài sản', 'Ngày sinh chủ tài sản', 'Quốc tịch chủ tài sản',
+      'Tình trạng hôn nhân chủ tài sản', 'Địa chỉ thường trú chủ tài sản', 'Đường/Địa chỉ chi tiết', 'Tỉnh/Thành phố', 'Quận/Huyện', 'Phường/Xã',
+      'CMND của chủ tài sản trên giấy GCN', 'Vợ/Chồng chủ tài sản', 'Ngày sinh vợ/chồng chủ tài sản', 'Quốc tịch vợ/chồng chủ tài sản',
+      'Tình trạng hôn nhân vợ/chồng chủ tài sản', 'Địa chỉ thường trú vợ/chồng chủ tài sản', 'Đường/Địa chỉ chi tiết', 'Tỉnh/Thành phố', 'Quận/Huyện', 'Phường/Xã',
+      'CMND vợ/chồng chủ tài sản', 'CMND của vợ/chồng chủ tài sản trên giấy GCN', 'Uỷ quyền ký HSTS chủ tài sản'
     ]
   },
   tai_san_ctt: {
@@ -55,10 +99,17 @@ const FILE_TYPES = {
     description: 'Dòng 1: Header | Dòng 2: Giá trị',
     required: false,
     fields: [
-      'Loại tài sản CTT', 'Mô tả tài sản CTT', 'Biển số xe',
-      'Số khung', 'Số máy', 'Năm sản xuất', 'Màu sắc',
-      'Nhãn hiệu', 'Giá trị tài sản CTT', 'Giá trị định giá CTT',
-      'Tỷ lệ cho vay CTT', 'Ghi chú CTT'
+      'Trạng thái căn khai thác', 'Tên dự án trên hợp đồng', 'Địa chỉ dự án', 'Ngày chi hộ của CTT', 'Ngày tham chiếu chi hộ', 'Đơn vị hỗ trợ lãi suất',
+      'Có yêu cầu bội số của 5%', 'Tên chủ đầu tư', 'Địa chỉ chủ đầu tư', 'ĐKKD Chủ đầu tư', 'Mã số thuế', 'Hợp đồng hợp tác', 'Ngày ký hợp đồng hợp tác',
+      'Số tài khoản thụ hưởng', 'Tên tài khoản thụ hưởng', 'Ngân hàng thụ hưởng', 'CN Ngân hàng thụ hưởng', 'Đại diện chủ đầu tư', 'Chức vụ', 'Thông tin đại diện',
+      'Uỷ quyền', 'Số HĐMB', 'Ngày ký HĐMB', 'Giá NET', 'Giá VAT', 'Kinh phí bảo trì', 'Ngày dự kiến bàn giao', 'Tháng chặn hỗ trợ lãi suất', 'Ngày chặn hỗ trợ ls',
+      'Tháng hỗ trợ phí TNKH', 'Ngày chặn hỗ trợ phí TNKH', 'Tháng chặn hỗ trợ lãi suất', 'Ngày chặn hỗ trợ ls', 'Tháng hỗ trợ phí TNTH', 'Ngày chặn hỗ trợ phí TNTH',
+      'Trạng thái tài sản', 'Trạng thái chuyển nhượng', 'Tên bên chuyển nhượng', 'Xác nhận đủ vốn tự có', 'Tỷ lệ hỗ trợ lãi suất tối đa (net)',
+      'Tỷ lệ hỗ trợ lãi suất tối đa (vat)', 'Tỷ lệ HTLS tối đa kinh phí bảo trì', 'Code chính sách HTLS lần 1', 'Tỷ lệ HTLS (net) lần 1', 'Tỷ lệ HTLS (vat) lần 1',
+      'Tỷ lệ HTLS (kpbt) lần 1', 'Tỷ lệ vốn tự có (vat) lần 1', 'Tỷ lệ VTC kinh phí bảo trì lần 1', 'Code chính sách HTLS lần 2', 'Tỷ lệ HTLS (net) lần 2',
+      'Tỷ lệ HTLS (vat) lần 2', 'Tỷ lệ HTLS (kpbt) lần 2', 'Tỷ lệ vốn tự có (net) lần 2', 'Tỷ lệ vốn tự có (vat) lần 2', 'Code chính sách HTLS lần 3', 'Tỷ lệ HTLS (net) lần 3',
+      'Tỷ lệ HTLS (vat) lần 3', 'Tỷ lệ HTLS (kpbt) lần 3', 'Tỷ lệ vốn tự có (net) lần 3', 'Tỷ lệ vốn tự có (vat) lần 3', 'Tên người ký trên HĐMB', 'CMND', 'Địa chỉ',
+      'Tên người ký trên HĐMB 2', 'CMND 2', 'Địa chỉ 2', 'Code căn hộ', 'Trạng thái giao nhà', 'YC giữ lại 5% cuối'
     ]
   },
   thong_tin_chuyen_tien: {
@@ -68,9 +119,7 @@ const FILE_TYPES = {
     description: 'Dòng 1: Header | Dòng 2: Giá trị',
     required: false,
     fields: [
-      'Tên người thụ hưởng', 'Số tài khoản thụ hưởng', 'Ngân hàng thụ hưởng',
-      'Chi nhánh thụ hưởng', 'Số tiền chuyển', 'Nội dung chuyển tiền',
-      'Ngày chuyển tiền', 'Mã giao dịch', 'Phí chuyển tiền'
+      'ID', 'contractld', 'kunnld', 'cusName', 'paymentMethod', 'accountNo', 'bankName', 'bankCode', 'branchCode', 'amount', 'content', 'tempLockedMethod'
     ]
   },
   thu_phi_tnth: {
@@ -80,9 +129,7 @@ const FILE_TYPES = {
     description: 'Dòng 1: Header | Dòng 2-4: Giá trị (3 dòng)',
     required: false,
     fields: [
-      'Loại phí', 'Tên phí', 'Số tiền phí', 'Tỷ lệ phí',
-      'Ngày thu phí', 'Kỳ thanh toán', 'Trạng thái thu phí',
-      'Phí trả trước', 'Phí trả sau', 'Ghi chú phí'
+      'phase', 'fromTime', 'toTime', 'fee', 'feeCode', 'freePeriod'
     ]
   },
   han_muc: {
@@ -92,10 +139,8 @@ const FILE_TYPES = {
     description: 'Dòng 1: Header | Dòng 2: Giá trị',
     required: false,
     fields: [
-      'Số hạn mức', 'Ngày cấp hạn mức', 'Hạn mức tín dụng',
-      'Số tiền đã sử dụng', 'Số tiền còn lại', 'Ngày hết hạn',
-      'Loại hạn mức', 'Lãi suất hạn mức', 'Mục đích sử dụng HM',
-      'Trạng thái hạn mức'
+      'Tên hạn mức tiện ích', 'Giá trị được phê duyệt', 'Giá trị hạn mức sản phẩm phân bổ trên SC', 'Ngày hạn mức được phê duyệt', 'Ngày hạn mức tiện ích hết hạn',
+      'Loại hình giao dịch', 'Thời hạn vay', 'Thời hạn tối đa mỗi kunn'
     ]
   },
   tai_tai_tro: {
@@ -105,11 +150,280 @@ const FILE_TYPES = {
     description: 'Dòng 1: Header | Dòng 2: Giá trị',
     required: false,
     fields: [
-      'Loại tài trợ', 'Số tiền tài trợ', 'Ngày tài trợ',
-      'Ngày đáo hạn TT', 'Lãi suất tài trợ', 'Phương thức tài trợ',
-      'Nguồn vốn', 'Mục đích tài trợ', 'Trạng thái tài trợ',
-      'Ghi chú tài trợ'
+      'Ngân hàng đang tài trợ', 'Giá trị tài trợ', 'Ngày đáo hạn', 'Mục đích tài trợ'
     ]
+  }
+};
+
+// Freeze FILE_TYPES to prevent accidental modification
+Object.keys(FILE_TYPES).forEach(key => {
+  Object.freeze(FILE_TYPES[key].fields);
+  Object.freeze(FILE_TYPES[key]);
+});
+Object.freeze(FILE_TYPES);
+
+// ============================================
+// FILE VALIDATION UTILITIES
+// ============================================
+const FileValidator = {
+  /**
+   * Read headers from an uploaded Excel file
+   * Returns: { headers: string[], headerRow: number }
+   */
+  readHeaders(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array', sheetRows: 20 });
+          const sheetName = wb.SheetNames[0];
+          const sheet = wb.Sheets[sheetName];
+          if (!sheet || !sheet['!ref']) {
+            resolve({ headers: [], allHeaders: [] });
+            return;
+          }
+          const range = XLSX.utils.decode_range(sheet['!ref']);
+          const headers = [];
+
+          // For horizontal structure: read header row (row 0)
+          for (let col = range.s.c; col <= range.e.c; col++) {
+            const cell = sheet[XLSX.utils.encode_cell({ r: 0, c: col })];
+            if (cell && cell.v !== undefined && String(cell.v).trim()) {
+              headers.push({ name: String(cell.v).trim(), col: col });
+            }
+          }
+
+          // For vertical structure: read column A names
+          const verticalHeaders = [];
+          for (let row = 0; row <= range.e.r; row++) {
+            const cell = sheet[XLSX.utils.encode_cell({ r: row, c: 0 })];
+            if (cell && cell.v !== undefined && String(cell.v).trim()) {
+              verticalHeaders.push({ name: String(cell.v).trim(), row: row });
+            }
+          }
+
+          resolve({ headers, verticalHeaders });
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  },
+
+  /**
+   * Validate uploaded file headers against FILE_TYPES fields
+   * Returns: { valid: boolean, missingFields: string[], extraFields: string[], errors: string[] }
+   */
+  validateHeaders(fileHeaders, fileType) {
+    const config = FILE_TYPES[fileType];
+    if (!config || !config.fields || config.fields.length === 0) {
+      return { valid: true, missingFields: [], extraFields: [], errors: [] };
+    }
+
+    const expectedFields = config.fields;
+    let uploadedNames;
+
+    if (config.structure === 'vertical') {
+      // For vertical: column A values are field names
+      uploadedNames = fileHeaders.verticalHeaders.map(h => h.name);
+    } else {
+      // For horizontal: row 1 values are field names (headers)
+      uploadedNames = fileHeaders.headers.map(h => h.name);
+    }
+
+    const errors = [];
+    const missingFields = [];
+    const extraFields = [];
+
+    // Check for fields in the uploaded file that don't match any expected field
+    // Build a set of unique expected fields for lookup
+    const expectedSet = new Set(expectedFields);
+    const uploadedSet = new Set(uploadedNames);
+
+    // Find fields in uploaded file that are NOT in expected fields
+    uploadedNames.forEach((name, index) => {
+      if (!expectedSet.has(name)) {
+        extraFields.push(name);
+      }
+    });
+
+    // Find expected fields that are NOT in uploaded file
+    // Use unique set to avoid duplicate checking
+    const expectedUnique = [...new Set(expectedFields)];
+    expectedUnique.forEach(field => {
+      if (!uploadedSet.has(field)) {
+        missingFields.push(field);
+      }
+    });
+
+    // Build error messages for wrong/missing column names
+    if (config.structure === 'vertical') {
+      // For vertical structure, check column A values
+      uploadedNames.forEach((name, index) => {
+        if (!expectedSet.has(name)) {
+          errors.push(`Dòng ${fileHeaders.verticalHeaders[index].row + 1}: "${name}" không khớp với trường nào`);
+        }
+      });
+    } else {
+      // For horizontal structure, check header row
+      fileHeaders.headers.forEach((h, index) => {
+        if (!expectedSet.has(h.name)) {
+          const colLetter = this.colToLetter(h.col);
+          errors.push(`Cột ${colLetter}: "${h.name}" không khớp với trường nào`);
+        }
+      });
+    }
+
+    // Valid if no wrong columns found (extra columns will be handled separately)
+    const hasWrongColumns = errors.length > 0;
+    
+    return {
+      valid: !hasWrongColumns,
+      missingFields,
+      extraFields,
+      errors
+    };
+  },
+
+  colToLetter(col) {
+    let s = '';
+    let n = col;
+    while (n >= 0) {
+      s = String.fromCharCode(65 + (n % 26)) + s;
+      n = Math.floor(n / 26) - 1;
+    }
+    return s;
+  },
+
+  /**
+   * Show validation error modal
+   */
+  showValidationError(fileType, fileName, errors, missingFields) {
+    const config = FILE_TYPES[fileType];
+    const existingModal = document.getElementById('modal-validation-error');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'modal-validation-error';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:600px;">
+        <div class="modal-header" style="border-bottom-color:#fee2e2;">
+          <h3 style="color:#dc2626;">❌ File không hợp lệ</h3>
+          <button class="modal-close" onclick="FileValidator.closeValidationModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px;margin-bottom:16px;">
+            <p style="font-weight:600;margin-bottom:4px;">📄 File: <code>${fileName}</code></p>
+            <p style="font-size:0.85rem;color:#666;">Loại: <strong>${config.label}</strong></p>
+          </div>
+          
+          <div style="margin-bottom:16px;">
+            <h4 style="color:#dc2626;font-size:0.92rem;margin-bottom:8px;">⚠️ Các cột không khớp (${errors.length}):</h4>
+            <div style="background:#fff5f5;border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;">
+              ${errors.map(e => `<div style="padding:4px 8px;margin:2px 0;border-left:3px solid #dc2626;background:#fff;border-radius:4px;font-size:0.82rem;">${e}</div>`).join('')}
+            </div>
+          </div>
+
+          ${missingFields.length > 0 ? `
+          <div style="margin-bottom:16px;">
+            <h4 style="color:#f59e0b;font-size:0.92rem;margin-bottom:8px;">📋 Các trường bị thiếu (${missingFields.length}):</h4>
+            <div style="background:#fffbeb;border-radius:8px;padding:10px;max-height:150px;overflow-y:auto;">
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                ${missingFields.map(f => `<span style="padding:3px 8px;background:#fff;border:1px solid #fcd34d;border-radius:6px;font-size:0.78rem;">${f}</span>`).join('')}
+              </div>
+            </div>
+          </div>` : ''}
+
+          <p style="font-size:0.85rem;color:#666;margin-top:12px;">💡 Vui lòng kiểm tra lại tên các cột trong file Excel và đảm bảo khớp với cấu hình hệ thống.</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" onclick="FileValidator.closeValidationModal()">Đã hiểu</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  closeValidationModal() {
+    const modal = document.getElementById('modal-validation-error');
+    if (modal) modal.remove();
+  },
+
+  /**
+   * Show extra columns prompt modal
+   * Returns a Promise that resolves to true (accept) or false (reject)
+   */
+  showExtraColumnsPrompt(fileType, fileName, extraFields) {
+    return new Promise((resolve) => {
+      const config = FILE_TYPES[fileType];
+      const existingModal = document.getElementById('modal-extra-columns');
+      if (existingModal) existingModal.remove();
+
+      // Store the resolve callback globally so button handlers can access it
+      FileValidator._extraColsResolve = resolve;
+
+      const modal = document.createElement('div');
+      modal.id = 'modal-extra-columns';
+      modal.className = 'modal-overlay';
+      modal.style.display = 'flex';
+      modal.innerHTML = `
+        <div class="modal" style="max-width:600px;">
+          <div class="modal-header" style="border-bottom-color:#dbeafe;">
+            <h3 style="color:#2563eb;">📊 Phát hiện cột mới</h3>
+            <button class="modal-close" onclick="FileValidator.resolveExtraCols(false)">&times;</button>
+          </div>
+          <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;margin-bottom:16px;">
+              <p style="font-weight:600;margin-bottom:4px;">📄 File: <code>${fileName}</code></p>
+              <p style="font-size:0.85rem;color:#666;">Loại: <strong>${config.label}</strong></p>
+            </div>
+            
+            <div style="margin-bottom:16px;">
+              <p style="font-size:0.9rem;margin-bottom:10px;">File upload chứa <strong>${extraFields.length} cột mới</strong> không có trong cấu hình mặc định:</p>
+              <div style="background:#f8fafc;border-radius:8px;padding:12px;max-height:200px;overflow-y:auto;">
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                  ${extraFields.map(f => `<span style="padding:5px 10px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #93c5fd;border-radius:8px;font-size:0.82rem;font-weight:500;color:#1e40af;">+ ${f}</span>`).join('')}
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;">
+              <p style="font-weight:600;color:#16a34a;margin-bottom:4px;">Bạn có muốn thêm dữ liệu từ các cột mới này?</p>
+              <p style="font-size:0.82rem;color:#666;">Nếu chọn "Có", dữ liệu từ các cột mới sẽ được import vào hệ thống. Nếu "Không", chỉ dữ liệu từ các cột đã cấu hình sẽ được sử dụng.</p>
+            </div>
+          </div>
+          <div class="modal-footer" style="gap:10px;">
+            <button class="btn btn-outline" onclick="FileValidator.resolveExtraCols(false)">❌ Không, bỏ qua</button>
+            <button class="btn btn-primary" onclick="FileValidator.resolveExtraCols(true)" style="background:linear-gradient(135deg,#16a34a,#22c55e);">✓ Có, thêm dữ liệu</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    });
+  },
+
+  resolveExtraCols(accept) {
+    const modal = document.getElementById('modal-extra-columns');
+    if (modal) modal.remove();
+    if (FileValidator._extraColsResolve) {
+      FileValidator._extraColsResolve(accept);
+      FileValidator._extraColsResolve = null;
+    }
+  },
+
+  /**
+   * Show stored last error for a file type (used by inline click handlers)
+   */
+  showLastError(fileType) {
+    const err = (this._lastErrors || {})[fileType];
+    if (err) {
+      this.showValidationError(fileType, err.fileName, err.errors, err.missingFields);
+    }
   }
 };
 
@@ -178,7 +492,7 @@ const DataSources = {
   /* ── persist field metadata to localStorage (not the file blob) ── */
   _persistMeta() {
     const meta = this._sources.map(s => ({ id: s.id, name: s.name, filename: s.filename, fields: s.fields }));
-    try { localStorage.setItem('excelmapper_datasources', JSON.stringify(meta)); } catch(_) {}
+    try { localStorage.setItem('excelmapper_datasources', JSON.stringify(meta)); } catch (_) { }
     // update badge
     const badge = document.getElementById('ds-file-count');
     if (badge) badge.textContent = this._sources.length;
@@ -193,7 +507,7 @@ const DataSources = {
         const badge = document.getElementById('ds-file-count');
         if (badge) badge.textContent = this._sources.length;
       }
-    } catch(_) {}
+    } catch (_) { }
   },
 
   /* ── read column headers from Excel ── */
@@ -250,15 +564,7 @@ const DataSources = {
 
   /* ── render file list in editor panel ── */
   _renderList() {
-    const container = document.getElementById('ds-files-list');
-    if (!container) return;
-
-    if (this._sources.length === 0) {
-      container.innerHTML = '';
-      return;
-    }
-
-    container.innerHTML = this._sources.map(src => `
+    const html = this._sources.length === 0 ? '' : this._sources.map(src => `
       <div class="ds-file-item">
         <div class="ds-file-info">
           <span class="ds-file-icon">📊</span>
@@ -270,6 +576,12 @@ const DataSources = {
         <button class="ds-file-remove" onclick="DataSources.removeSource('${src.id}')" title="Xóa">✕</button>
       </div>
     `).join('');
+
+    // Render to both spreadsheet and word editor panels
+    const container = document.getElementById('ds-files-list');
+    if (container) container.innerHTML = html;
+    const wordContainer = document.getElementById('word-ds-files-list');
+    if (wordContainer) wordContainer.innerHTML = html;
   }
 };
 
@@ -346,18 +658,25 @@ const App = {
       if (!AppState.editingTemplateId) {
         TemplateBuilder.resetEditor();
       }
-      // Focus the spreadsheet container for keyboard navigation
       setTimeout(() => {
         const sc = document.getElementById('spreadsheet-container');
         if (sc) sc.focus();
       }, 100);
     }
     if (page === 'generate') Generator.initStep1();
+    // Word pages
+    if (page === 'word-templates' && typeof WordEditor !== 'undefined') WordEditor.renderTemplatesList();
+    if (page === 'word-editor' && typeof WordEditor !== 'undefined') {
+      if (!WordState.editingId) WordEditor.resetEditor();
+    }
+    if (page === 'word-generate' && typeof WordGenerator !== 'undefined') WordGenerator.initStep1();
   },
 
   updateDashboard() {
-    document.getElementById('stat-templates').textContent = AppState.templates.length;
-    document.getElementById('stat-exports').textContent = AppState.exportCount;
+    const wordCount = (typeof WordState !== 'undefined') ? WordState.templates.length : 0;
+    document.getElementById('stat-templates').textContent = AppState.templates.length + wordCount;
+    const wordExports = (typeof WordState !== 'undefined') ? WordState.exportCount : 0;
+    document.getElementById('stat-exports').textContent = AppState.exportCount + wordExports;
   },
 
   toast(message, type = 'info') {
@@ -1114,7 +1433,7 @@ const DataProcessor = {
           if (date) {
             return `${String(date.d).padStart(2, '0')}/${String(date.m).padStart(2, '0')}/${date.y}`;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
       // Regular number
       if (Number.isInteger(cell.v)) {
@@ -1134,19 +1453,24 @@ const DataProcessor = {
 // GENERATOR - Generate Documents
 // ============================================
 const Generator = {
+  // Track extra columns acceptance per file type
+  _acceptedExtraCols: {},
+
   initUploadSlots() {
     const grid = document.getElementById('upload-grid');
     if (!grid) return;
+    this._acceptedExtraCols = {};
 
     grid.innerHTML = Object.keys(FILE_TYPES).map(key => {
       const config = FILE_TYPES[key];
+      const fieldCount = config.fields ? config.fields.length : 0;
       return `
         <div class="upload-slot" id="slot-${key}">
           <div class="upload-slot-header">
             <span class="upload-slot-title">${config.label}</span>
             <span class="upload-slot-badge optional">Tùy chọn</span>
           </div>
-          <div class="upload-slot-desc">${config.description}</div>
+          <div class="upload-slot-desc">${config.description} — <strong>${fieldCount} trường cố định</strong></div>
           <div class="upload-input-wrapper">
             <input type="file" accept=".xlsx,.xls,.csv"
               id="file-${key}"
@@ -1155,26 +1479,95 @@ const Generator = {
           <div class="upload-file-info" id="file-info-${key}" style="display:none;">
             ✓ <span id="file-name-${key}"></span>
           </div>
+          <div class="upload-file-error" id="file-error-${key}" style="display:none;color:#dc2626;font-size:0.82rem;padding:6px 10px;background:#fef2f2;border-radius:8px;margin-top:6px;">
+          </div>
+          <div class="upload-extra-info" id="file-extra-${key}" style="display:none;color:#2563eb;font-size:0.82rem;padding:6px 10px;background:#eff6ff;border-radius:8px;margin-top:6px;">
+          </div>
         </div>
       `;
     }).join('');
   },
 
-  onFileSelected(fileType, input) {
+  async onFileSelected(fileType, input) {
     const slot = document.getElementById(`slot-${fileType}`);
     const info = document.getElementById(`file-info-${fileType}`);
     const nameEl = document.getElementById(`file-name-${fileType}`);
+    const errorEl = document.getElementById(`file-error-${fileType}`);
+    const extraEl = document.getElementById(`file-extra-${fileType}`);
 
-    if (input.files.length > 0) {
-      AppState.uploadedFiles[fileType] = input.files[0];
-      slot.classList.add('has-file');
-      info.style.display = 'flex';
-      nameEl.textContent = input.files[0].name;
-    } else {
+    // Reset states
+    errorEl.style.display = 'none';
+    errorEl.innerHTML = '';
+    extraEl.style.display = 'none';
+    extraEl.innerHTML = '';
+    delete this._acceptedExtraCols[fileType];
+
+    if (input.files.length === 0) {
       delete AppState.uploadedFiles[fileType];
       slot.classList.remove('has-file');
       info.style.display = 'none';
+      return;
     }
+
+    const file = input.files[0];
+    const config = FILE_TYPES[fileType];
+
+    // Validate file headers against fixed fields
+    if (config.fields && config.fields.length > 0) {
+      try {
+        App.toast('Đang kiểm tra cấu trúc file...', 'info');
+        const fileHeaders = await FileValidator.readHeaders(file);
+        const validation = FileValidator.validateHeaders(fileHeaders, fileType);
+
+        if (!validation.valid) {
+          // File has wrong column names - reject upload
+          delete AppState.uploadedFiles[fileType];
+          slot.classList.remove('has-file');
+          slot.classList.add('has-error');
+          info.style.display = 'none';
+          input.value = ''; // Reset file input
+
+          // Store validation for click-through reference
+          if (!FileValidator._lastErrors) FileValidator._lastErrors = {};
+          FileValidator._lastErrors[fileType] = { fileName: file.name, errors: validation.errors, missingFields: validation.missingFields };
+          // Show error in slot
+          errorEl.innerHTML = '\u274c File b\u1ecb t\u1eeb ch\u1ed1i: ' + validation.errors.length + ' c\u1ed9t kh\u00f4ng kh\u1edbp. <a href="#" onclick="event.preventDefault(); FileValidator.showLastError(\x27' + fileType + '\x27)" style="color:#dc2626;text-decoration:underline;">Xem chi ti\u1ebft</a>';
+          errorEl.style.display = 'block';
+
+          // Also show the detailed modal
+          FileValidator.showValidationError(fileType, file.name, validation.errors, validation.missingFields);
+          App.toast(`File "${file.name}" không hợp lệ - ${validation.errors.length} cột không khớp`, 'error');
+          return;
+        }
+
+        // Check for extra columns
+        if (validation.extraFields.length > 0) {
+          const accept = await FileValidator.showExtraColumnsPrompt(fileType, file.name, validation.extraFields);
+          if (accept) {
+            this._acceptedExtraCols[fileType] = validation.extraFields;
+            extraEl.innerHTML = `📊 Đã chấp nhận ${validation.extraFields.length} cột mới: ${validation.extraFields.slice(0, 3).join(', ')}${validation.extraFields.length > 3 ? '...' : ''}`;
+            extraEl.style.display = 'block';
+            App.toast(`Đã chấp nhận ${validation.extraFields.length} cột mới từ "${file.name}"`, 'success');
+          } else {
+            extraEl.innerHTML = `ℹ️ Bỏ qua ${validation.extraFields.length} cột mới (chỉ dùng cột cố định)`;
+            extraEl.style.display = 'block';
+            App.toast(`Bỏ qua ${validation.extraFields.length} cột mới, chỉ sử dụng cột cố định`, 'info');
+          }
+        }
+
+      } catch (err) {
+        console.error('Validation error:', err);
+        App.toast(`Lỗi khi kiểm tra file: ${err.message}`, 'error');
+      }
+    }
+
+    // File is valid — accept it
+    AppState.uploadedFiles[fileType] = file;
+    slot.classList.add('has-file');
+    slot.classList.remove('has-error');
+    info.style.display = 'flex';
+    nameEl.textContent = file.name;
+    App.toast(`✓ File "${file.name}" hợp lệ`, 'success');
   },
 
   initStep1() {
@@ -1256,7 +1649,23 @@ const Generator = {
       for (const fileType of fileKeys) {
         const file = AppState.uploadedFiles[fileType];
         const data = await DataProcessor.parseFile(file, fileType);
-        AppState.extractedData[fileType] = data;
+
+        // If extra columns were NOT accepted, filter them out
+        const config = FILE_TYPES[fileType];
+        if (config.fields && config.fields.length > 0 && !this._acceptedExtraCols[fileType]) {
+          const expectedSet = new Set(config.fields);
+          const filteredData = {};
+          for (const key in data) {
+            // For multi-row files, strip "(Dòng X)" suffix for matching
+            const baseKey = key.replace(/\s*\(Dòng \d+\)$/, '');
+            if (expectedSet.has(baseKey) || expectedSet.has(key)) {
+              filteredData[key] = data[key];
+            }
+          }
+          AppState.extractedData[fileType] = filteredData;
+        } else {
+          AppState.extractedData[fileType] = data;
+        }
       }
 
       // Count total fields
