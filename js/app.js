@@ -469,12 +469,13 @@ const DataSources = {
         continue;
       }
       try {
-        let fields, htmlContent = null;
+        let fields, htmlContent = null, isHighFidelity = false;
         const isWord = wordExts.includes(ext);
         if (isWord) {
           const result = await this._readWordFields(file);
           fields = result.fields;
           htmlContent = result.htmlContent;
+          isHighFidelity = result._isHighFidelity || false;
         } else {
           fields = await this._readHeaders(file);
         }
@@ -484,7 +485,8 @@ const DataSources = {
           filename: file.name,
           fileType: isWord ? 'word' : 'excel',
           fields,
-          htmlContent
+          htmlContent,
+          isHighFidelity
         };
         this._sources.push(source);
         App.toast(`Đã đọc ${fields.length} trường từ "${file.name}"`, 'success');
@@ -515,7 +517,8 @@ const DataSources = {
       id: s.id, name: s.name, filename: s.filename,
       fileType: s.fileType || 'excel',
       fields: s.fields,
-      htmlContent: s.htmlContent || null
+      htmlContent: s.htmlContent || null,
+      isHighFidelity: s.isHighFidelity || false
     }));
     try { localStorage.setItem('excelmapper_datasources', JSON.stringify(meta)); } catch (_) { }
     // update badge
@@ -587,25 +590,17 @@ const DataSources = {
     });
   },
 
-  /* ── read field names from Word document (.doc/.docx) using mammoth.js ── */
+  /* ── read field names from Word document (.doc/.docx) ── */
+  /* Uses mammoth.js for field extraction + docx-preview for formatting-preserving HTML */
   _readWordFields(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          if (typeof mammoth === 'undefined') {
-            reject(new Error('Thư viện mammoth.js chưa được tải. Vui lòng làm mới trang.'));
-            return;
-          }
-
           const arrayBuffer = e.target.result;
-          
-          // Extract both HTML and raw text
-          const [htmlResult, textResult] = await Promise.all([
-            mammoth.convertToHtml({ arrayBuffer }),
-            mammoth.extractRawText({ arrayBuffer })
-          ]);
+          const ext = file.name.split('.').pop().toLowerCase();
 
+          // === Step 1: Extract fields using mammoth.js (text analysis) ===
           const fields = [];
           const addField = (val) => {
             const trimmed = val.trim();
@@ -614,76 +609,197 @@ const DataSources = {
             }
           };
 
-          // === Strategy 1: Extract {{placeholder}} patterns ===
-          const placeholderRegex = /\{\{([^}]+)\}\}/g;
-          let match;
-          const fullText = textResult.value;
-          while ((match = placeholderRegex.exec(fullText)) !== null) {
-            addField(match[1].trim());
-          }
+          let mammothHtmlStr = '';
+          if (typeof mammoth !== 'undefined') {
+            try {
+              const [htmlResult, textResult] = await Promise.all([
+                mammoth.convertToHtml({ arrayBuffer: arrayBuffer.slice(0) }),
+                mammoth.extractRawText({ arrayBuffer: arrayBuffer.slice(0) })
+              ]);
+              mammothHtmlStr = htmlResult.value;
+              const fullText = textResult.value;
 
-          // === Strategy 2: Extract table headers from Word tables ===
-          const htmlStr = htmlResult.value;
-          if (htmlStr.includes('<table')) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = htmlStr;
-            const tables = tempDiv.querySelectorAll('table');
-            tables.forEach(table => {
-              // Get headers from first row
-              const firstRow = table.querySelector('tr');
-              if (firstRow) {
-                const cells = firstRow.querySelectorAll('th, td');
-                cells.forEach(cell => {
-                  const text = cell.textContent.trim();
-                  if (text) addField(text);
+              // Strategy 1: Extract {{placeholder}} patterns
+              const placeholderRegex = /\{\{([^}]+)\}\}/g;
+              let match;
+              while ((match = placeholderRegex.exec(fullText)) !== null) {
+                addField(match[1].trim());
+              }
+
+              // Strategy 2: Extract table headers
+              if (mammothHtmlStr.includes('<table')) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = mammothHtmlStr;
+                tempDiv.querySelectorAll('table').forEach(table => {
+                  const firstRow = table.querySelector('tr');
+                  if (firstRow) {
+                    firstRow.querySelectorAll('th, td').forEach(cell => {
+                      const text = cell.textContent.trim();
+                      if (text) addField(text);
+                    });
+                  }
                 });
               }
-            });
+
+              // Strategy 3: Extract key:value patterns
+              const lines = fullText.split('\n');
+              lines.forEach(line => {
+                const trimLine = line.trim();
+                if (!trimLine) return;
+                const colonMatch = trimLine.match(/^([^:]{2,60})\s*:\s*(.+)/);
+                if (colonMatch) {
+                  const key = colonMatch[1].trim();
+                  if (key && !key.match(/^(http|ftp|\d{1,2}|\d+\/\d+)/i) && key.length >= 2) {
+                    addField(key);
+                  }
+                }
+              });
+
+              // Strategy 4: Extract labeled lines (Vietnamese patterns)
+              const labelPatterns = [
+                /^(?:Tên|Họ tên|Số|Mã số|Ngày|\u0110ịa chỉ|SĐT|Điện thoại|Email|CMND|CCCD|MST)\b/i,
+                /^[A-ZĐÀ-ỹ][a-zđà-ỹ]+(?:\s+[A-ZĐÀ-ỹa-zđà-ỹ]+){0,6}\s*$/
+              ];
+              lines.forEach(line => {
+                const trimLine = line.trim();
+                if (!trimLine || trimLine.length > 80 || trimLine.length < 2) return;
+                for (const pattern of labelPatterns) {
+                  if (pattern.test(trimLine) && !fields.includes(trimLine)) {
+                    if (trimLine.split(/\s+/).length <= 8 && !trimLine.includes('.')) {
+                      addField(trimLine);
+                    }
+                    break;
+                  }
+                }
+              });
+            } catch (mammothErr) {
+              console.warn('mammoth field extraction failed:', mammothErr);
+            }
           }
 
-          // === Strategy 3: Extract key:value or key-value patterns ===
-          const lines = fullText.split('\n');
-          lines.forEach(line => {
-            const trimLine = line.trim();
-            if (!trimLine) return;
-            
-            // Pattern: "Key: Value" or "Key : Value"
-            const colonMatch = trimLine.match(/^([^:]{2,60})\s*:\s*(.+)/);
-            if (colonMatch) {
-              const key = colonMatch[1].trim();
-              // Skip if looks like a URL, time, or ratio
-              if (key && !key.match(/^(http|ftp|\d{1,2}|\d+\/\d+)/i) && key.length >= 2) {
-                addField(key);
-              }
-            }
-          });
+          // === Step 2: Generate high-fidelity HTML ===
+          let htmlContent = mammothHtmlStr;
+          let isHighFidelity = false;
 
-          // === Strategy 4: Extract labeled lines (Vietnamese patterns) ===
-          const labelPatterns = [
-            /^(?:Tên|Họ tên|Số|Mã số|Ngày|\u0110ịa chỉ|SĐT|Điện thoại|Email|CMND|CCCD|MST)\b/i,
-            /^[A-ZĐÀ-ỹ][a-zđà-ỹ]+(?:\s+[A-ZĐÀ-ỹa-zđà-ỹ]+){0,6}\s*$/
-          ];
-          lines.forEach(line => {
-            const trimLine = line.trim();
-            if (!trimLine || trimLine.length > 80 || trimLine.length < 2) return;
-            for (const pattern of labelPatterns) {
-              if (pattern.test(trimLine) && !fields.includes(trimLine)) {
-                // Only add if it looks like a field label, not a sentence
-                if (trimLine.split(/\s+/).length <= 8 && !trimLine.includes('.')) {
-                  addField(trimLine);
-                }
-                break;
-              }
+          // Try docx-preview for .docx files (preserves original formatting)
+          if (ext === 'docx' && typeof docx !== 'undefined' && docx.renderAsync) {
+            try {
+              htmlContent = await DataSources._renderDocxPreview(arrayBuffer.slice(0));
+              isHighFidelity = true;
+              App.toast('Đã giữ nguyên định dạng gốc của file Word', 'success');
+            } catch (docxErr) {
+              console.warn('docx-preview thất bại, dùng mammoth:', docxErr);
+              htmlContent = mammothHtmlStr; // fallback
             }
-          });
+          }
 
-          resolve({ fields, htmlContent: htmlStr });
+          // Mark high-fidelity for the source object
+          const result = { fields, htmlContent };
+          if (isHighFidelity) result._isHighFidelity = true;
+          resolve(result);
         } catch (err) {
           reject(err);
         }
       };
       reader.onerror = reject;
       reader.readAsArrayBuffer(file);
+    });
+  },
+
+  /* ── Render .docx with docx-preview (preserves original formatting) ── */
+  async _renderDocxPreview(arrayBuffer) {
+    // Create temporary containers for rendering
+    const tempContainer = document.createElement('div');
+    tempContainer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;width:210mm;';
+    document.body.appendChild(tempContainer);
+
+    const tempStyleEl = document.createElement('style');
+    document.head.appendChild(tempStyleEl);
+
+    try {
+      await docx.renderAsync(arrayBuffer, tempContainer, tempStyleEl, {
+        className: 'docx-import',
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: true,
+        ignoreFonts: false,
+        breakPages: true,
+        renderHeaders: true,
+        renderFooters: true,
+        useBase64URL: true,
+        experimental: true
+      });
+
+      // Convert class-based CSS to inline styles for portability
+      const cssText = tempStyleEl.textContent || tempStyleEl.innerText || '';
+      this._applyInlineStyles(tempContainer, cssText);
+
+      // Extract content from rendered pages
+      let html = '';
+      const sections = tempContainer.querySelectorAll('section');
+      if (sections.length > 0) {
+        sections.forEach((section, index) => {
+          const article = section.querySelector('article') || section;
+          if (index > 0) {
+            // Add page break marker between pages
+            html += '<div style="page-break-before:always;break-before:page;height:0;margin:0;padding:0;"></div>';
+          }
+          html += article.innerHTML;
+        });
+      } else {
+        // No sections found, extract all content
+        html = tempContainer.innerHTML;
+      }
+
+      // Clean up wrapper artifacts from docx-preview
+      html = html.replace(/<div[^>]*class="[^"]*docx-import[^"]*"[^>]*>/gi, '<div>')
+                 .replace(/class="[^"]*docx-import[^"]*"/gi, '');
+
+      return html;
+    } finally {
+      // Always cleanup temp elements
+      tempContainer.remove();
+      tempStyleEl.remove();
+    }
+  },
+
+  /* ── Convert CSS class-based styles to inline styles for portability ── */
+  _applyInlineStyles(container, cssText) {
+    const tempStyle = document.createElement('style');
+    tempStyle.textContent = cssText;
+    document.head.appendChild(tempStyle);
+
+    try {
+      const sheet = tempStyle.sheet;
+      if (sheet && sheet.cssRules) {
+        for (let i = 0; i < sheet.cssRules.length; i++) {
+          const rule = sheet.cssRules[i];
+          if (rule.selectorText && rule.style && rule.style.length > 0) {
+            try {
+              const elements = container.querySelectorAll(rule.selectorText);
+              elements.forEach(el => {
+                for (let j = 0; j < rule.style.length; j++) {
+                  const prop = rule.style[j];
+                  const val = rule.style.getPropertyValue(prop);
+                  const priority = rule.style.getPropertyPriority(prop);
+                  if (val && !el.style.getPropertyValue(prop)) {
+                    el.style.setProperty(prop, val, priority);
+                  }
+                }
+              });
+            } catch (selectorErr) {
+              // Skip invalid selectors
+            }
+          }
+        }
+      }
+    } finally {
+      tempStyle.remove();
+    }
+
+    // Remove class attributes since styles are now inline
+    container.querySelectorAll('[class]').forEach(el => {
+      el.removeAttribute('class');
     });
   },
 
@@ -744,8 +860,10 @@ const DataSources = {
       return;
     }
 
-    // Sanitize and enhance the HTML from mammoth
-    let html = this._enhanceWordHtml(source.htmlContent);
+    // Use high-fidelity HTML directly (from docx-preview) or enhance mammoth output
+    let html = source.isHighFidelity
+      ? source.htmlContent
+      : this._enhanceWordHtml(source.htmlContent);
 
     if (mode === 'append') {
       editor.innerHTML += '<hr style="margin:20px 0;border:1px dashed var(--border);">' + html;
