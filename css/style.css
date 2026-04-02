@@ -1195,8 +1195,10 @@ select.input option {
   border-radius: var(--radius-lg);
   padding: 30px;
   display: flex;
-  justify-content: center;
-  max-height: 600px;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  max-height: 70vh;
   overflow-y: auto;
 }
 
@@ -1959,6 +1961,7 @@ select.input option {
   font-family: 'Inter', Arial, sans-serif;
   font-size: 11pt;
   line-height: 1.6;
+  box-sizing: border-box;
 }
 
 .pdf-export-content table {
@@ -1975,6 +1978,47 @@ select.input option {
 .pdf-export-content table th {
   background: #e8e8ee;
   font-weight: 600;
+}
+
+/* Word PDF Export - extended styles for multi-page support */
+.word-pdf-export {
+  font-family: 'Times New Roman', 'Inter', serif;
+  font-size: 13pt;
+  line-height: 1.5;
+}
+
+.word-pdf-export h1 { font-size: 18pt; margin: 0 0 10pt 0; }
+.word-pdf-export h2 { font-size: 16pt; margin: 0 0 8pt 0; }
+.word-pdf-export h3 { font-size: 14pt; margin: 0 0 6pt 0; }
+.word-pdf-export p { margin: 0 0 6pt 0; }
+
+.word-pdf-export table {
+  page-break-inside: auto;
+}
+
+.word-pdf-export tr {
+  page-break-inside: avoid;
+  page-break-after: auto;
+}
+
+.word-pdf-export thead {
+  display: table-header-group;
+}
+
+/* Page break utility classes for templates */
+.page-break-before {
+  page-break-before: always;
+  break-before: page;
+}
+
+.page-break-after {
+  page-break-after: always;
+  break-after: page;
+}
+
+.avoid-page-break {
+  page-break-inside: avoid;
+  break-inside: avoid;
 }
 
 /* ============================================

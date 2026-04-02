@@ -682,34 +682,69 @@ const WordGenerator = {
     App.toast('Xem trước đã sẵn sàng!', 'success');
   },
 
-  exportWord() {
+  exportPDF() {
     const preview = document.getElementById('word-preview');
     if (!preview || !preview.innerHTML.trim()) { App.toast('Không có nội dung để xuất', 'warning'); return; }
     const tpl = WordState.templates.find(t => t.id === WordState.selectedTemplateId);
     const fileName = tpl ? tpl.name.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() : 'document';
-    const wordHtml = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset='utf-8'><title>${_wEsc(fileName)}</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
-<style>
-@page { size: A4; margin: 2cm; }
-body { font-family: 'Times New Roman', serif; font-size: 13pt; line-height: 1.5; color: #000; }
-table { border-collapse: collapse; width: 100%; }
-table td, table th { border: 1px solid #000; padding: 5px 8px; vertical-align: top; }
-table th { background-color: #f0f0f0; font-weight: bold; }
-h1 { font-size: 18pt; } h2 { font-size: 16pt; } h3 { font-size: 14pt; }
-p { margin: 0 0 6pt 0; }
-</style></head><body>${preview.innerHTML}</body></html>`;
-    const blob = new Blob(['\ufeff', wordHtml], { type: 'application/msword' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = fileName + '.doc';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-    WordState.exportCount++;
-    WordEditor.saveState();
-    App.toast('File Word đã được tải xuống!', 'success');
+
+    // Create a dedicated render container for PDF generation
+    const renderArea = document.getElementById('pdf-render-area');
+    renderArea.innerHTML = '';
+
+    const exportDiv = document.createElement('div');
+    exportDiv.className = 'pdf-export-content word-pdf-export';
+    exportDiv.innerHTML = preview.innerHTML;
+    renderArea.appendChild(exportDiv);
+
+    // Make render area temporarily visible for html2canvas
+    renderArea.style.position = 'absolute';
+    renderArea.style.left = '0';
+    renderArea.style.top = '0';
+    renderArea.style.zIndex = '-1';
+    renderArea.style.opacity = '0';
+
+    const opt = {
+      margin: [15, 15, 15, 15],
+      filename: `${fileName}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+        logging: false,
+        width: exportDiv.scrollWidth,
+        windowWidth: exportDiv.scrollWidth
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait'
+      },
+      pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'thead'] }
+    };
+
+    App.toast('Đang tạo PDF...', 'info');
+
+    html2pdf().set(opt).from(exportDiv).save().then(() => {
+      // Cleanup
+      renderArea.style.position = 'absolute';
+      renderArea.style.left = '-9999px';
+      renderArea.style.top = '-9999px';
+      renderArea.style.opacity = '1';
+      renderArea.innerHTML = '';
+
+      WordState.exportCount++;
+      WordEditor.saveState();
+      App.toast('File PDF đã được tải xuống!', 'success');
+    }).catch(err => {
+      console.error('PDF export error:', err);
+      renderArea.style.position = 'absolute';
+      renderArea.style.left = '-9999px';
+      renderArea.style.top = '-9999px';
+      renderArea.innerHTML = '';
+      App.toast('Lỗi khi xuất PDF: ' + err.message, 'error');
+    });
   }
 };
 

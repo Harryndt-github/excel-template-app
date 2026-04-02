@@ -82,7 +82,7 @@
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
           <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
         </svg>
-        <span>Ghép & Xuất Word</span>
+        <span>Ghép & Xuất PDF</span>
       </a>
     </nav>
 
@@ -621,8 +621,8 @@
     <section id="page-word-generate" class="page">
       <div class="page-header">
         <div>
-          <h2 class="page-title">Ghép dữ liệu & Xuất Word</h2>
-          <p class="page-subtitle">Upload Excel, mapping dữ liệu và xuất file Word (.doc)</p>
+          <h2 class="page-title">Ghép dữ liệu & Xuất PDF</h2>
+          <p class="page-subtitle">Upload Excel, mapping dữ liệu và xuất file PDF</p>
         </div>
       </div>
 
@@ -633,7 +633,7 @@
         <div class="step-line"></div>
         <div class="step" data-step="3"><div class="step-number">3</div><span>Mapping</span></div>
         <div class="step-line"></div>
-        <div class="step" data-step="4"><div class="step-number">4</div><span>Xuất Word</span></div>
+        <div class="step" data-step="4"><div class="step-number">4</div><span>Xuất PDF</span></div>
       </div>
 
       <!-- Step 1 -->
@@ -681,16 +681,16 @@
       <!-- Step 4 -->
       <div id="wgen-step-4" class="wgen-step">
         <div class="step-card">
-          <h3>Bước 4: Xem trước & Xuất Word</h3>
-          <p>Kiểm tra kết quả và xuất file Word (.doc)</p>
+          <h3>Bước 4: Xem trước & Xuất PDF</h3>
+          <p>Kiểm tra kết quả và xuất file PDF</p>
           <div class="preview-wrapper">
             <div id="word-preview" class="pdf-preview"></div>
           </div>
           <div class="step-actions">
             <button class="btn btn-outline" onclick="WordGenerator.goToStep(3)">← Quay lại</button>
-            <button class="btn btn-success" onclick="WordGenerator.exportWord()">
+            <button class="btn btn-success" onclick="WordGenerator.exportPDF()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Xuất Word (.doc)
+              Xuất PDF
             </button>
           </div>
         </div>
