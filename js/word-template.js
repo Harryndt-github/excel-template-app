@@ -485,34 +485,43 @@ const WordGenerator = {
         const validation = FileValidator.validateHeaders(fileHeaders, ft);
 
         if (!validation.valid) {
-          // File has wrong column names - reject upload
+          // File has NO data columns at all - reject upload
           delete WordState.uploadedFiles[ft];
           slot.classList.remove('has-file');
           slot.classList.add('has-error');
           info.style.display = 'none';
           input.value = '';
 
-          // Store validation for click-through reference
-          if (!FileValidator._lastErrors) FileValidator._lastErrors = {};
-          FileValidator._lastErrors[ft] = { fileName: file.name, errors: validation.errors, missingFields: validation.missingFields };
-          errorEl.innerHTML = '❌ File bị từ chối: ' + validation.errors.length + ' cột không khớp. <a href="#" onclick="event.preventDefault(); FileValidator.showLastError(\'' + ft + '\')" style="color:#dc2626;text-decoration:underline;">Xem chi tiết</a>';
+          errorEl.innerHTML = '❌ File không có dữ liệu cột nào. Vui lòng kiểm tra lại file.';
           errorEl.style.display = 'block';
-
-          FileValidator.showValidationError(ft, file.name, validation.errors, validation.missingFields);
-          App.toast('File "' + file.name + '" không hợp lệ - ' + validation.errors.length + ' cột không khớp', 'error');
+          App.toast('File "' + file.name + '" không có dữ liệu', 'error');
           return;
         }
 
-        // Check for extra columns
+        // Show info about missing fields (warning, NOT rejection)
+        if (validation.missingFields.length > 0) {
+          const matchCount = validation.matchedFields ? validation.matchedFields.length : 0;
+          const missingCount = validation.missingFields.length;
+          extraEl.innerHTML = `⚠️ Đã nhận ${matchCount} cột khớp. Có ${missingCount} trường chưa có dữ liệu (cột trống hoặc thiếu): <span style="font-size:0.78rem;color:#92400e;">${validation.missingFields.slice(0, 5).join(', ')}${missingCount > 5 ? '...' : ''}</span>`;
+          extraEl.style.display = 'block';
+          extraEl.style.color = '#92400e';
+          extraEl.style.background = '#fffbeb';
+        }
+
+        // Check for extra columns (columns not in config)
         if (validation.extraFields.length > 0) {
           const accept = await FileValidator.showExtraColumnsPrompt(ft, file.name, validation.extraFields);
           if (accept) {
             this._wAcceptedExtraCols[ft] = validation.extraFields;
-            extraEl.innerHTML = `📊 Đã chấp nhận ${validation.extraFields.length} cột mới: ${validation.extraFields.slice(0, 3).join(', ')}${validation.extraFields.length > 3 ? '...' : ''}`;
+            const existingInfo = extraEl.innerHTML;
+            extraEl.innerHTML = existingInfo + (existingInfo ? '<br>' : '') + `📊 Đã chấp nhận ${validation.extraFields.length} cột mới: ${validation.extraFields.slice(0, 3).join(', ')}${validation.extraFields.length > 3 ? '...' : ''}`;
             extraEl.style.display = 'block';
+            extraEl.style.color = '#2563eb';
+            extraEl.style.background = '#eff6ff';
             App.toast(`Đã chấp nhận ${validation.extraFields.length} cột mới`, 'success');
           } else {
-            extraEl.innerHTML = `ℹ️ Bỏ qua ${validation.extraFields.length} cột mới (chỉ dùng cột cố định)`;
+            const existingInfo = extraEl.innerHTML;
+            extraEl.innerHTML = existingInfo + (existingInfo ? '<br>' : '') + `ℹ️ Bỏ qua ${validation.extraFields.length} cột mới (chỉ dùng cột cố định)`;
             extraEl.style.display = 'block';
           }
         }

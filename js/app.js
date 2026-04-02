@@ -220,7 +220,7 @@ const FileValidator = {
   validateHeaders(fileHeaders, fileType) {
     const config = FILE_TYPES[fileType];
     if (!config || !config.fields || config.fields.length === 0) {
-      return { valid: true, missingFields: [], extraFields: [], errors: [] };
+      return { valid: true, missingFields: [], extraFields: [], errors: [], matchedFields: [] };
     }
 
     const expectedFields = config.fields;
@@ -237,21 +237,22 @@ const FileValidator = {
     const errors = [];
     const missingFields = [];
     const extraFields = [];
+    const matchedFields = [];
 
-    // Check for fields in the uploaded file that don't match any expected field
     // Build a set of unique expected fields for lookup
     const expectedSet = new Set(expectedFields);
     const uploadedSet = new Set(uploadedNames);
 
-    // Find fields in uploaded file that are NOT in expected fields
+    // Categorize uploaded fields: matched vs extra
     uploadedNames.forEach((name, index) => {
-      if (!expectedSet.has(name)) {
+      if (expectedSet.has(name)) {
+        matchedFields.push(name);
+      } else {
         extraFields.push(name);
       }
     });
 
     // Find expected fields that are NOT in uploaded file
-    // Use unique set to avoid duplicate checking
     const expectedUnique = [...new Set(expectedFields)];
     expectedUnique.forEach(field => {
       if (!uploadedSet.has(field)) {
@@ -259,16 +260,14 @@ const FileValidator = {
       }
     });
 
-    // Build error messages for wrong/missing column names
+    // Build info messages for extra column names (not errors, just info)
     if (config.structure === 'vertical') {
-      // For vertical structure, check column A values
       uploadedNames.forEach((name, index) => {
         if (!expectedSet.has(name)) {
           errors.push(`Dòng ${fileHeaders.verticalHeaders[index].row + 1}: "${name}" không khớp với trường nào`);
         }
       });
     } else {
-      // For horizontal structure, check header row
       fileHeaders.headers.forEach((h, index) => {
         if (!expectedSet.has(h.name)) {
           const colLetter = this.colToLetter(h.col);
@@ -277,13 +276,17 @@ const FileValidator = {
       });
     }
 
-    // Valid if no wrong columns found (extra columns will be handled separately)
-    const hasWrongColumns = errors.length > 0;
+    // NEW LOGIC: File is valid as long as it has at least 1 matched field
+    // OR if the file has any uploaded columns at all (even if all are "extra")
+    // Files are only invalid if they have ZERO uploaded columns
+    const hasAtLeastOneMatch = matchedFields.length > 0;
+    const hasAnyColumns = uploadedNames.length > 0;
     
     return {
-      valid: !hasWrongColumns,
+      valid: hasAnyColumns,  // Accept file as long as it has data columns
       missingFields,
       extraFields,
+      matchedFields,
       errors
     };
   },
@@ -1758,36 +1761,43 @@ const Generator = {
         const validation = FileValidator.validateHeaders(fileHeaders, fileType);
 
         if (!validation.valid) {
-          // File has wrong column names - reject upload
+          // File has NO data columns at all - reject upload
           delete AppState.uploadedFiles[fileType];
           slot.classList.remove('has-file');
           slot.classList.add('has-error');
           info.style.display = 'none';
           input.value = ''; // Reset file input
 
-          // Store validation for click-through reference
-          if (!FileValidator._lastErrors) FileValidator._lastErrors = {};
-          FileValidator._lastErrors[fileType] = { fileName: file.name, errors: validation.errors, missingFields: validation.missingFields };
-          // Show error in slot
-          errorEl.innerHTML = '\u274c File b\u1ecb t\u1eeb ch\u1ed1i: ' + validation.errors.length + ' c\u1ed9t kh\u00f4ng kh\u1edbp. <a href="#" onclick="event.preventDefault(); FileValidator.showLastError(\x27' + fileType + '\x27)" style="color:#dc2626;text-decoration:underline;">Xem chi ti\u1ebft</a>';
+          errorEl.innerHTML = '❌ File không có dữ liệu cột nào. Vui lòng kiểm tra lại file.';
           errorEl.style.display = 'block';
-
-          // Also show the detailed modal
-          FileValidator.showValidationError(fileType, file.name, validation.errors, validation.missingFields);
-          App.toast(`File "${file.name}" không hợp lệ - ${validation.errors.length} cột không khớp`, 'error');
+          App.toast(`File "${file.name}" không có dữ liệu`, 'error');
           return;
         }
 
-        // Check for extra columns
+        // Show info about missing fields (warning, NOT rejection)
+        if (validation.missingFields.length > 0) {
+          const matchCount = validation.matchedFields ? validation.matchedFields.length : 0;
+          const missingCount = validation.missingFields.length;
+          extraEl.innerHTML = `⚠️ Đã nhận ${matchCount} cột khớp. Có ${missingCount} trường chưa có dữ liệu (cột trống hoặc thiếu): <span style="font-size:0.78rem;color:#92400e;">${validation.missingFields.slice(0, 5).join(', ')}${missingCount > 5 ? '...' : ''}</span>`;
+          extraEl.style.display = 'block';
+          extraEl.style.color = '#92400e';
+          extraEl.style.background = '#fffbeb';
+        }
+
+        // Check for extra columns (columns not in config)
         if (validation.extraFields.length > 0) {
           const accept = await FileValidator.showExtraColumnsPrompt(fileType, file.name, validation.extraFields);
           if (accept) {
             this._acceptedExtraCols[fileType] = validation.extraFields;
-            extraEl.innerHTML = `📊 Đã chấp nhận ${validation.extraFields.length} cột mới: ${validation.extraFields.slice(0, 3).join(', ')}${validation.extraFields.length > 3 ? '...' : ''}`;
+            const existingInfo = extraEl.innerHTML;
+            extraEl.innerHTML = existingInfo + (existingInfo ? '<br>' : '') + `📊 Đã chấp nhận ${validation.extraFields.length} cột mới: ${validation.extraFields.slice(0, 3).join(', ')}${validation.extraFields.length > 3 ? '...' : ''}`;
             extraEl.style.display = 'block';
+            extraEl.style.color = '#2563eb';
+            extraEl.style.background = '#eff6ff';
             App.toast(`Đã chấp nhận ${validation.extraFields.length} cột mới từ "${file.name}"`, 'success');
           } else {
-            extraEl.innerHTML = `ℹ️ Bỏ qua ${validation.extraFields.length} cột mới (chỉ dùng cột cố định)`;
+            const existingInfo = extraEl.innerHTML;
+            extraEl.innerHTML = existingInfo + (existingInfo ? '<br>' : '') + `ℹ️ Bỏ qua ${validation.extraFields.length} cột mới (chỉ dùng cột cố định)`;
             extraEl.style.display = 'block';
             App.toast(`Bỏ qua ${validation.extraFields.length} cột mới, chỉ sử dụng cột cố định`, 'info');
           }
