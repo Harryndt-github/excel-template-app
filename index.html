@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/spreadsheet.css">
+  <link rel="stylesheet" href="css/master-data.css">
 </head>
 <body>
   <!-- Sidebar Navigation -->
@@ -60,6 +61,17 @@
           <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
         <span>Ghép & Xuất PDF</span>
+      </a>
+      <div class="nav-divider-label"><span>Dữ Liệu</span></div>
+      <a href="#" class="nav-item" data-page="master-data" id="nav-master-data">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <circle cx="5" cy="6" r="2"/><line x1="7" y1="7" x2="9" y2="9"/>
+          <circle cx="19" cy="6" r="2"/><line x1="17" y1="7" x2="15" y2="9"/>
+          <circle cx="5" cy="18" r="2"/><line x1="7" y1="17" x2="9" y2="15"/>
+          <circle cx="19" cy="18" r="2"/><line x1="17" y1="17" x2="15" y2="15"/>
+        </svg>
+        <span>Master Data</span>
       </a>
       <div class="nav-divider-label"><span>Word</span></div>
       <a href="#" class="nav-item" data-page="word-templates" id="nav-word-templates">
@@ -443,7 +455,44 @@
         <div class="step-card">
           <h3>Bước 2: Upload file Excel</h3>
           <p>Upload các file Excel tương ứng với từng loại dữ liệu</p>
-          
+
+          <!-- Multi-Sheet Import Zone -->
+          <div class="multi-sheet-import-zone" id="multi-sheet-zone">
+            <div class="multi-sheet-header">
+              <div class="multi-sheet-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h2"/>
+                </svg>
+              </div>
+              <div class="multi-sheet-text">
+                <h4>📑 Import từ 1 file nhiều sheet</h4>
+                <p>Upload 1 file Excel chứa nhiều sheet — mỗi sheet tương ứng 1 loại dữ liệu</p>
+              </div>
+            </div>
+            <div class="multi-sheet-upload-area" id="multi-sheet-drop"
+                 ondragover="event.preventDefault(); this.classList.add('dragover')"
+                 ondragleave="this.classList.remove('dragover')"
+                 ondrop="event.preventDefault(); this.classList.remove('dragover'); MultiSheetImport.handleDrop(event, 'excel')">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span>Kéo thả file hoặc</span>
+              <label class="multi-sheet-browse-btn">
+                Chọn file Excel
+                <input type="file" accept=".xlsx,.xls" hidden
+                       onchange="MultiSheetImport.handleFile(this.files[0], 'excel')">
+              </label>
+            </div>
+            <div class="multi-sheet-result" id="multi-sheet-result" style="display:none;"></div>
+          </div>
+
+          <div class="multi-sheet-divider">
+            <span>hoặc upload từng file riêng lẻ</span>
+          </div>
+
           <div class="upload-grid" id="upload-grid">
             <!-- Upload slots created by JS -->
           </div>
@@ -657,6 +706,44 @@
         <div class="step-card">
           <h3>Bước 2: Upload file Excel</h3>
           <p>Upload các file Excel tương ứng với từng loại dữ liệu</p>
+
+          <!-- Multi-Sheet Import Zone (Word) -->
+          <div class="multi-sheet-import-zone" id="word-multi-sheet-zone">
+            <div class="multi-sheet-header">
+              <div class="multi-sheet-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h2"/>
+                </svg>
+              </div>
+              <div class="multi-sheet-text">
+                <h4>📑 Import từ 1 file nhiều sheet</h4>
+                <p>Upload 1 file Excel chứa nhiều sheet — mỗi sheet tương ứng 1 loại dữ liệu</p>
+              </div>
+            </div>
+            <div class="multi-sheet-upload-area" id="word-multi-sheet-drop"
+                 ondragover="event.preventDefault(); this.classList.add('dragover')"
+                 ondragleave="this.classList.remove('dragover')"
+                 ondrop="event.preventDefault(); this.classList.remove('dragover'); MultiSheetImport.handleDrop(event, 'word')">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span>Kéo thả file hoặc</span>
+              <label class="multi-sheet-browse-btn">
+                Chọn file Excel
+                <input type="file" accept=".xlsx,.xls" hidden
+                       onchange="MultiSheetImport.handleFile(this.files[0], 'word')">
+              </label>
+            </div>
+            <div class="multi-sheet-result" id="word-multi-sheet-result" style="display:none;"></div>
+          </div>
+
+          <div class="multi-sheet-divider">
+            <span>hoặc upload từng file riêng lẻ</span>
+          </div>
+
           <div class="upload-grid" id="word-upload-grid"></div>
           <div class="step-actions">
             <button class="btn btn-outline" onclick="WordGenerator.goToStep(1)">← Quay lại</button>
@@ -696,6 +783,67 @@
         </div>
       </div>
     </section>
+
+    <!-- ========== MASTER DATA PAGE ========== -->
+    <div class="page" id="page-master-data">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Master Data</h2>
+          <p class="page-subtitle">Quản lý dữ liệu tổng thể & mối quan hệ giữa các loại dữ liệu</p>
+        </div>
+      </div>
+
+      <div class="md-page-layout">
+        <!-- Entity Sidebar -->
+        <div class="md-sidebar">
+          <div class="md-sidebar-header">
+            <span class="md-sidebar-title">Entities</span>
+            <div class="md-sidebar-actions">
+              <button class="btn btn-primary btn-sm" onclick="MasterData.showAddEntity()">＋ Thêm</button>
+              <button class="btn btn-outline btn-sm" onclick="MasterData.showAddConnection()">🔗 Liên kết</button>
+            </div>
+          </div>
+          <div class="md-entity-list" id="md-entity-list"></div>
+        </div>
+
+        <!-- Main Area -->
+        <div class="md-main">
+          <div class="md-toolbar">
+            <div class="md-view-switcher">
+              <button class="md-view-btn active" data-view="mindmap" onclick="MasterData.setView('mindmap')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <circle cx="5" cy="6" r="1.5"/><line x1="7" y1="7" x2="9" y2="9"/>
+                  <circle cx="19" cy="6" r="1.5"/><line x1="17" y1="7" x2="15" y2="9"/>
+                </svg>
+                Mindmap
+              </button>
+              <button class="md-view-btn" data-view="matrix" onclick="MasterData.setView('matrix')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                  <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                </svg>
+                Ma trận
+              </button>
+              <button class="md-view-btn" data-view="records" onclick="MasterData.setView('records')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+                  <line x1="8" y1="18" x2="21" y2="18"/>
+                  <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                </svg>
+                Bản ghi
+              </button>
+            </div>
+          </div>
+          <div class="md-view-panel" id="md-view-mindmap" style="display:block;position:relative;">
+            <div id="md-mindmap-canvas" style="width:100%;height:100%;"></div>
+          </div>
+          <div class="md-view-panel" id="md-view-matrix" style="display:none;"></div>
+          <div class="md-view-panel" id="md-view-records" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- Modal: Insert Placeholder (Enhanced) -->
@@ -960,6 +1108,95 @@
   </div>
 
   <!-- Toast Notification -->
+
+  <!-- Entity Modal -->
+  <div class="md-modal-overlay" id="modal-entity">
+    <div class="md-modal">
+      <div class="md-modal-header">
+        <h3 id="entity-modal-title">Thêm Entity mới</h3>
+        <button class="md-modal-close" onclick="MasterData.closeEntityModal()">✕</button>
+      </div>
+      <div class="md-modal-body">
+        <input type="hidden" id="entity-modal-id" value="">
+
+        <div class="md-form-group">
+          <label class="md-form-label">Tên Entity</label>
+          <input type="text" class="input" id="entity-name-input" placeholder="VD: Khách hàng, Tài sản, Khoản vay...">
+        </div>
+
+        <div class="md-form-group">
+          <label class="md-form-label">Màu sắc</label>
+          <input type="hidden" id="entity-color-input" value="#6366f1">
+          <div class="md-color-grid" id="entity-color-grid">
+            <div class="md-color-swatch selected" style="background:#6366f1;" onclick="MasterData._selectColor(this,'#6366f1')"></div>
+            <div class="md-color-swatch" style="background:#8b5cf6;" onclick="MasterData._selectColor(this,'#8b5cf6')"></div>
+            <div class="md-color-swatch" style="background:#ec4899;" onclick="MasterData._selectColor(this,'#ec4899')"></div>
+            <div class="md-color-swatch" style="background:#ef4444;" onclick="MasterData._selectColor(this,'#ef4444')"></div>
+            <div class="md-color-swatch" style="background:#f59e0b;" onclick="MasterData._selectColor(this,'#f59e0b')"></div>
+            <div class="md-color-swatch" style="background:#10b981;" onclick="MasterData._selectColor(this,'#10b981')"></div>
+            <div class="md-color-swatch" style="background:#06b6d4;" onclick="MasterData._selectColor(this,'#06b6d4')"></div>
+            <div class="md-color-swatch" style="background:#3b82f6;" onclick="MasterData._selectColor(this,'#3b82f6')"></div>
+          </div>
+        </div>
+
+        <div class="md-form-group">
+          <div class="md-fields-header">
+            <h4>Danh sách trường dữ liệu</h4>
+            <button class="btn btn-outline btn-sm" onclick="MasterData.addFieldRow()">＋ Thêm trường</button>
+          </div>
+          <div id="entity-fields-editor">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+      <div class="md-modal-footer">
+        <button class="btn btn-outline" onclick="MasterData.closeEntityModal()">Hủy</button>
+        <button class="btn btn-primary" onclick="MasterData.saveEntity()">💾 Lưu Entity</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connection Modal -->
+  <div class="md-modal-overlay" id="modal-connection">
+    <div class="md-modal" style="max-width:480px;">
+      <div class="md-modal-header">
+        <h3>🔗 Tạo liên kết giữa Entity</h3>
+        <button class="md-modal-close" onclick="MasterData.closeConnectionModal()">✕</button>
+      </div>
+      <div class="md-modal-body">
+        <div class="md-form-group">
+          <label class="md-form-label">Entity nguồn</label>
+          <select class="input" id="conn-from-entity" onchange="MasterData.onConnEntityChange('from')">
+            <option value="">-- Chọn entity --</option>
+          </select>
+        </div>
+        <div class="md-form-group">
+          <label class="md-form-label">Trường liên kết (nguồn)</label>
+          <select class="input" id="conn-from-field">
+            <option value="">-- Chọn trường --</option>
+          </select>
+        </div>
+        <div style="text-align:center;padding:8px 0;color:var(--text-muted);font-size:1.2rem;">⟷</div>
+        <div class="md-form-group">
+          <label class="md-form-label">Entity đích</label>
+          <select class="input" id="conn-to-entity" onchange="MasterData.onConnEntityChange('to')">
+            <option value="">-- Chọn entity --</option>
+          </select>
+        </div>
+        <div class="md-form-group">
+          <label class="md-form-label">Trường liên kết (đích)</label>
+          <select class="input" id="conn-to-field">
+            <option value="">-- Chọn trường --</option>
+          </select>
+        </div>
+      </div>
+      <div class="md-modal-footer">
+        <button class="btn btn-outline" onclick="MasterData.closeConnectionModal()">Hủy</button>
+        <button class="btn btn-primary" onclick="MasterData.saveConnection()">🔗 Tạo liên kết</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Hidden PDF render area -->
@@ -972,6 +1209,7 @@
   <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
   <script src="js/spreadsheet.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/master-data.js"></script>
   <script src="js/word-template.js"></script>
 </body>
 </html>

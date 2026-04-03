@@ -1023,6 +1023,8 @@ const App = {
       }, 100);
     }
     if (page === 'generate') Generator.initStep1();
+    // Master Data
+    if (page === 'master-data' && typeof MasterData !== 'undefined') MasterData.initPage();
     // Word pages
     if (page === 'word-templates' && typeof WordEditor !== 'undefined') WordEditor.renderTemplatesList();
     if (page === 'word-editor' && typeof WordEditor !== 'undefined') {
@@ -1805,6 +1807,394 @@ const DataProcessor = {
       return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     }
     return cell.v !== undefined ? String(cell.v) : '';
+  }
+};
+
+// ============================================
+// MULTI-SHEET IMPORT - Import multiple sheets from 1 file
+// ============================================
+const MultiSheetImport = {
+  /**
+   * Handle drag-and-drop of a file
+   */
+  handleDrop(event, mode) {
+    const files = event.dataTransfer.files;
+    if (files.length > 0) {
+      this.handleFile(files[0], mode);
+    }
+  },
+
+  /**
+   * Main handler: read the Excel file, extract sheet names, match to FILE_TYPES
+   * @param {File} file - The uploaded Excel file
+   * @param {string} mode - 'excel' or 'word'
+   */
+  async handleFile(file, mode) {
+    if (!file) return;
+
+    // Validate file type
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx', 'xls'].includes(ext)) {
+      App.toast('Vui lòng chọn file Excel (.xlsx hoặc .xls)', 'warning');
+      return;
+    }
+
+    const resultEl = document.getElementById(mode === 'word' ? 'word-multi-sheet-result' : 'multi-sheet-result');
+
+    try {
+      App.toast('Đang phân tích file...', 'info');
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = '<div class="ms-loading"><span class="ms-spinner"></span> Đang đọc file và phân tích các sheet...</div>';
+
+      // Read the workbook
+      const arrayBuffer = await this._readFileAsArrayBuffer(file);
+      const data = new Uint8Array(arrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetNames = workbook.SheetNames;
+
+      if (sheetNames.length === 0) {
+        resultEl.innerHTML = '<div class="ms-error">❌ File không có sheet nào</div>';
+        App.toast('File không có sheet nào', 'error');
+        return;
+      }
+
+      if (sheetNames.length === 1) {
+        resultEl.innerHTML = '<div class="ms-warning">⚠️ File chỉ có 1 sheet. Vui lòng sử dụng phần upload riêng lẻ bên dưới.</div>';
+        App.toast('File chỉ có 1 sheet, hãy upload riêng lẻ', 'info');
+        return;
+      }
+
+      // Match sheet names to FILE_TYPES
+      const matches = this._matchSheets(sheetNames, workbook);
+
+      // Render matching result
+      this._renderMatchResult(resultEl, file, sheetNames, matches, mode);
+
+    } catch (err) {
+      console.error('MultiSheetImport error:', err);
+      resultEl.innerHTML = `<div class="ms-error">❌ Lỗi: ${err.message}</div>`;
+      App.toast('Lỗi khi đọc file: ' + err.message, 'error');
+    }
+  },
+
+  /**
+   * Read a file as ArrayBuffer
+   */
+  _readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  },
+
+  /**
+   * Match sheet names to FILE_TYPES keys using fuzzy matching
+   */
+  _matchSheets(sheetNames, workbook) {
+    const fileTypeKeys = Object.keys(FILE_TYPES);
+    const matches = [];
+
+    for (const sheetName of sheetNames) {
+      const sheetLower = sheetName.toLowerCase().trim();
+      let bestKey = null;
+      let bestScore = 0;
+      let matchType = '';
+
+      for (const key of fileTypeKeys) {
+        const keyLower = key.toLowerCase();
+        const label = FILE_TYPES[key].label.toLowerCase();
+        let score = 0;
+        let type = '';
+
+        // Exact match with key
+        if (sheetLower === keyLower) {
+          score = 100; type = 'exact';
+        }
+        // Exact match with label
+        else if (sheetLower === label) {
+          score = 95; type = 'label';
+        }
+        // Sheet contains key or vice versa
+        else if (sheetLower.includes(keyLower) || keyLower.includes(sheetLower)) {
+          score = 80; type = 'partial';
+        }
+        // Sheet contains label or vice versa
+        else if (sheetLower.includes(label) || label.includes(sheetLower)) {
+          score = 75; type = 'partial';
+        }
+        // Normalize: remove spaces, underscores, dashes and compare
+        else {
+          const normalizedSheet = sheetLower.replace(/[\s_\-]/g, '');
+          const normalizedKey = keyLower.replace(/[\s_\-]/g, '');
+          const normalizedLabel = label.replace(/[\s_\-]/g, '');
+          if (normalizedSheet === normalizedKey || normalizedSheet === normalizedLabel) {
+            score = 90; type = 'normalized';
+          }
+          else if (normalizedSheet.includes(normalizedKey) || normalizedKey.includes(normalizedSheet)) {
+            score = 70; type = 'fuzzy';
+          }
+          else if (normalizedSheet.includes(normalizedLabel) || normalizedLabel.includes(normalizedSheet)) {
+            score = 65; type = 'fuzzy';
+          }
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestKey = key;
+          matchType = type;
+        }
+      }
+
+      // Get sheet row count for info
+      const sheet = workbook.Sheets[sheetName];
+      let rowCount = 0;
+      if (sheet && sheet['!ref']) {
+        try {
+          const range = XLSX.utils.decode_range(sheet['!ref']);
+          rowCount = range.e.r - range.s.r + 1;
+        } catch(e) {}
+      }
+
+      matches.push({
+        sheetName,
+        matchedKey: bestScore >= 50 ? bestKey : null,
+        score: bestScore,
+        matchType,
+        rowCount,
+        selectedKey: bestScore >= 50 ? bestKey : '' // user can override
+      });
+    }
+
+    return matches;
+  },
+
+  /**
+   * Render the match result UI with dropdown overrides
+   */
+  _renderMatchResult(container, file, sheetNames, matches, mode) {
+    const matchedCount = matches.filter(m => m.matchedKey).length;
+
+    // Build FILE_TYPE options for dropdown
+    const fileTypeOptions = Object.keys(FILE_TYPES).map(key => {
+      return `<option value="${key}">${FILE_TYPES[key].label} (${key})</option>`;
+    }).join('');
+
+    let html = `
+      <div class="ms-result-card">
+        <div class="ms-result-header">
+          <div class="ms-file-info">
+            <span class="ms-file-icon">📊</span>
+            <div>
+              <strong>${file.name}</strong>
+              <span class="ms-file-meta">${sheetNames.length} sheets • ${matchedCount} tự động khớp</span>
+            </div>
+          </div>
+        </div>
+        <div class="ms-match-table">
+          <div class="ms-match-row ms-match-header-row">
+            <span class="ms-col-sheet">Sheet trong file</span>
+            <span class="ms-col-arrow"></span>
+            <span class="ms-col-type">Loại dữ liệu tương ứng</span>
+            <span class="ms-col-info">Dữ liệu</span>
+            <span class="ms-col-status">Trạng thái</span>
+          </div>`;
+
+    matches.forEach((m, idx) => {
+      const statusClass = m.matchedKey ? 'ms-matched' : 'ms-unmatched';
+      const statusText = m.matchedKey ? '✓ Khớp' : '⚠ Chưa khớp';
+      const statusIcon = m.matchedKey ? '✅' : '⚠️';
+
+      html += `
+          <div class="ms-match-row ${statusClass}" data-idx="${idx}">
+            <span class="ms-col-sheet">
+              <span class="ms-sheet-badge">${m.sheetName}</span>
+            </span>
+            <span class="ms-col-arrow">→</span>
+            <span class="ms-col-type">
+              <select class="ms-type-select" id="ms-select-${mode}-${idx}" onchange="MultiSheetImport.onMappingChange(${idx}, this.value, '${mode}')">
+                <option value="">-- Bỏ qua --</option>
+                ${fileTypeOptions}
+              </select>
+            </span>
+            <span class="ms-col-info">${m.rowCount > 0 ? m.rowCount + ' dòng' : '—'}</span>
+            <span class="ms-col-status">
+              <span class="ms-status-badge ${statusClass}" id="ms-status-${mode}-${idx}">${statusIcon} ${statusText}</span>
+            </span>
+          </div>`;
+    });
+
+    html += `
+        </div>
+        <div class="ms-actions">
+          <button class="btn btn-primary ms-apply-btn" onclick="MultiSheetImport.applyImport('${mode}')">
+            <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\">
+              <path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>
+              <polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/>
+            </svg>
+            Áp dụng ${matchedCount} sheet đã khớp
+          </button>
+          <button class="btn btn-outline" onclick="MultiSheetImport.clearResult('${mode}')">
+            Hủy
+          </button>
+        </div>
+      </div>`;
+
+    container.innerHTML = html;
+
+    // Set selected values in dropdowns
+    matches.forEach((m, idx) => {
+      const select = document.getElementById(`ms-select-${mode}-${idx}`);
+      if (select && m.selectedKey) {
+        select.value = m.selectedKey;
+      }
+    });
+
+    // Store state
+    this._currentFile = file;
+    this._currentMatches = matches;
+    this._currentMode = mode;
+  },
+
+  /**
+   * Handle user changing a sheet mapping dropdown
+   */
+  onMappingChange(idx, value, mode) {
+    if (!this._currentMatches) return;
+    this._currentMatches[idx].selectedKey = value;
+
+    const statusEl = document.getElementById(`ms-status-${mode}-${idx}`);
+    const rowEl = statusEl ? statusEl.closest('.ms-match-row') : null;
+
+    if (value) {
+      if (statusEl) statusEl.innerHTML = '✅ ✓ Khớp';
+      if (statusEl) statusEl.className = 'ms-status-badge ms-matched';
+      if (rowEl) { rowEl.classList.add('ms-matched'); rowEl.classList.remove('ms-unmatched'); }
+    } else {
+      if (statusEl) statusEl.innerHTML = '⏭️ Bỏ qua';
+      if (statusEl) statusEl.className = 'ms-status-badge ms-unmatched';
+      if (rowEl) { rowEl.classList.remove('ms-matched'); rowEl.classList.add('ms-unmatched'); }
+    }
+
+    // Update apply button count
+    const matchedCount = this._currentMatches.filter(m => m.selectedKey).length;
+    const applyBtn = document.querySelector(`#${mode === 'word' ? 'word-' : ''}multi-sheet-result .ms-apply-btn`);
+    if (applyBtn) {
+      applyBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Áp dụng ${matchedCount} sheet đã khớp`;
+    }
+  },
+
+  /**
+   * Apply the multi-sheet import: extract each matched sheet as a separate "file" 
+   * and load it into the corresponding upload slot
+   */
+  async applyImport(mode) {
+    if (!this._currentFile || !this._currentMatches) return;
+
+    const matches = this._currentMatches.filter(m => m.selectedKey);
+    if (matches.length === 0) {
+      App.toast('Chưa có sheet nào được mapping. Hãy chọn loại dữ liệu cho ít nhất 1 sheet.', 'warning');
+      return;
+    }
+
+    // Check for duplicate mappings
+    const usedKeys = {};
+    for (const m of matches) {
+      if (usedKeys[m.selectedKey]) {
+        App.toast(`Loại "${FILE_TYPES[m.selectedKey].label}" đã được gán cho sheet "${usedKeys[m.selectedKey]}". Mỗi loại chỉ được gán 1 sheet.`, 'warning');
+        return;
+      }
+      usedKeys[m.selectedKey] = m.sheetName;
+    }
+
+    try {
+      App.toast('Đang tách và nạp các sheet...', 'info');
+
+      // Read original workbook
+      const arrayBuffer = await this._readFileAsArrayBuffer(this._currentFile);
+      const data = new Uint8Array(arrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+
+      let successCount = 0;
+
+      for (const match of matches) {
+        const sheet = workbook.Sheets[match.sheetName];
+        if (!sheet) continue;
+
+        // Create a new workbook with just this sheet
+        const newWb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(newWb, sheet, match.sheetName);
+
+        // Write to array buffer then create a File object
+        const wbOut = XLSX.write(newWb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const sheetFile = new File([blob], `${match.sheetName}.xlsx`, {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+
+        // Load into the appropriate state
+        const fileType = match.selectedKey;
+
+        if (mode === 'word') {
+          WordState.uploadedFiles[fileType] = sheetFile;
+          // Update UI
+          const slot = document.getElementById(`word-slot-${fileType}`);
+          const info = document.getElementById(`word-file-info-${fileType}`);
+          const nameEl = document.getElementById(`word-file-name-${fileType}`);
+          if (slot) slot.classList.add('has-file');
+          if (info) info.style.display = 'flex';
+          if (nameEl) nameEl.textContent = `📑 ${match.sheetName} (từ ${this._currentFile.name})`;
+        } else {
+          AppState.uploadedFiles[fileType] = sheetFile;
+          // Update UI
+          const slot = document.getElementById(`slot-${fileType}`);
+          const info = document.getElementById(`file-info-${fileType}`);
+          const nameEl = document.getElementById(`file-name-${fileType}`);
+          if (slot) slot.classList.add('has-file');
+          if (info) info.style.display = 'flex';
+          if (nameEl) nameEl.textContent = `📑 ${match.sheetName} (từ ${this._currentFile.name})`;
+        }
+
+        successCount++;
+      }
+
+      // Update result UI to show success
+      const resultEl = document.getElementById(mode === 'word' ? 'word-multi-sheet-result' : 'multi-sheet-result');
+      resultEl.innerHTML = `
+        <div class="ms-success">
+          <span class="ms-success-icon">✅</span>
+          <div>
+            <strong>Đã nạp thành công ${successCount} sheet từ "${this._currentFile.name}"</strong>
+            <p>${matches.map(m => `<span class="ms-success-tag">${m.sheetName} → ${FILE_TYPES[m.selectedKey].label}</span>`).join(' ')}</p>
+          </div>
+          <button class="ms-clear-btn" onclick="MultiSheetImport.clearResult('${mode}')">✕</button>
+        </div>`;
+
+      App.toast(`✓ Đã nạp thành công ${successCount} sheet!`, 'success');
+
+    } catch (err) {
+      console.error('MultiSheetImport apply error:', err);
+      App.toast('Lỗi khi tách sheet: ' + err.message, 'error');
+    }
+  },
+
+  /**
+   * Clear the multi-sheet result area
+   */
+  clearResult(mode) {
+    const resultEl = document.getElementById(mode === 'word' ? 'word-multi-sheet-result' : 'multi-sheet-result');
+    if (resultEl) {
+      resultEl.style.display = 'none';
+      resultEl.innerHTML = '';
+    }
+    this._currentFile = null;
+    this._currentMatches = null;
   }
 };
 

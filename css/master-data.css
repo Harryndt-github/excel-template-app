@@ -1,0 +1,775 @@
+/* ============================================
+   Master Data — Styles
+   ============================================ */
+
+/* ── Page Layout ── */
+.md-page-layout {
+  display: flex;
+  gap: 0;
+  height: calc(100vh - 96px);
+  margin: -32px -40px;
+  margin-top: 0;
+}
+
+.md-sidebar {
+  width: 280px;
+  min-width: 280px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.md-sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.md-sidebar-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.md-sidebar-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.md-sidebar-actions .btn {
+  flex: 1;
+  justify-content: center;
+  font-size: 0.78rem;
+  padding: 7px 10px;
+}
+
+.md-entity-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.md-entity-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition);
+  margin-bottom: 2px;
+}
+
+.md-entity-item:hover {
+  background: var(--accent-light);
+}
+
+.md-entity-item.active {
+  background: var(--accent-light);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.md-entity-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.md-entity-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.md-entity-name {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.md-entity-meta {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.md-entity-edit-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  transition: var(--transition);
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.md-entity-item:hover .md-entity-edit-btn {
+  opacity: 1;
+}
+
+.md-entity-edit-btn:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+/* ── Main Area ── */
+.md-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.md-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  gap: 12px;
+}
+
+.md-view-switcher {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-input);
+  border-radius: var(--radius-md);
+  padding: 3px;
+}
+
+.md-view-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.md-view-btn:hover {
+  color: var(--text-primary);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.md-view-btn.active {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.md-toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Mindmap Canvas ── */
+.md-view-panel {
+  flex: 1;
+  overflow: hidden;
+}
+
+#md-mindmap-canvas {
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.03) 0%, transparent 70%),
+    linear-gradient(90deg, rgba(30, 30, 58, 0.15) 1px, transparent 1px),
+    linear-gradient(rgba(30, 30, 58, 0.15) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
+  cursor: default;
+}
+
+.md-node {
+  cursor: grab;
+  transition: transform 0.1s;
+}
+
+.md-node:hover .md-node-rect {
+  filter: url(#shadow) brightness(1.2);
+}
+
+.md-connection-line {
+  transition: stroke 0.2s;
+  pointer-events: none;
+}
+
+/* ── Matrix View ── */
+.md-matrix-wrap {
+  padding: 24px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.md-matrix-section {
+  margin-bottom: 32px;
+}
+
+.md-matrix-section h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.md-matrix-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+}
+
+.md-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.md-matrix-table th,
+.md-matrix-table td {
+  padding: 12px 14px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.md-matrix-table th:last-child,
+.md-matrix-table td:last-child {
+  border-right: none;
+}
+
+.md-matrix-table thead th {
+  background: rgba(99, 102, 241, 0.06);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-secondary);
+  position: sticky;
+  top: 0;
+}
+
+.md-matrix-row-header {
+  text-align: left !important;
+  font-weight: 600;
+  min-width: 140px;
+  background: rgba(10, 10, 18, 0.3);
+}
+
+.md-matrix-self {
+  background: rgba(99, 102, 241, 0.05);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.md-matrix-linked {
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.md-matrix-linked:hover {
+  background: var(--accent-light);
+}
+
+.md-matrix-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--success-light);
+  color: var(--success);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+/* Matrix detail grid */
+.md-matrix-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.md-conn-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: var(--transition);
+}
+
+.md-conn-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.md-conn-from, .md-conn-to {
+  flex: 1;
+  padding: 8px 12px;
+  border-left: 3px solid;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.md-conn-entity-name {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 3px;
+}
+
+.md-conn-field-name {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.md-conn-arrow {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ── Records View ── */
+.md-records-wrap {
+  padding: 24px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.md-records-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.md-records-header h4 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.md-records-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: block;
+}
+
+.md-records-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.md-records-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+}
+
+.md-records-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  min-width: 800px;
+}
+
+.md-records-table th,
+.md-records-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.md-records-table th:last-child,
+.md-records-table td:last-child {
+  border-right: none;
+}
+
+.md-records-table th {
+  background: rgba(99, 102, 241, 0.06);
+  font-weight: 600;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.md-record-idx {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-align: center !important;
+}
+
+.md-record-cell {
+  min-width: 100px;
+  max-width: 200px;
+  outline: none;
+  transition: var(--transition);
+  cursor: text;
+}
+
+.md-record-cell:focus {
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.md-rec-action-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  transition: var(--transition);
+}
+
+.md-rec-fill-btn {
+  color: var(--accent);
+}
+
+.md-rec-fill-btn:hover {
+  background: var(--accent-light);
+}
+
+.md-rec-del-btn {
+  color: var(--text-muted);
+}
+
+.md-rec-del-btn:hover {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+.md-records-more-hint {
+  text-align: center;
+  padding: 12px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+/* ── Empty View ── */
+.md-empty-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+
+.md-empty-icon {
+  font-size: 3.5rem;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.md-empty-view h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.md-empty-view p {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  max-width: 340px;
+  line-height: 1.5;
+}
+
+/* ── Entity Modal ── */
+.md-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+
+.md-modal {
+  width: 95%;
+  max-width: 650px;
+  max-height: 85vh;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.md-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.md-modal-header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.md-modal-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  transition: var(--transition);
+}
+
+.md-modal-close:hover {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+.md-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.md-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.md-form-group {
+  margin-bottom: 20px;
+}
+
+.md-form-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.md-form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.md-form-row > * {
+  flex: 1;
+}
+
+/* Fields editor */
+.md-fields-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.md-fields-header h4 {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.md-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(30, 30, 58, 0.4);
+}
+
+.md-field-idx {
+  width: 24px;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.md-field-name-input {
+  flex: 2;
+  font-size: 0.82rem !important;
+  padding: 7px 10px !important;
+}
+
+.md-field-type-select {
+  flex: 1;
+  font-size: 0.82rem !important;
+  padding: 7px 10px !important;
+}
+
+.md-field-remove-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  transition: var(--transition);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.md-field-remove-btn:hover {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+/* Color picker */
+.md-color-grid {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.md-color-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+
+.md-color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.md-color-swatch.selected {
+  border-color: white;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.md-color-swatch.selected::after {
+  content: '✓';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ── Nav divider ── */
+.nav-divider-label {
+  padding: 16px 16px 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-divider-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.nav-divider-label span {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .md-page-layout {
+    flex-direction: column;
+    height: auto;
+  }
+  .md-sidebar {
+    width: 100%;
+    min-width: unset;
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .md-entity-list {
+    display: flex;
+    overflow-x: auto;
+    padding: 8px;
+    gap: 4px;
+  }
+  .md-entity-item {
+    min-width: 160px;
+    flex-shrink: 0;
+  }
+  .md-matrix-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
