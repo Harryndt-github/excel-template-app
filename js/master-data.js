@@ -498,7 +498,7 @@ const MasterData = {
   },
 
   // ══════════════════════════════════════════
-  //  RECORDS VIEW — Data Entry & Auto-fill
+  //  RECORDS VIEW — 2-Column Key-Value + Cascading
   // ══════════════════════════════════════════
   renderRecords() {
     const container = document.getElementById('md-view-records');
@@ -518,20 +518,18 @@ const MasterData = {
     if (!entity) return;
 
     const records = MasterDataState.records[entity.id] || [];
+    // Find connected (child) entities
+    const childLinks = this._getLinkedEntities(entity.id);
 
     let html = `<div class="md-records-wrap">
       <div class="md-records-header">
         <div>
           <h4 style="color:${entity.color};">📋 ${_mdEsc(entity.name)} — Dữ liệu</h4>
-          <span class="md-records-meta">${records.length} bản ghi • ${entity.fields.length} trường</span>
+          <span class="md-records-meta">${records.length} bản ghi • ${entity.fields.length} trường${childLinks.length > 0 ? ' • ' + childLinks.length + ' liên kết' : ''}</span>
         </div>
         <div class="md-records-actions">
-          <button class="btn btn-primary btn-sm" onclick="MasterData.addRecord('${entity.id}')">
-            ＋ Thêm bản ghi
-          </button>
-          <button class="btn btn-outline btn-sm" onclick="MasterData.importRecordsFromExcel('${entity.id}')">
-            📥 Import Excel
-          </button>
+          <button class="btn btn-primary btn-sm" onclick="MasterData.addRecord('${entity.id}')">＋ Thêm bản ghi</button>
+          <button class="btn btn-outline btn-sm" onclick="MasterData.importRecordsFromExcel('${entity.id}')">📥 Import Excel</button>
         </div>
       </div>`;
 
@@ -540,40 +538,313 @@ const MasterData = {
         <p>Chưa có bản ghi nào. Nhấn "Thêm bản ghi" để bắt đầu nhập dữ liệu.</p>
       </div>`;
     } else {
-      // Data table
-      html += '<div class="md-records-table-wrap"><table class="md-records-table"><thead><tr>';
-      html += '<th style="width:40px;">#</th>';
-      entity.fields.slice(0, 15).forEach(field => {
-        html += `<th>${_mdEsc(field.name)}</th>`;
-      });
-      html += '<th style="width:80px;">Thao tác</th>';
-      html += '</tr></thead><tbody>';
-
+      // Record tabs + 2-column view
+      html += `<div class="md-record-tabs">`;
       records.forEach((rec, idx) => {
-        html += `<tr class="md-record-row" data-idx="${idx}">`;
-        html += `<td class="md-record-idx">${idx + 1}</td>`;
-        entity.fields.slice(0, 15).forEach(field => {
-          const val = rec[field.id] || '';
-          html += `<td class="md-record-cell" contenteditable="true"
-            data-entity="${entity.id}" data-record="${idx}" data-field="${field.id}"
-            onblur="MasterData.onCellEdit(this)">${_mdEsc(val)}</td>`;
-        });
-        html += `<td>
-          <button class="md-rec-action-btn md-rec-fill-btn" onclick="MasterData.autoFillRecord('${entity.id}', ${idx})" title="Auto-fill liên kết">🔗</button>
-          <button class="md-rec-action-btn md-rec-del-btn" onclick="MasterData.deleteRecord('${entity.id}', ${idx})" title="Xóa">✕</button>
-        </td>`;
-        html += '</tr>';
+        const selected = (MasterDataState.selectedRecord === idx || (!MasterDataState.selectedRecord && idx === 0)) ? ' active' : '';
+        const label = this._getRecordLabel(entity, rec, idx);
+        html += `<button class="md-record-tab${selected}" onclick="MasterData.selectRecord(${idx})">${label}</button>`;
       });
+      html += `</div>`;
 
-      html += '</tbody></table></div>';
-
-      if (entity.fields.length > 15) {
-        html += `<p class="md-records-more-hint">Hiển thị 15/${entity.fields.length} trường. Scroll ngang để xem thêm.</p>`;
+      // Show selected record in 2-column format
+      const recIdx = MasterDataState.selectedRecord || 0;
+      const rec = records[recIdx] || records[0];
+      if (rec) {
+        html += this._renderKeyValueRecord(entity, rec, recIdx, childLinks);
       }
     }
 
     html += '</div>';
     container.innerHTML = html;
+  },
+
+  selectRecord(idx) {
+    MasterDataState.selectedRecord = idx;
+    this.renderRecords();
+  },
+
+  _getRecordLabel(entity, rec, idx) {
+    // Try to use first non-empty field value as label
+    for (const f of entity.fields) {
+      const v = rec[f.id];
+      if (v && String(v).trim()) return _mdEsc(String(v).substring(0, 20));
+    }
+    return `Bản ghi ${idx + 1}`;
+  },
+
+  _getLinkedEntities(entityId) {
+    const links = [];
+    const seen = new Set();
+    MasterDataState.connections.forEach(conn => {
+      let childEntityId = null;
+      let linkFieldFrom = null;
+      let linkFieldTo = null;
+      if (conn.fromEntity === entityId) {
+        childEntityId = conn.toEntity;
+        linkFieldFrom = conn.fromField;
+        linkFieldTo = conn.toField;
+      } else if (conn.toEntity === entityId) {
+        childEntityId = conn.fromEntity;
+        linkFieldFrom = conn.toField;
+        linkFieldTo = conn.fromField;
+      }
+      if (childEntityId && !seen.has(childEntityId)) {
+        const childEnt = MasterDataState.entities.find(e => e.id === childEntityId);
+        if (childEnt) {
+          seen.add(childEntityId);
+          links.push({ entity: childEnt, connId: conn.id, linkFieldFrom, linkFieldTo });
+        }
+      }
+    });
+    return links;
+  },
+
+  _renderKeyValueRecord(entity, rec, recIdx, childLinks) {
+    let html = `<div class="md-kv-record">`;
+
+    // ── Parent entity fields (2-column: Label | Value) ──
+    html += `<div class="md-kv-section">
+      <div class="md-kv-section-header" style="border-left:4px solid ${entity.color};">
+        <span class="md-kv-section-icon" style="background:${entity.color};">${_mdEsc(entity.name.charAt(0))}</span>
+        <span class="md-kv-section-title">${_mdEsc(entity.name)}</span>
+        <div class="md-kv-section-actions">
+          <button class="md-rec-action-btn md-rec-fill-btn" onclick="MasterData.autoFillRecord('${entity.id}', ${recIdx})" title="Auto-fill">🔗 Auto-fill</button>
+          <button class="md-rec-action-btn md-rec-del-btn" onclick="MasterData.deleteRecord('${entity.id}', ${recIdx})" title="Xóa">✕ Xóa</button>
+        </div>
+      </div>
+      <table class="md-kv-table">
+        <thead><tr><th class="md-kv-label-col">Trường dữ liệu</th><th class="md-kv-value-col">Giá trị</th></tr></thead>
+        <tbody>`;
+
+    entity.fields.forEach(field => {
+      const val = rec[field.id] || '';
+      // Check if this field has linked records for dropdown
+      const linkedDropdown = this._getDropdownForField(entity.id, field, childLinks);
+      html += `<tr class="md-kv-row">
+        <td class="md-kv-label">
+          <span class="md-kv-field-type" title="${this._fieldTypeLabel(field.type)}">${this._fieldTypeIcon(field.type)}</span>
+          ${_mdEsc(field.name)}
+        </td>
+        <td class="md-kv-value">`;
+      if (linkedDropdown) {
+        html += this._renderDropdownCell(entity.id, recIdx, field, val, linkedDropdown);
+      } else {
+        html += `<input type="text" class="md-kv-input" value="${_mdEsc(val)}"
+          data-entity="${entity.id}" data-record="${recIdx}" data-field="${field.id}"
+          onchange="MasterData.onKvEdit(this)">`;
+      }
+      html += `</td></tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+
+    // ── Child entity sections (cascading) ──
+    childLinks.forEach(link => {
+      html += this._renderChildSection(entity, rec, recIdx, link);
+    });
+
+    html += `</div>`;
+    return html;
+  },
+
+  _getDropdownForField(entityId, field, childLinks) {
+    // Check if this field connects to another entity and that entity has records
+    for (const link of childLinks) {
+      // Find all connections between this entity and the child
+      const conns = MasterDataState.connections.filter(c =>
+        (c.fromEntity === entityId && c.toEntity === link.entity.id) ||
+        (c.toEntity === entityId && c.fromEntity === link.entity.id)
+      );
+      for (const conn of conns) {
+        const myFieldId = (conn.fromEntity === entityId) ? conn.fromField : conn.toField;
+        if (myFieldId === field.id) {
+          const otherEntityRecords = MasterDataState.records[link.entity.id] || [];
+          if (otherEntityRecords.length > 0) {
+            const otherFieldId = (conn.fromEntity === entityId) ? conn.toField : conn.fromField;
+            return { childEntity: link.entity, otherFieldId, records: otherEntityRecords };
+          }
+        }
+      }
+    }
+    return null;
+  },
+
+  _renderDropdownCell(entityId, recIdx, field, currentVal, dropdown) {
+    // Get unique values from the linked entity's field
+    const options = new Set();
+    dropdown.records.forEach(r => {
+      const v = r[dropdown.otherFieldId];
+      if (v && String(v).trim()) options.add(String(v));
+    });
+
+    let html = `<div class="md-kv-dropdown-wrap">
+      <select class="md-kv-select" data-entity="${entityId}" data-record="${recIdx}"
+        data-field="${field.id}" data-child-entity="${dropdown.childEntity.id}"
+        data-child-field="${dropdown.otherFieldId}"
+        onchange="MasterData.onDropdownChange(this)">
+        <option value="">-- Chọn từ ${_mdEsc(dropdown.childEntity.name)} --</option>`;
+    options.forEach(v => {
+      html += `<option value="${_mdEsc(v)}" ${v === currentVal ? 'selected' : ''}>${_mdEsc(v)}</option>`;
+    });
+    html += `</select>
+      <span class="md-kv-link-badge" style="background:${dropdown.childEntity.color}20;color:${dropdown.childEntity.color};">
+        🔗 ${_mdEsc(dropdown.childEntity.name)}
+      </span>
+    </div>`;
+    return html;
+  },
+
+  _renderChildSection(parentEntity, parentRec, parentRecIdx, link) {
+    const childEntity = link.entity;
+    const childRecords = MasterDataState.records[childEntity.id] || [];
+
+    // Find which child records are related via the connection
+    const matchingRecords = this._findMatchingChildRecords(parentEntity.id, parentRec, childEntity.id);
+
+    let html = `<div class="md-kv-section md-kv-child-section">
+      <div class="md-kv-section-header" style="border-left:4px solid ${childEntity.color};">
+        <span class="md-kv-section-icon" style="background:${childEntity.color};">${_mdEsc(childEntity.name.charAt(0))}</span>
+        <span class="md-kv-section-title">${_mdEsc(childEntity.name)}</span>
+        <span class="md-kv-child-badge">${matchingRecords.length} kết quả liên kết</span>
+      </div>`;
+
+    if (matchingRecords.length === 0) {
+      html += `<div class="md-kv-child-empty">
+        <p>Chưa có dữ liệu liên kết. Hãy nhập dữ liệu cho "${_mdEsc(childEntity.name)}" hoặc chọn giá trị ở trường liên kết phía trên.</p>
+      </div>`;
+    } else {
+      // Show matching records as a compact table
+      html += `<div class="md-kv-child-records">
+        <table class="md-kv-table md-kv-child-table">
+          <thead><tr>`;
+      childEntity.fields.slice(0, 8).forEach(f => {
+        html += `<th>${_mdEsc(f.name)}</th>`;
+      });
+      html += `</tr></thead><tbody>`;
+      matchingRecords.forEach(mr => {
+        html += `<tr class="md-kv-child-row" onclick="MasterData.applyChildRecord('${parentEntity.id}', ${parentRecIdx}, '${childEntity.id}', ${mr.idx})">`;
+        childEntity.fields.slice(0, 8).forEach(f => {
+          html += `<td>${_mdEsc(mr.record[f.id] || '')}</td>`;
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody></table></div>`;
+    }
+
+    html += `</div>`;
+    return html;
+  },
+
+  _findMatchingChildRecords(parentEntityId, parentRec, childEntityId) {
+    const conns = MasterDataState.connections.filter(c =>
+      (c.fromEntity === parentEntityId && c.toEntity === childEntityId) ||
+      (c.toEntity === parentEntityId && c.fromEntity === childEntityId)
+    );
+
+    const childRecords = MasterDataState.records[childEntityId] || [];
+    if (conns.length === 0 || childRecords.length === 0) return [];
+
+    const results = [];
+    childRecords.forEach((cr, idx) => {
+      let matches = false;
+      for (const conn of conns) {
+        const parentFieldId = (conn.fromEntity === parentEntityId) ? conn.fromField : conn.toField;
+        const childFieldId = (conn.fromEntity === parentEntityId) ? conn.toField : conn.fromField;
+
+        const parentVal = parentRec[parentFieldId];
+        const childVal = cr[childFieldId];
+
+        if (parentVal && childVal && String(parentVal).toLowerCase().trim() === String(childVal).toLowerCase().trim()) {
+          matches = true;
+          break;
+        }
+      }
+      if (matches) results.push({ record: cr, idx });
+    });
+
+    return results;
+  },
+
+  onDropdownChange(select) {
+    const entityId = select.getAttribute('data-entity');
+    const recIdx = parseInt(select.getAttribute('data-record'));
+    const fieldId = select.getAttribute('data-field');
+    const childEntityId = select.getAttribute('data-child-entity');
+    const childFieldId = select.getAttribute('data-child-field');
+    const value = select.value;
+
+    // Update the parent record field
+    if (!MasterDataState.records[entityId]) MasterDataState.records[entityId] = [];
+    if (MasterDataState.records[entityId][recIdx]) {
+      MasterDataState.records[entityId][recIdx][fieldId] = value;
+    }
+
+    // Auto-fill from child entity if a matching record exists
+    if (value && childEntityId) {
+      const childRecords = MasterDataState.records[childEntityId] || [];
+      const matchRec = childRecords.find(r => String(r[childFieldId]) === value);
+      if (matchRec) {
+        const parentEntity = MasterDataState.entities.find(e => e.id === entityId);
+        const childEntity = MasterDataState.entities.find(e => e.id === childEntityId);
+        if (parentEntity && childEntity) {
+          const parentFieldMap = new Map(parentEntity.fields.map(f => [f.name.toLowerCase().trim(), f.id]));
+          let filled = 0;
+          childEntity.fields.forEach(cf => {
+            const matchParentFieldId = parentFieldMap.get(cf.name.toLowerCase().trim());
+            if (matchParentFieldId && matchRec[cf.id]) {
+              MasterDataState.records[entityId][recIdx][matchParentFieldId] = matchRec[cf.id];
+              filled++;
+            }
+          });
+          if (filled > 0) {
+            App.toast(`Auto-fill ${filled} trường từ "${childEntity.name}"`, 'success');
+          }
+        }
+      }
+    }
+
+    this.saveState();
+    this.renderRecords();
+  },
+
+  applyChildRecord(parentEntityId, parentRecIdx, childEntityId, childRecIdx) {
+    const parentEntity = MasterDataState.entities.find(e => e.id === parentEntityId);
+    const childEntity = MasterDataState.entities.find(e => e.id === childEntityId);
+    if (!parentEntity || !childEntity) return;
+
+    const parentRec = MasterDataState.records[parentEntityId]?.[parentRecIdx];
+    const childRec = MasterDataState.records[childEntityId]?.[childRecIdx];
+    if (!parentRec || !childRec) return;
+
+    const parentFieldMap = new Map(parentEntity.fields.map(f => [f.name.toLowerCase().trim(), f.id]));
+    let filled = 0;
+    childEntity.fields.forEach(cf => {
+      const matchId = parentFieldMap.get(cf.name.toLowerCase().trim());
+      if (matchId && childRec[cf.id]) {
+        parentRec[matchId] = childRec[cf.id];
+        filled++;
+      }
+    });
+
+    this.saveState();
+    this.renderRecords();
+    if (filled > 0) {
+      App.toast(`Đã áp dụng ${filled} trường từ "${childEntity.name}"`, 'success');
+    }
+  },
+
+  onKvEdit(input) {
+    const entityId = input.getAttribute('data-entity');
+    const recIdx = parseInt(input.getAttribute('data-record'));
+    const fieldId = input.getAttribute('data-field');
+    const value = input.value.trim();
+
+    if (!MasterDataState.records[entityId]) MasterDataState.records[entityId] = [];
+    if (MasterDataState.records[entityId][recIdx]) {
+      MasterDataState.records[entityId][recIdx][fieldId] = value;
+      this.saveState();
+    }
   },
 
   onCellEdit(td) {
@@ -589,6 +860,15 @@ const MasterData = {
     }
   },
 
+  _fieldTypeIcon(type) {
+    const icons = { text:'Aa', number:'#', date:'📅', select:'▼', currency:'💰', percent:'%', phone:'📞', email:'@' };
+    return icons[type] || 'Aa';
+  },
+  _fieldTypeLabel(type) {
+    const m = FIELD_TYPES.find(t => t.value === type);
+    return m ? m.label : 'Văn bản';
+  },
+
   addRecord(entityId) {
     const entity = MasterDataState.entities.find(e => e.id === entityId);
     if (!entity) return;
@@ -598,6 +878,7 @@ const MasterData = {
     const rec = {};
     entity.fields.forEach(f => { rec[f.id] = ''; });
     MasterDataState.records[entityId].push(rec);
+    MasterDataState.selectedRecord = MasterDataState.records[entityId].length - 1;
     this.saveState();
     this.renderRecords();
     this.renderEntityList();
@@ -608,6 +889,7 @@ const MasterData = {
     if (!confirm('Xóa bản ghi này?')) return;
     if (MasterDataState.records[entityId]) {
       MasterDataState.records[entityId].splice(idx, 1);
+      MasterDataState.selectedRecord = 0;
       this.saveState();
       this.renderRecords();
       this.renderEntityList();
@@ -643,12 +925,10 @@ const MasterData = {
       const myFieldValue = record[myFieldId];
       if (!myFieldValue) return;
 
-      // Find matching record in the other entity
       const otherRecords = MasterDataState.records[otherEntityId] || [];
       const matchingRecord = otherRecords.find(r => r[otherFieldId] === myFieldValue);
 
       if (matchingRecord) {
-        // Find shared fields between entities
         const otherEntity = MasterDataState.entities.find(e => e.id === otherEntityId);
         if (!otherEntity) return;
 
@@ -706,7 +986,6 @@ const MasterData = {
         jsonData.forEach(row => {
           const rec = {};
           entity.fields.forEach(field => {
-            // Try to match by field name
             const val = row[field.name] ?? '';
             rec[field.id] = String(val);
           });
@@ -938,7 +1217,6 @@ const MasterData = {
   // ══════════════════════════════════════════
   //  TEMPLATE INTEGRATION — Insert from Master Data
   // ══════════════════════════════════════════
-  // Gets all master data fields as a flat list for template insertion
   getAllFieldsFlat() {
     const result = [];
     MasterDataState.entities.forEach(ent => {
@@ -957,20 +1235,18 @@ const MasterData = {
     return result;
   },
 
-  // Gets a specific record's value for a field
   getFieldValue(entityId, fieldId, recordIdx = 0) {
     const records = MasterDataState.records[entityId] || [];
     if (recordIdx >= records.length) return '';
     return records[recordIdx][fieldId] || '';
   },
 
-  // Get all data for template merging
   getDataForMerge() {
     const data = {};
     MasterDataState.entities.forEach(ent => {
       const records = MasterDataState.records[ent.id] || [];
       if (records.length > 0) {
-        const rec = records[0]; // Use first record for merge
+        const rec = records[0];
         ent.fields.forEach(field => {
           const key = `[${ent.name}] ${field.name}`;
           data[key] = rec[field.id] || '';
@@ -978,6 +1254,177 @@ const MasterData = {
       }
     });
     return data;
+  },
+
+  // ── Render master data entity cards for placeholder modals ──
+  renderMasterDataSourceCards(containerId, callbackPrefix) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const entities = MasterDataState.entities;
+    if (entities.length === 0) {
+      container.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--text-muted);">
+        <p style="font-size:2rem;margin-bottom:8px;">📊</p>
+        <p>Chưa có Master Data.</p>
+        <p style="font-size:0.78rem;margin-top:6px;">Tạo entity trong mục <b>Master Data</b>.</p>
+      </div>`;
+      return;
+    }
+
+    container.innerHTML = entities.map(ent => {
+      const recCount = (MasterDataState.records[ent.id] || []).length;
+      return `<div class="ph-source-card md-ph-entity-card" onclick="${callbackPrefix}('${ent.id}')" style="border-left:3px solid ${ent.color};">
+        <span class="ph-source-icon" style="color:${ent.color};">⬢</span>
+        <span class="ph-source-label">${_mdEsc(ent.name)}</span>
+        <span class="ph-source-count">${ent.fields.length} trường • ${recCount} bản ghi</span>
+      </div>`;
+    }).join('');
+  },
+
+  // ── Render fields of a selected entity for insertion ──
+  renderMasterDataFields(entityId, containerId, callbackPrefix, filter) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const entity = MasterDataState.entities.find(e => e.id === entityId);
+    if (!entity) return;
+
+    const fields = filter
+      ? entity.fields.filter(f => f.name.toLowerCase().includes(filter.toLowerCase()))
+      : entity.fields;
+
+    container.innerHTML = fields.map(f => `
+      <div class="ph-field-chip md-ph-field-chip" onclick="${callbackPrefix}('${_mdEsc(entity.name)}', '${_mdEsc(f.name)}')" style="border-left:3px solid ${entity.color};">
+        <span class="ph-field-icon" style="color:${entity.color};">${this._fieldTypeIcon(f.type)}</span>
+        <span class="ph-field-name">${_mdEsc(f.name)}</span>
+      </div>
+    `).join('');
+  },
+
+  // ── Spreadsheet (Excel) integration ──
+  _ssSelectedEntity: null,
+
+  showSsMasterDataSources() {
+    const srcStep = document.getElementById('ss-ph-step-source');
+    const fieldsStep = document.getElementById('ss-ph-step-fields');
+    const mdStep = document.getElementById('ss-ph-step-masterdata');
+    if (srcStep) srcStep.style.display = 'none';
+    if (fieldsStep) fieldsStep.style.display = 'none';
+    if (mdStep) mdStep.style.display = '';
+
+    this.renderMasterDataSourceCards('ss-md-entity-grid', 'MasterData.selectSsMdEntity');
+  },
+
+  selectSsMdEntity(entityId) {
+    this._ssSelectedEntity = entityId;
+    const entity = MasterDataState.entities.find(e => e.id === entityId);
+    if (!entity) return;
+
+    document.getElementById('ss-md-entity-label').textContent = `⬢ ${entity.name}`;
+    document.getElementById('ss-md-entity-label').style.color = entity.color;
+    document.getElementById('ss-md-step-entities').style.display = 'none';
+    document.getElementById('ss-md-step-fields').style.display = '';
+
+    this.renderMasterDataFields(entityId, 'ss-md-fields-grid', 'MasterData.insertSsMdField');
+  },
+
+  showSsMdEntitiesStep() {
+    document.getElementById('ss-md-step-entities').style.display = '';
+    document.getElementById('ss-md-step-fields').style.display = 'none';
+  },
+
+  filterSsMdFields(q) {
+    if (!this._ssSelectedEntity) return;
+    this.renderMasterDataFields(this._ssSelectedEntity, 'ss-md-fields-grid', 'MasterData.insertSsMdField', q);
+  },
+
+  insertSsMdField(entityName, fieldName) {
+    const placeholder = `[${entityName}] ${fieldName}`;
+    Spreadsheet.insertPhField(placeholder);
+  },
+
+  // ── Word Template integration ──
+  _wordSelectedEntity: null,
+
+  showWordMasterDataSources() {
+    document.getElementById('word-ph-step-source').style.display = 'none';
+    document.getElementById('word-ph-step-fields').style.display = 'none';
+    document.getElementById('word-ph-step-masterdata').style.display = '';
+
+    this.renderMasterDataSourceCards('word-md-entity-grid', 'MasterData.selectWordMdEntity');
+  },
+
+  selectWordMdEntity(entityId) {
+    this._wordSelectedEntity = entityId;
+    const entity = MasterDataState.entities.find(e => e.id === entityId);
+    if (!entity) return;
+
+    document.getElementById('word-md-entity-label').textContent = `⬢ ${entity.name}`;
+    document.getElementById('word-md-entity-label').style.color = entity.color;
+    document.getElementById('word-md-step-entities').style.display = 'none';
+    document.getElementById('word-md-step-fields').style.display = '';
+
+    this.renderMasterDataFields(entityId, 'word-md-fields-grid', 'MasterData.insertWordMdField');
+  },
+
+  showWordMdEntitiesStep() {
+    document.getElementById('word-md-step-entities').style.display = '';
+    document.getElementById('word-md-step-fields').style.display = 'none';
+  },
+
+  filterWordMdFields(q) {
+    if (!this._wordSelectedEntity) return;
+    this.renderMasterDataFields(this._wordSelectedEntity, 'word-md-fields-grid', 'MasterData.insertWordMdField', q);
+  },
+
+  insertWordMdField(entityName, fieldName) {
+    const placeholder = `[${entityName}] ${fieldName}`;
+    WordEditor.insertPhField(placeholder);
+  },
+
+  // ── Tab switching for modals ──
+  _switchSsTab(tab) {
+    const fileBtn = document.getElementById('ss-tab-file');
+    const masterBtn = document.getElementById('ss-tab-master');
+    const srcStep = document.getElementById('ss-ph-step-source');
+    const fieldsStep = document.getElementById('ss-ph-step-fields');
+    const mdStep = document.getElementById('ss-ph-step-masterdata');
+
+    if (tab === 'file') {
+      fileBtn.classList.add('active');
+      masterBtn.classList.remove('active');
+      if (srcStep) srcStep.style.display = '';
+      if (fieldsStep) fieldsStep.style.display = 'none';
+      if (mdStep) mdStep.style.display = 'none';
+    } else {
+      fileBtn.classList.remove('active');
+      masterBtn.classList.add('active');
+      if (srcStep) srcStep.style.display = 'none';
+      if (fieldsStep) fieldsStep.style.display = 'none';
+      this.showSsMasterDataSources();
+    }
+  },
+
+  _switchWordTab(tab) {
+    const fileBtn = document.getElementById('word-tab-file');
+    const masterBtn = document.getElementById('word-tab-master');
+    const srcStep = document.getElementById('word-ph-step-source');
+    const fieldsStep = document.getElementById('word-ph-step-fields');
+    const mdStep = document.getElementById('word-ph-step-masterdata');
+
+    if (tab === 'file') {
+      fileBtn.classList.add('active');
+      masterBtn.classList.remove('active');
+      if (srcStep) srcStep.style.display = '';
+      if (fieldsStep) fieldsStep.style.display = 'none';
+      if (mdStep) mdStep.style.display = 'none';
+    } else {
+      fileBtn.classList.remove('active');
+      masterBtn.classList.add('active');
+      if (srcStep) srcStep.style.display = 'none';
+      if (fieldsStep) fieldsStep.style.display = 'none';
+      this.showWordMasterDataSources();
+    }
   },
 
   // ── Color picker helper ──

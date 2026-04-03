@@ -1014,8 +1014,13 @@
         <h3>⧉ Chèn trường dữ liệu vào ô</h3>
         <button class="ss-ph-close" onclick="Spreadsheet.closePhModal()">&times;</button>
       </div>
+      <!-- Source Tabs: File nguồn vs Master Data -->
+      <div class="md-ph-tabs">
+        <button class="md-ph-tab active" id="ss-tab-file" onclick="MasterData._switchSsTab('file')">📄 File nguồn</button>
+        <button class="md-ph-tab" id="ss-tab-master" onclick="MasterData._switchSsTab('master')">📊 Master Data</button>
+      </div>
       <div class="ss-ph-modal-content">
-        <!-- Step 1: Select source -->
+        <!-- Step 1: Select source (File) -->
         <div id="ss-ph-step-source">
           <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">Chọn file nguồn chứa dữ liệu:</p>
           <div class="ph-source-grid" id="ss-ph-source-grid">
@@ -1023,7 +1028,7 @@
           </div>
         </div>
 
-        <!-- Step 2: Select field -->
+        <!-- Step 2: Select field (File) -->
         <div id="ss-ph-step-fields" style="display:none;">
           <button class="ss-ph-back-btn" onclick="Spreadsheet.showPhSourceStep()">← Chọn nguồn file khác</button>
           <div class="ss-ph-source-label" id="ss-ph-source-label"></div>
@@ -1042,6 +1047,22 @@
             <button class="ss-ph-custom-btn" onclick="Spreadsheet.insertPhCustom()">＋ Chèn</button>
           </div>
         </div>
+
+        <!-- Master Data: Entity selection -->
+        <div id="ss-ph-step-masterdata" style="display:none;">
+          <div id="ss-md-step-entities">
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">Chọn Entity từ Master Data:</p>
+            <div class="ph-source-grid" id="ss-md-entity-grid"></div>
+          </div>
+          <div id="ss-md-step-fields" style="display:none;">
+            <button class="ss-ph-back-btn" onclick="MasterData.showSsMdEntitiesStep()">← Chọn Entity khác</button>
+            <div class="ss-ph-source-label" id="ss-md-entity-label"></div>
+            <div class="ss-ph-search-wrap">
+              <input type="text" class="ss-ph-search-input" placeholder="🔍 Tìm kiếm trường..." oninput="MasterData.filterSsMdFields(this.value)">
+            </div>
+            <div class="ph-fields-grid" id="ss-md-fields-grid"></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1054,10 +1075,19 @@
         <button class="modal-close" onclick="WordEditor.closePlaceholderModal()">&times;</button>
       </div>
       <div class="modal-body">
+        <!-- Source Tabs -->
+        <div class="md-ph-tabs">
+          <button class="md-ph-tab active" id="word-tab-file" onclick="MasterData._switchWordTab('file')">📄 File nguồn</button>
+          <button class="md-ph-tab" id="word-tab-master" onclick="MasterData._switchWordTab('master')">📊 Master Data</button>
+        </div>
+
+        <!-- File source step -->
         <div id="word-ph-step-source">
           <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">Chọn file nguồn chứa dữ liệu:</p>
           <div class="ph-source-grid" id="word-ph-source-grid"></div>
         </div>
+
+        <!-- File fields step -->
         <div id="word-ph-step-fields" style="display:none;">
           <button class="ph-back-btn" onclick="WordEditor.showPhSourceStep()">← Chọn nguồn file khác</button>
           <div class="ss-ph-source-label" id="word-ph-source-label" style="margin:10px 0;font-weight:600;"></div>
@@ -1072,6 +1102,23 @@
               <input type="text" id="word-ph-custom-name" class="input" placeholder="VD: Tên chỉ tiêu khác...">
               <button class="btn btn-primary btn-sm" onclick="WordEditor.insertPhCustom()">＋ Chèn</button>
             </div>
+          </div>
+        </div>
+
+        <!-- Master Data step -->
+        <div id="word-ph-step-masterdata" style="display:none;">
+          <div id="word-md-step-entities">
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">Chọn Entity từ Master Data:</p>
+            <div class="ph-source-grid" id="word-md-entity-grid"></div>
+          </div>
+          <div id="word-md-step-fields" style="display:none;">
+            <button class="ph-back-btn" onclick="MasterData.showWordMdEntitiesStep()">← Chọn Entity khác</button>
+            <div class="ss-ph-source-label" id="word-md-entity-label" style="margin:10px 0;font-weight:600;"></div>
+            <div class="ph-search-bar">
+              <span class="ph-search-icon">🔍</span>
+              <input type="text" class="input" placeholder="Tìm kiếm trường..." oninput="MasterData.filterWordMdFields(this.value)" style="padding-left:40px;">
+            </div>
+            <div class="ph-fields-grid" id="word-md-fields-grid"></div>
           </div>
         </div>
       </div>
