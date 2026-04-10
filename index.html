@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/spreadsheet.css">
   <link rel="stylesheet" href="css/master-data.css">
+  <link rel="stylesheet" href="css/address-parser.css">
 </head>
 <body>
   <!-- Sidebar Navigation -->
@@ -72,6 +73,13 @@
           <circle cx="19" cy="18" r="2"/><line x1="17" y1="17" x2="15" y2="15"/>
         </svg>
         <span>Master Data</span>
+      </a>
+      <a href="#" class="nav-item" data-page="address-parser" id="nav-address-parser">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        <span>Phân rã Địa chỉ</span>
       </a>
       <div class="nav-divider-label"><span>Word</span></div>
       <a href="#" class="nav-item" data-page="word-templates" id="nav-word-templates">
@@ -844,6 +852,59 @@
       </div>
     </div>
 
+    <!-- ========== ADDRESS PARSER PAGE ========== -->
+    <section id="page-address-parser" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Phân rã Địa chỉ</h2>
+          <p class="page-subtitle">Upload file Excel — tự động tách địa chỉ thành Số nhà & Đường, Phường/Xã, Tỉnh/TP</p>
+        </div>
+      </div>
+
+      <!-- Hero / Upload Section -->
+      <div class="ap-hero">
+        <div class="ap-hero-icon">📍</div>
+        <h3>Phân rã Địa chỉ Việt Nam thông minh</h3>
+        <p>
+          Tự động nhận diện và tách địa chỉ thành 3 cột: <strong>Số nhà & Đường</strong>, 
+          <strong>Phường/Xã</strong>, và <strong>Tỉnh/Thành phố</strong>.<br>
+          Hỗ trợ viết tắt (HN, HCM, TP., Q.), địa chỉ nhiều dòng, 
+          và hệ thống hành chính 2 cấp mới (từ 01/07/2025).
+        </p>
+        <div class="ap-features">
+          <span class="ap-feature-tag"><span class="ap-tag-icon">🔤</span> Xử lý viết tắt</span>
+          <span class="ap-feature-tag"><span class="ap-tag-icon">📝</span> Địa chỉ nhiều dòng</span>
+          <span class="ap-feature-tag"><span class="ap-tag-icon">🗺️</span> 63 → 34 tỉnh/TP</span>
+          <span class="ap-feature-tag"><span class="ap-tag-icon">🔄</span> 3 cấp → 2 cấp</span>
+          <span class="ap-feature-tag"><span class="ap-tag-icon">📊</span> Xuất Excel</span>
+        </div>
+      </div>
+
+      <!-- Step 1: Upload -->
+      <div class="ap-upload-zone" id="ap-upload-zone"
+           ondragover="event.preventDefault(); this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="event.preventDefault(); this.classList.remove('dragover'); AddressParserUI.handleDrop(event)">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p>Kéo thả file Excel (.xlsx) vào đây</p>
+        <span>hoặc</span>
+        <label class="ap-browse-btn">
+          Chọn file Excel
+          <input type="file" accept=".xlsx,.xls" 
+                 onchange="AddressParserUI.handleFile(this.files[0])">
+        </label>
+      </div>
+
+      <!-- Step 2: Column Selector -->
+      <div id="ap-column-selector"></div>
+
+      <!-- Step 3: Results -->
+      <div id="ap-result-section"></div>
+    </section>
+
   </main>
 
   <!-- Modal: Insert Placeholder (Enhanced) -->
@@ -1258,5 +1319,6 @@
   <script src="js/app.js"></script>
   <script src="js/master-data.js"></script>
   <script src="js/word-template.js"></script>
+  <script src="js/address-parser.js"></script>
 </body>
 </html>
