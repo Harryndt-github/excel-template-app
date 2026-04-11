@@ -710,3 +710,91 @@
     transform: translateY(0);
   }
 }
+
+/* ── Noise Alert Banner ── */
+.ap-noise-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.08), rgba(99, 102, 241, 0.06));
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  border-radius: var(--radius-lg);
+  margin-bottom: 20px;
+  animation: fadeInUp 0.4s ease 0.2s both;
+}
+
+.ap-noise-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.ap-noise-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.ap-noise-text strong {
+  color: #22d3ee;
+  font-weight: 600;
+}
+
+/* ── Warning Status Badge ── */
+.ap-status-warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* ── Stat Card Warning Variant ── */
+.ap-stat-card.ap-stat-warning .ap-stat-value {
+  background: linear-gradient(135deg, #ef4444, #f59e0b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Warning Items in Table Rows ── */
+.ap-row-warnings {
+  margin-top: 6px;
+}
+
+.ap-warning-item {
+  font-size: 0.7rem;
+  color: #f59e0b;
+  padding: 3px 8px;
+  background: rgba(245, 158, 11, 0.08);
+  border-radius: 6px;
+  margin-top: 4px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.ap-warning-item:first-child {
+  margin-top: 0;
+}
+
+/* ── Noise Badge (small indicator on raw address) ── */
+.ap-noise-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.75rem;
+  cursor: help;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.ap-noise-badge:hover {
+  opacity: 1;
+}
+
+/* ── Empty Row ── */
+.ap-result-table tr.ap-row-empty {
+  opacity: 0.6;
+}
+
+.ap-result-table tr.ap-row-empty:hover {
+  opacity: 0.9;
+}
