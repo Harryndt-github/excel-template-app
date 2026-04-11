@@ -15,15 +15,17 @@
   width: 280px;
   min-width: 280px;
   background: var(--bg-secondary);
-  border-right: 1px solid var(--border);
+  border-right: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 4px 0 16px rgba(17, 17, 37, 0.3);
 }
 
 .md-sidebar-header {
   padding: 20px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
+  background: rgba(99, 102, 241, 0.04);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -144,9 +146,10 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 24px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
   background: var(--bg-card);
   gap: 12px;
+  box-shadow: 0 2px 8px rgba(17, 17, 37, 0.3);
 }
 
 .md-view-switcher {
@@ -240,9 +243,10 @@
 
 .md-matrix-table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-lg);
   background: var(--bg-card);
+  box-shadow: 0 2px 12px rgba(17, 17, 37, 0.4);
 }
 
 .md-matrix-table {
@@ -255,8 +259,8 @@
 .md-matrix-table td {
   padding: 12px 14px;
   text-align: center;
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
+  border-bottom: 1px solid rgba(70, 69, 84, 0.15);
+  border-right: 1px solid rgba(70, 69, 84, 0.08);
 }
 
 .md-matrix-table th:last-child,
@@ -323,14 +327,16 @@
   gap: 12px;
   padding: 14px 16px;
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-md);
   transition: var(--transition);
+  box-shadow: 0 2px 8px rgba(17, 17, 37, 0.3);
 }
 
 .md-conn-card:hover {
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-sm);
+  background: var(--bg-card-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .md-conn-from, .md-conn-to {
@@ -399,9 +405,10 @@
 
 .md-records-table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-lg);
   background: var(--bg-card);
+  box-shadow: 0 2px 12px rgba(17, 17, 37, 0.4);
 }
 
 .md-records-table {
@@ -414,8 +421,8 @@
 .md-records-table th,
 .md-records-table td {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
+  border-bottom: 1px solid rgba(70, 69, 84, 0.15);
+  border-right: 1px solid rgba(70, 69, 84, 0.08);
   text-align: left;
   white-space: nowrap;
 }
@@ -534,8 +541,8 @@
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(17, 17, 37, 0.7);
+  backdrop-filter: blur(12px);
   z-index: 1000;
   align-items: center;
   justify-content: center;
@@ -545,13 +552,14 @@
   width: 95%;
   max-width: 650px;
   max-height: 85vh;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: rgba(40, 40, 61, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(70, 69, 84, 0.15);
   border-radius: var(--radius-xl);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 24px 64px rgba(17, 17, 37, 0.6), 0 0 0 1px rgba(192, 193, 255, 0.05);
 }
 
 .md-modal-header {
@@ -559,7 +567,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
+  background: rgba(99, 102, 241, 0.04);
 }
 
 .md-modal-header h3 {
@@ -595,7 +604,8 @@
 
 .md-modal-footer {
   padding: 16px 24px;
-  border-top: 1px solid var(--border);
+  border-top: none;
+  background: rgba(0, 0, 0, 0.12);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -824,16 +834,17 @@
 
 /* ── KV Section (Parent & Child) ── */
 .md-kv-section {
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-lg);
   background: var(--bg-card);
   overflow: hidden;
   transition: var(--transition);
+  box-shadow: 0 2px 12px rgba(17, 17, 37, 0.4);
 }
 
 .md-kv-section:hover {
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-sm);
+  background: var(--bg-card-hover);
+  box-shadow: var(--shadow-md);
 }
 
 .md-kv-child-section {
@@ -858,7 +869,7 @@
   gap: 12px;
   padding: 14px 20px;
   background: rgba(99, 102, 241, 0.04);
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
 }
 
 .md-kv-section-icon {
@@ -927,7 +938,7 @@
   color: var(--text-muted);
   font-weight: 600;
   background: rgba(99, 102, 241, 0.03);
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
 }
 
 .md-kv-label-col { width: 35%; }

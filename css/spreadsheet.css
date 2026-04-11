@@ -8,17 +8,18 @@
   display: flex;
   flex-direction: column;
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: 0 4px 24px rgba(17, 17, 37, 0.5);
 }
 
 /* Formula Bar */
 .ss-formula-bar-wrap {
   display: flex;
   align-items: center;
-  background: #fafafe;
-  border-bottom: 1px solid #e0e0ea;
+  background: var(--bg-secondary);
+  border-bottom: none;
   padding: 0;
   height: 34px;
 }
@@ -29,8 +30,8 @@
   justify-content: center;
   width: 60px;
   height: 100%;
-  background: #f0f0f5;
-  border-right: 1px solid #e0e0ea;
+  background: rgba(99, 102, 241, 0.08);
+  border-right: 1px solid rgba(70, 69, 84, 0.2);
   font-size: 0.78rem;
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
@@ -47,7 +48,7 @@
   padding: 0 12px;
   font-size: 0.85rem;
   font-family: inherit;
-  color: #1a1a2e;
+  color: var(--text-primary);
 }
 
 /* Toolbar */
@@ -56,15 +57,15 @@
   align-items: center;
   gap: 2px;
   padding: 4px 8px;
-  background: #f5f5fa;
-  border-bottom: 1px solid #e0e0ea;
+  background: var(--bg-card);
+  border-bottom: none;
   flex-wrap: wrap;
 }
 
 .ss-toolbar .tool-divider {
   width: 1px;
   height: 22px;
-  background: #d0d0da;
+  background: rgba(70, 69, 84, 0.3);
   margin: 0 4px;
 }
 
@@ -79,14 +80,14 @@
   align-items: center;
   justify-content: center;
   font-size: 0.82rem;
-  color: #555;
+  color: var(--text-secondary);
   transition: all 0.12s;
   position: relative;
 }
 
 .ss-tool-btn:hover {
-  background: #e0e0ea;
-  color: #1a1a2e;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--accent);
 }
 
 .ss-tool-btn.active {
@@ -107,11 +108,11 @@
 .ss-tool-select {
   height: 30px;
   padding: 2px 6px;
-  border: 1px solid #d0d0da;
+  border: 1px solid rgba(70, 69, 84, 0.3);
   border-radius: 5px;
-  background: white;
+  background: var(--bg-input);
   font-size: 0.78rem;
-  color: #555;
+  color: var(--text-primary);
   cursor: pointer;
   outline: none;
 }
@@ -119,13 +120,13 @@
 .ss-tool-color {
   width: 28px;
   height: 28px;
-  border: 2px solid #d0d0da;
+  border: 2px solid rgba(70, 69, 84, 0.3);
   border-radius: 5px;
   padding: 0;
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
-  background: transparent;
+  background: var(--bg-card);
 }
 
 .ss-tool-color::-webkit-color-swatch {
@@ -141,7 +142,7 @@
 #spreadsheet-container {
   overflow: auto;
   max-height: 65vh;
-  background: #f0f0f5;
+  background: var(--bg-secondary);
   position: relative;
 }
 
@@ -331,12 +332,13 @@
 .ss-context-menu {
   position: fixed;
   z-index: 10000;
-  background: white;
-  border: 1px solid #d0d0da;
+  background: rgba(40, 40, 61, 0.96);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(70, 69, 84, 0.15);
   border-radius: 8px;
   padding: 4px 0;
   min-width: 220px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 12px 40px rgba(17, 17, 37, 0.6);
   font-size: 0.82rem;
 }
 
@@ -346,12 +348,12 @@
   gap: 10px;
   padding: 8px 14px;
   cursor: pointer;
-  color: #333;
+  color: var(--text-primary);
   transition: background 0.1s;
 }
 
 .ss-ctx-item:hover {
-  background: #f0f0ff;
+  background: rgba(99, 102, 241, 0.1);
 }
 
 .ss-ctx-icon {
@@ -370,7 +372,7 @@
 
 .ss-ctx-divider {
   height: 1px;
-  background: #e8e8ee;
+  background: rgba(70, 69, 84, 0.2);
   margin: 4px 10px;
 }
 
@@ -384,19 +386,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(17, 17, 37, 0.7);
+  backdrop-filter: blur(12px);
 }
 
 .ss-ph-modal-body {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: rgba(40, 40, 61, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(70, 69, 84, 0.15);
   border-radius: var(--radius-xl);
   width: 90%;
   max-width: 720px;
   max-height: 85vh;
   overflow-y: auto;
   padding: 0;
+  box-shadow: 0 24px 64px rgba(17, 17, 37, 0.6);
 }
 
 .ss-ph-modal-header {
@@ -404,7 +408,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
+  background: rgba(99, 102, 241, 0.04);
 }
 
 .ss-ph-modal-header h3 {
@@ -619,10 +624,11 @@
 /* Cell Properties Panel */
 .ss-cell-panel {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-lg);
   padding: 16px;
   margin-top: 16px;
+  box-shadow: 0 2px 12px rgba(17, 17, 37, 0.4);
 }
 
 .ss-cell-panel h4 {
@@ -721,14 +727,14 @@
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: #f5f5fa;
-  border-top: 1px solid #e0e0ea;
+  background: var(--bg-card);
+  border-top: none;
   flex-wrap: wrap;
 }
 
 .ss-status {
   font-size: 0.75rem;
-  color: #888;
+  color: var(--text-muted);
   margin-left: auto;
 }
 
@@ -833,9 +839,10 @@
    ============================================ */
 .data-sources-panel {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: 0 2px 12px rgba(17, 17, 37, 0.4);
 }
 
 .ds-panel-header {
