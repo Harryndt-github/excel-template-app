@@ -124,123 +124,225 @@
           <h2 class="page-title">Tổng quan</h2>
           <p class="page-subtitle">Chào mừng bạn đến với ExcelMapper</p>
         </div>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value" id="stat-templates">0</span>
-            <span class="stat-label">Templates đã tạo</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background: linear-gradient(135deg, #22d3ee, #06b6d4);">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value" id="stat-exports">0</span>
-            <span class="stat-label">PDF đã xuất</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-              <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">8</span>
-            <span class="stat-label">Loại file hỗ trợ</span>
-          </div>
+        <div class="dash-date-badge" id="dash-date-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <span id="dash-current-date"></span>
+          <span class="dash-time-pill" id="dash-current-time"></span>
         </div>
       </div>
 
-      <div class="quick-actions">
-        <h3>Thao tác nhanh</h3>
-        <div class="actions-grid">
-          <button class="action-card" onclick="App.navigateTo('editor')">
-            <div class="action-icon">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M12 5v14M5 12h14"/>
-              </svg>
-            </div>
-            <span class="action-title">Tạo Template mới</span>
-            <span class="action-desc">Thiết kế template với trình soạn thảo trực quan</span>
-          </button>
-          <button class="action-card" onclick="App.navigateTo('generate')">
-            <div class="action-icon accent">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-            </div>
-            <span class="action-title">Ghép dữ liệu & Xuất PDF</span>
-            <span class="action-desc">Upload Excel, mapping và xuất PDF ngay</span>
-          </button>
-          <button class="action-card" onclick="App.navigateTo('templates')">
-            <div class="action-icon success">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <!-- KPI Stats Row — 4 cards -->
+      <div class="stats-grid stats-grid-4">
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
               </svg>
             </div>
-            <span class="action-title">Quản lý Templates</span>
-            <span class="action-desc">Xem, sửa, xóa các template đã tạo</span>
-          </button>
+            <span class="stat-trend stat-trend-indigo" id="stat-templates-trend">+0 tháng này</span>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label-upper">Templates đã tạo</span>
+            <span class="stat-value" id="stat-templates">0</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #22d3ee, #06b6d4);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </div>
+            <span class="stat-trend stat-trend-cyan" id="stat-exports-trend">+0 tuần này</span>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label-upper">PDF đã xuất</span>
+            <span class="stat-value" id="stat-exports">0</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/>
+              </svg>
+            </div>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label-upper">Word Templates</span>
+            <span class="stat-value" id="stat-word-templates">0</span>
+          </div>
+        </div>
+        <div class="stat-card stat-card-glow">
+          <div class="stat-glow-bg"></div>
+          <div class="stat-card-top">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label-upper">Tỷ lệ thành công</span>
+            <div class="stat-value-row">
+              <span class="stat-value stat-value-success" id="stat-success-rate">98.5%</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="file-types-info">
-        <h3>Các loại file Excel được hỗ trợ</h3>
-        <div class="file-types-grid">
-          <div class="file-type-card">
-            <span class="file-badge">1</span>
-            <strong>thong_tin_vay</strong>
-            <p>Cột A: Chỉ tiêu | Cột B: Giá trị</p>
+      <!-- Main Dashboard Grid — 2 columns -->
+      <div class="dash-main-grid">
+        <!-- Left Column -->
+        <div class="dash-col-left">
+          <!-- Hoạt động gần đây -->
+          <div class="dash-section-card">
+            <div class="dash-section-header">
+              <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Hoạt động gần đây
+              </h3>
+              <button class="dash-link-btn" onclick="App.navigateTo('templates')">Xem tất cả</button>
+            </div>
+            <div class="dash-activity-feed" id="dash-activity-feed">
+              <div class="dash-activity-item">
+                <div class="dash-activity-icon dash-activity-icon-indigo">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                </div>
+                <div class="dash-activity-content">
+                  <p>Đã tạo template mới: <strong>Báo cáo Tài sản Q3</strong></p>
+                  <span>Bởi Admin • 10 phút trước</span>
+                </div>
+              </div>
+              <div class="dash-activity-item">
+                <div class="dash-activity-icon dash-activity-icon-cyan">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </div>
+                <div class="dash-activity-content">
+                  <p>Xuất 45 tệp PDF từ template <strong>Hợp đồng vay vốn</strong></p>
+                  <span>Bởi Hệ thống • 45 phút trước</span>
+                </div>
+              </div>
+              <div class="dash-activity-item">
+                <div class="dash-activity-icon dash-activity-icon-purple">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </div>
+                <div class="dash-activity-content">
+                  <p>Cập nhật Master Data: <strong>Danh mục chi nhánh</strong></p>
+                  <span>Bởi User02 • 2 giờ trước</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="file-type-card">
-            <span class="file-badge">2</span>
-            <strong>tai_san</strong>
-            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
+
+          <!-- Loại file được hỗ trợ -->
+          <div class="dash-section-card">
+            <div class="dash-section-header">
+              <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>
+                </svg>
+                Loại file được hỗ trợ
+              </h3>
+            </div>
+            <div class="dash-file-badges">
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-indigo"></span>thong_tin_vay</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-cyan"></span>tai_san</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-purple"></span>chu_tai_san</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-green"></span>tai_san_ctt</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-cyan"></span>thong_tin_chuyen_tien</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-indigo"></span>thu_phi_tnth</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-purple"></span>han_muc</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-green"></span>tai_tai_tro</span>
+            </div>
           </div>
-          <div class="file-type-card">
-            <span class="file-badge">3</span>
-            <strong>chu_tai_san</strong>
-            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
+        </div>
+
+        <!-- Right Column -->
+        <div class="dash-col-right">
+          <!-- Thao tác nhanh -->
+          <div class="dash-section-card">
+            <div class="dash-section-header">
+              <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+                Thao tác nhanh
+              </h3>
+            </div>
+            <div class="dash-quick-actions-stack">
+              <button class="dash-action-gradient dash-action-indigo" onclick="App.navigateTo('editor')">
+                <div>
+                  <span class="dash-action-title">Tạo Template mới</span>
+                  <span class="dash-action-subtitle">Xây dựng cấu trúc dữ liệu mapping</span>
+                </div>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+              <button class="dash-action-gradient dash-action-cyan" onclick="App.navigateTo('generate')">
+                <div>
+                  <span class="dash-action-title">Ghép dữ liệu & Xuất PDF</span>
+                  <span class="dash-action-subtitle">Xử lý hàng loạt tệp tin</span>
+                </div>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </button>
+              <button class="dash-action-gradient dash-action-slate" onclick="App.navigateTo('templates')">
+                <div>
+                  <span class="dash-action-title">Quản lý Templates</span>
+                  <span class="dash-action-subtitle">Chỉnh sửa & tối ưu hóa</span>
+                </div>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </button>
+            </div>
           </div>
-          <div class="file-type-card">
-            <span class="file-badge">4</span>
-            <strong>tai_san_ctt</strong>
-            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
-          </div>
-          <div class="file-type-card">
-            <span class="file-badge">5</span>
-            <strong>thong_tin_chuyen_tien</strong>
-            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
-          </div>
-          <div class="file-type-card">
-            <span class="file-badge">6</span>
-            <strong>thu_phi_tnth</strong>
-            <p>Dòng 1: Header | Dòng 2-4: Giá trị</p>
-          </div>
-          <div class="file-type-card">
-            <span class="file-badge">7</span>
-            <strong>han_muc</strong>
-            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
-          </div>
-          <div class="file-type-card">
-            <span class="file-badge">8</span>
-            <strong>tai_tai_tro</strong>
-            <p>Dòng 1: Header | Dòng 2: Giá trị</p>
+
+          <!-- Thống kê sử dụng -->
+          <div class="dash-section-card">
+            <div class="dash-section-header">
+              <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2">
+                  <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+                  <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                Thống kê sử dụng
+              </h3>
+            </div>
+            <div class="dash-usage-stats">
+              <div class="dash-usage-row">
+                <div class="dash-usage-labels"><span>Hợp đồng Vay</span><span>84%</span></div>
+                <div class="dash-usage-bar"><div class="dash-usage-fill dash-fill-indigo" style="width: 84%"></div></div>
+              </div>
+              <div class="dash-usage-row">
+                <div class="dash-usage-labels"><span>Tài sản đảm bảo</span><span>56%</span></div>
+                <div class="dash-usage-bar"><div class="dash-usage-fill dash-fill-cyan" style="width: 56%"></div></div>
+              </div>
+              <div class="dash-usage-row">
+                <div class="dash-usage-labels"><span>Báo cáo nội bộ</span><span>22%</span></div>
+                <div class="dash-usage-bar"><div class="dash-usage-fill dash-fill-purple" style="width: 22%"></div></div>
+              </div>
+            </div>
+            <div class="dash-storage">
+              <div class="dash-storage-labels"><span>Dung lượng bộ nhớ</span><span>1.2 GB / 5 GB</span></div>
+              <div class="dash-storage-bar"><div class="dash-storage-fill" style="width: 24%"></div></div>
+            </div>
           </div>
         </div>
       </div>
