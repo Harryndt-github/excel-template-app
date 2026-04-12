@@ -142,7 +142,7 @@
 #spreadsheet-container {
   overflow: auto;
   max-height: 65vh;
-  background: var(--bg-secondary);
+  background: #0c0c1f;
   position: relative;
 }
 
@@ -163,8 +163,8 @@
   width: 40px;
   min-width: 40px;
   height: 28px;
-  background: #e8eaed;
-  border: 1px solid #c8c8d0;
+  background: #1e1e32;
+  border: 1px solid rgba(70, 69, 84, 0.2);
   border-width: 0 1px 1px 0;
   position: sticky;
   left: 0;
@@ -176,12 +176,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #e8eaed;
-  border: 1px solid #c8c8d0;
+  background: #1e1e32;
+  border: 1px solid rgba(70, 69, 84, 0.2);
   border-width: 0 1px 1px 0;
   font-size: 0.72rem;
-  font-weight: 600;
-  color: #666;
+  font-weight: 700;
+  color: var(--text-muted);
   user-select: none;
   position: relative;
   text-transform: uppercase;
@@ -189,8 +189,8 @@
 }
 
 .ss-col-header.selected {
-  background: #d0d4ff;
-  color: #4338ca;
+  background: rgba(99, 102, 241, 0.15);
+  color: #6366f1;
 }
 
 .ss-col-resizer {
@@ -218,12 +218,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #e8eaed;
-  border: 1px solid #c8c8d0;
+  background: #1e1e32;
+  border: 1px solid rgba(70, 69, 84, 0.2);
   border-width: 0 1px 1px 0;
   font-size: 0.72rem;
-  font-weight: 600;
-  color: #666;
+  font-weight: 700;
+  color: var(--text-muted);
   user-select: none;
   position: sticky;
   left: 0;
@@ -231,15 +231,15 @@
 }
 
 .ss-row-header.selected {
-  background: #d0d4ff;
-  color: #4338ca;
+  background: rgba(99, 102, 241, 0.15);
+  color: #6366f1;
 }
 
 /* Cells */
 .ss-cell {
-  border: 1px solid #d4d4dc;
+  border: 1px solid rgba(70, 69, 84, 0.15);
   border-width: 0 1px 1px 0;
-  background: white;
+  background: #0c0c1f;
   cursor: cell;
   overflow: hidden;
   position: relative;
@@ -247,32 +247,35 @@
 }
 
 .ss-cell:hover {
-  background: #f8f8ff;
+  background: rgba(99, 102, 241, 0.04);
 }
 
 .ss-cell.selected {
   outline: 2px solid #6366f1;
   outline-offset: -1px;
   z-index: 5;
+  background: rgba(99, 102, 241, 0.06);
 }
 
 .ss-cell.in-range {
-  background: rgba(99, 102, 241, 0.08);
+  background: rgba(99, 102, 241, 0.06);
 }
 
 .ss-cell.editing {
   outline: 2px solid #6366f1;
   z-index: 6;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  background: rgba(99, 102, 241, 0.04);
 }
 
 .ss-cell.header-cell {
-  background: #f0f0f5;
+  background: rgba(245, 158, 11, 0.06);
   font-weight: 700;
+  color: #f59e0b;
 }
 
 .ss-cell.placeholder-cell {
-  background: rgba(99, 102, 241, 0.04);
+  background: rgba(99, 102, 241, 0.06);
 }
 
 .ss-cell.bold .ss-cell-content {
@@ -295,6 +298,8 @@
   align-items: center;
   outline: none;
   line-height: 1.4;
+  color: var(--text-primary);
+  font-size: 0.82rem;
 }
 
 .ss-cell-content:focus {

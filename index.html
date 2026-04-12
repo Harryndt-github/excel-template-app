@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/spreadsheet.css">
   <link rel="stylesheet" href="css/master-data.css">
   <link rel="stylesheet" href="css/address-parser.css">
+  <link rel="stylesheet" href="css/stitch-enhancements.css">
 </head>
 <body>
   <!-- Sidebar Navigation -->
@@ -956,57 +957,88 @@
 
     <!-- ========== ADDRESS PARSER PAGE ========== -->
     <section id="page-address-parser" class="page">
+      <!-- Page Header with Breadcrumb -->
       <div class="page-header">
         <div>
-          <h2 class="page-title">Phân rã Địa chỉ</h2>
-          <p class="page-subtitle">Upload file Excel — tự động tách địa chỉ thành Số nhà & Đường, Phường/Xã, Tỉnh/TP</p>
+          <h2 class="page-title">Phân rã địa chỉ</h2>
+          <p class="page-subtitle">Xử lý và bóc tách dữ liệu địa chỉ tự động bằng AI</p>
+        </div>
+        <div class="ap-breadcrumb">
+          <span class="ap-bc-item">MAIN ENGINE</span>
+          <span class="ap-bc-sep">›</span>
+          <span class="ap-bc-item ap-bc-active">ADDRESS PARSER</span>
         </div>
       </div>
 
-      <!-- Hero / Upload Section -->
-      <div class="ap-hero">
-        <div class="ap-hero-icon">🧠</div>
-        <h3>Phân rã Địa chỉ Việt Nam thông minh — AI-Powered v2.0</h3>
-        <p>
-          Tự động nhận diện và tách địa chỉ thành 3 cột: <strong>Số nhà & Đường</strong>, 
-          <strong>Phường/Xã</strong>, và <strong>Tỉnh/Thành phố</strong>.<br>
-          Tích hợp bộ lọc LLM-like loại bỏ dữ liệu thừa, nhận diện viết tắt thông minh (P15, PThanh Xuan, QTan Binh),
-          tự động convert địa chỉ cũ 3 cấp sang 2 cấp và suy luận từ tên đường.
-        </p>
-        <div class="ap-features">
-          <span class="ap-feature-tag"><span class="ap-tag-icon">🧹</span> Lọc noise thông minh</span>
-          <span class="ap-feature-tag"><span class="ap-tag-icon">🔤</span> P15 → Phường 15</span>
-          <span class="ap-feature-tag"><span class="ap-tag-icon">📝</span> PThanh Xuan → Phường Thanh Xuân</span>
-          <span class="ap-feature-tag"><span class="ap-tag-icon">🗺️</span> 63 → 34 tỉnh/TP</span>
-          <span class="ap-feature-tag"><span class="ap-tag-icon">🔄</span> 3 cấp → 2 cấp</span>
-          <span class="ap-feature-tag"><span class="ap-tag-icon">🔍</span> Suy luận từ tên đường</span>
-          <span class="ap-feature-tag"><span class="ap-tag-icon">⚠️</span> Cảnh báo mơ hồ</span>
-          <span class="ap-feature-tag"><span class="ap-tag-icon">📊</span> Xuất Excel</span>
+      <!-- KPI Stats Row -->
+      <div class="ap-kpi-row">
+        <div class="ap-kpi-card">
+          <div class="ap-kpi-label">TỔNG ĐỊA CHỈ</div>
+          <div class="ap-kpi-body">
+            <span class="ap-kpi-value" id="ap-kpi-total">0</span>
+            <span class="ap-kpi-icon">📋</span>
+          </div>
+        </div>
+        <div class="ap-kpi-card">
+          <div class="ap-kpi-label">ĐÃ PHÂN RÃ</div>
+          <div class="ap-kpi-body">
+            <span class="ap-kpi-value" id="ap-kpi-parsed">0</span>
+            <span class="ap-kpi-icon ap-kpi-icon-success">✅</span>
+          </div>
+        </div>
+        <div class="ap-kpi-card ap-kpi-accent">
+          <div class="ap-kpi-label">TỶ LỆ CHÍNH XÁC</div>
+          <div class="ap-kpi-body">
+            <span class="ap-kpi-value ap-kpi-value-accent" id="ap-kpi-accuracy">0%</span>
+            <span class="ap-kpi-icon ap-kpi-icon-accent">📈</span>
+          </div>
         </div>
       </div>
 
-      <!-- Step 1: Upload -->
-      <div class="ap-upload-zone" id="ap-upload-zone"
-           ondragover="event.preventDefault(); this.classList.add('dragover')"
-           ondragleave="this.classList.remove('dragover')"
-           ondrop="event.preventDefault(); this.classList.remove('dragover'); AddressParserUI.handleDrop(event)">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
-        <p>Kéo thả file Excel (.xlsx) vào đây</p>
-        <span>hoặc</span>
-        <label class="ap-browse-btn">
-          Chọn file Excel
-          <input type="file" accept=".xlsx,.xls" 
-                 onchange="AddressParserUI.handleFile(this.files[0])">
-        </label>
+      <!-- Upload + Manual Input Side-by-Side -->
+      <div class="ap-input-grid">
+        <!-- Left: Upload Zone -->
+        <div class="ap-upload-card">
+          <div class="ap-upload-icon-wrap">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <h4 class="ap-upload-title">Tải lên danh sách</h4>
+          <p class="ap-upload-desc">Kéo và thả tệp Excel (.xlsx) hoặc CSV của bạn vào đây để bắt đầu xử lý hàng loạt.</p>
+          <div class="ap-upload-actions">
+            <label class="btn btn-outline ap-upload-btn">
+              Chọn tệp...
+              <input type="file" accept=".xlsx,.xls" style="display:none"
+                     onchange="AddressParserUI.handleFile(this.files[0])">
+            </label>
+            <button class="btn btn-outline" onclick="AddressParserUI.loadSampleData && AddressParserUI.loadSampleData()">Mẫu dữ liệu</button>
+          </div>
+          <!-- Invisible drag-drop overlay -->
+          <div class="ap-drop-overlay" id="ap-upload-zone"
+               ondragover="event.preventDefault(); this.classList.add('dragover')"
+               ondragleave="this.classList.remove('dragover')"
+               ondrop="event.preventDefault(); this.classList.remove('dragover'); AddressParserUI.handleDrop(event)">
+          </div>
+        </div>
+
+        <!-- Right: Manual Input -->
+        <div class="ap-manual-card">
+          <h4 class="ap-manual-title">✏️ Nhập thủ công</h4>
+          <textarea class="ap-manual-input" id="ap-manual-input"
+                    placeholder="Nhập địa chỉ cần phân rã (ví dụ: 123 Lê Lợi, P. Bến Thành, Quận 1, TP. HCM)"
+                    rows="4"></textarea>
+          <button class="btn btn-accent ap-manual-btn" onclick="AddressParserUI.parseManual && AddressParserUI.parseManual()">
+            PHÂN RÃ NGAY
+          </button>
+        </div>
       </div>
 
-      <!-- Step 2: Column Selector -->
+      <!-- Column Selector (shown after file upload) -->
       <div id="ap-column-selector"></div>
 
-      <!-- Step 3: Results -->
+      <!-- Results Section -->
       <div id="ap-result-section"></div>
     </section>
 

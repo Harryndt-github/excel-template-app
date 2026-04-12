@@ -5,31 +5,45 @@
 
 /* CSS Variables */
 :root {
-  /* ── Lumina Grid: Surface Tonal Layering ── */
-  --bg-primary: #111125;
-  --bg-secondary: #1a1a2e;
-  --bg-card: #1e1e32;
-  --bg-card-hover: #28283d;
-  --bg-input: #0c0c20;
+  /* ━━━ Stitch Design System: "The Digital Architect" ━━━ */
+  
+  /* ── Surface Hierarchy (Tonal Layering) ── */
+  --bg-primary: #111125;                    /* Background canvas */
+  --bg-secondary: #1a1a2e;                  /* Surface-container-low */
+  --bg-card: #1e1e32;                       /* Surface-container */
+  --bg-card-hover: #28283d;                 /* Surface-container-high */
+  --bg-input: #0c0c1f;                      /* Surface-container-lowest (recessed) */
   --bg-editor: #ffffff;
-  --bg-surface-highest: #333348;
+  --bg-surface-highest: #333348;            /* Surface-container-highest */
+  --bg-surface-bright: #37374d;             /* Surface-bright */
+  --bg-hover: rgba(99, 102, 241, 0.04);
+  
+  /* ── Ghost Border System ── */
   --border: rgba(70, 69, 84, 0.25);
   --border-hover: rgba(70, 69, 84, 0.5);
   --border-focus: #6366f1;
+  --ghost-border: rgba(70, 69, 84, 0.12);   /* 12% opacity ghost */
+  --ghost-border-hover: rgba(70, 69, 84, 0.25);
 
-  --text-primary: #e2e0fc;
-  --text-secondary: #a0a4b8;
-  --text-muted: #5a5e78;
+  /* ── Typography: Inter Editorial ── */
+  --text-primary: #e2e0fc;                  /* on-surface */
+  --text-secondary: #c7c4d7;               /* on-surface-variant */
+  --text-muted: #908fa0;                    /* outline */
   --text-dark: #1a1a2e;
 
-  --accent: #6366f1;
-  --accent-hover: #8083ff;
+  /* ── Color Palette ── */
+  --accent: #6366f1;                        /* Indigo primary */
+  --accent-hover: #8083ff;                  /* Primary-container */
   --accent-light: rgba(99, 102, 241, 0.12);
   --accent-glow: rgba(99, 102, 241, 0.30);
+  --primary: #c0c1ff;                       /* Primary (light) */
+  --primary-container: #8083ff;             /* Primary-container */
   --purple: #8b5cf6;
-  --cyan: #22d3ee;
+  --cyan: #22d3ee;                          /* Secondary */
+  --cyan-container: #00cbe6;               /* Secondary-container */
   --cyan-light: rgba(34, 211, 238, 0.12);
-  --emerald: #4edea3;
+  --emerald: #4edea3;                       /* Tertiary */
+  --emerald-container: #00885d;            /* Tertiary-container */
   --success: #10b981;
   --success-light: rgba(16, 185, 129, 0.12);
   --warning: #f59e0b;
@@ -37,10 +51,14 @@
   --danger: #ef4444;
   --danger-light: rgba(239, 68, 68, 0.12);
 
+  /* ── Signature Gradients ── */
   --gradient-primary: linear-gradient(135deg, #8083ff, #c0c1ff);
   --gradient-accent: linear-gradient(135deg, #22d3ee, #6366f1);
   --gradient-emerald: linear-gradient(135deg, #10b981, #4edea3);
+  --gradient-indigo-deep: linear-gradient(135deg, #4f46e5, #6366f1);
+  --gradient-glass: linear-gradient(135deg, rgba(30, 30, 50, 0.6), rgba(30, 30, 50, 0.3));
 
+  /* ── Layout ── */
   --sidebar-width: 260px;
   --header-height: 64px;
   --radius-sm: 6px;
@@ -48,13 +66,17 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
 
-  /* ── Tinted Shadows (never pure black) ── */
+  /* ── Tinted Shadows (never pure black — "Digital Architect" rule) ── */
   --shadow-sm: 0 1px 3px rgba(17, 17, 37, 0.4);
   --shadow-md: 0 4px 14px rgba(17, 17, 37, 0.5);
   --shadow-lg: 0 10px 40px rgba(17, 17, 37, 0.6);
+  --shadow-ambient: 0 24px 48px rgba(17, 17, 37, 0.4);
   --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.2);
+  --shadow-glow-lg: 0 0 60px rgba(99, 102, 241, 0.15);
 
-  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* ── Transitions (spring-like) ── */
+  --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Reset & Base */

@@ -872,31 +872,84 @@ const AddressParserUI = {
     const withWard = result.parsed.filter(p => p.ward).length;
     const withStreet = result.parsed.filter(p => p.street).length;
     const withDistrict = result.parsed.filter(p => p.district).length;
-    const withWarnings = result.parsed.filter(p => p.warnings && p.warnings.some(w => w.severity === 'warning')).length;
-    const noiseRemoved = result.parsed.filter(p => p.warnings && p.warnings.some(w => w.type === 'noise_removed')).length;
+    const accuracy = total > 0 ? ((withProvince / total) * 100).toFixed(1) : 0;
 
-    const provinceCounts = {};
-    result.parsed.forEach(p => {
-      if (p.province) {
-        provinceCounts[p.province] = (provinceCounts[p.province] || 0) + 1;
-      }
-    });
-    const topProvinces = Object.entries(provinceCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8);
+    // Update KPI cards
+    const kpiTotal = document.getElementById('ap-kpi-total');
+    const kpiParsed = document.getElementById('ap-kpi-parsed');
+    const kpiAccuracy = document.getElementById('ap-kpi-accuracy');
+    if (kpiTotal) kpiTotal.textContent = total.toLocaleString();
+    if (kpiParsed) kpiParsed.textContent = withProvince.toLocaleString();
+    if (kpiAccuracy) kpiAccuracy.textContent = accuracy + '%';
 
     section.innerHTML = `
-      <div class="ap-result-header">
-        <h3>📊 Kết quả phân rã địa chỉ</h3>
-        <div class="ap-result-actions">
-          <button class="btn btn-outline" onclick="AddressParserUI.toggleAllRows()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-            Xem tất cả
-          </button>
-          <button class="btn btn-success" onclick="AddressParserUI.exportResult()">
+      <div class="ap-result-wrap">
+        <!-- Results Header -->
+        <div class="ap-result-header">
+          <div class="ap-result-title-wrap">
+            <h3 class="ap-result-title">Kết quả phân tích</h3>
+            <span class="ap-live-badge"><span class="ap-live-dot"></span> LIVE DATA</span>
+          </div>
+          <div class="ap-result-controls">
+            <input type="text" class="ap-search-input" placeholder="Tìm kiếm địa chỉ..." 
+                   oninput="AddressParserUI.filterResults(this.value)">
+            <button class="ap-filter-btn" title="Bộ lọc">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="ap-table-wrap">
+          <table class="ap-result-table">
+            <thead>
+              <tr>
+                <th>ĐỊA CHỈ GỐC</th>
+                <th>SỐ NHÀ</th>
+                <th>TÊN ĐƯỜNG</th>
+                <th>PHƯỜNG/XÃ</th>
+                <th>QUẬN/HUYỆN</th>
+                <th>TỈNH/THÀNH PHỐ</th>
+                <th>ĐỘ TIN CẬY</th>
+              </tr>
+            </thead>
+            <tbody id="ap-result-tbody">
+              ${result.parsed.slice(0, 50).map((p, i) => this._renderResultRow(p, i)).join('')}
+            </tbody>
+          </table>
+          ${result.parsed.length > 50 ? `
+            <div class="ap-table-footer">
+              <span>Đang hiển thị 50 / ${result.parsed.length} dòng</span>
+              <button class="btn btn-outline btn-sm" onclick="AddressParserUI.showAllRows()">Hiển thị tất cả</button>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Stats Bar -->
+        <div class="ap-stats-bar">
+          <div class="ap-stat-item">
+            <span>Tổng:</span>
+            <span class="ap-stat-value">${total}</span>
+          </div>
+          <div class="ap-stat-item">
+            <span>Có đường:</span>
+            <span class="ap-stat-value">${withStreet}</span>
+          </div>
+          <div class="ap-stat-item">
+            <span>Có phường:</span>
+            <span class="ap-stat-value">${withWard}</span>
+          </div>
+          <div class="ap-stat-item">
+            <span>Có quận:</span>
+            <span class="ap-stat-value">${withDistrict}</span>
+          </div>
+          <div class="ap-stat-item">
+            <span>Có tỉnh:</span>
+            <span class="ap-stat-value">${withProvince}</span>
+          </div>
+          <button class="btn btn-success ap-download-btn" onclick="AddressParserUI.exportResult()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
@@ -905,98 +958,6 @@ const AddressParserUI = {
             Xuất Excel
           </button>
         </div>
-      </div>
-
-      <!-- Stats Cards -->
-      <div class="ap-stats-grid">
-        <div class="ap-stat-card">
-          <div class="ap-stat-value">${total}</div>
-          <div class="ap-stat-label">Tổng địa chỉ</div>
-          <div class="ap-stat-bar"><div class="ap-stat-fill" style="width:100%;background:var(--primary);"></div></div>
-        </div>
-        <div class="ap-stat-card">
-          <div class="ap-stat-value">${withStreet}</div>
-          <div class="ap-stat-label">Có số nhà/đường</div>
-          <div class="ap-stat-bar"><div class="ap-stat-fill" style="width:${total ? (withStreet/total*100) : 0}%;background:#22d3ee;"></div></div>
-        </div>
-        <div class="ap-stat-card">
-          <div class="ap-stat-value">${withWard}</div>
-          <div class="ap-stat-label">Có phường/xã</div>
-          <div class="ap-stat-bar"><div class="ap-stat-fill" style="width:${total ? (withWard/total*100) : 0}%;background:#8b5cf6;"></div></div>
-        </div>
-        <div class="ap-stat-card">
-          <div class="ap-stat-value">${withProvince}</div>
-          <div class="ap-stat-label">Có tỉnh/TP</div>
-          <div class="ap-stat-bar"><div class="ap-stat-fill" style="width:${total ? (withProvince/total*100) : 0}%;background:#10b981;"></div></div>
-        </div>
-        <div class="ap-stat-card">
-          <div class="ap-stat-value">${withDistrict}</div>
-          <div class="ap-stat-label">Có quận/huyện (cũ)</div>
-          <div class="ap-stat-bar"><div class="ap-stat-fill" style="width:${total ? (withDistrict/total*100) : 0}%;background:#f59e0b;"></div></div>
-        </div>
-        <div class="ap-stat-card ${withWarnings > 0 ? 'ap-stat-warning' : ''}">
-          <div class="ap-stat-value">${withWarnings}</div>
-          <div class="ap-stat-label">Cần xác nhận</div>
-          <div class="ap-stat-bar"><div class="ap-stat-fill" style="width:${total ? (withWarnings/total*100) : 0}%;background:#ef4444;"></div></div>
-        </div>
-      </div>
-
-      ${noiseRemoved > 0 ? `
-      <div class="ap-noise-alert">
-        <div class="ap-noise-icon">🧹</div>
-        <div class="ap-noise-text">
-          <strong>LLM-like Noise Filter:</strong> Đã tự động loại bỏ dữ liệu thừa (như "ĐỊA CHỈ MỚI", "GHI CHÚ", v.v.) 
-          trên <strong>${noiseRemoved}</strong> địa chỉ để tăng độ chính xác phân rã.
-        </div>
-      </div>
-      ` : ''}
-
-      <!-- Top Provinces Chart -->
-      ${topProvinces.length > 0 ? `
-      <div class="ap-province-chart">
-        <h4>🏙️ Phân bổ theo Tỉnh/Thành phố</h4>
-        <div class="ap-province-bars">
-          ${topProvinces.map(([name, count], idx) => {
-            const pct = (count / total * 100).toFixed(1);
-            const colors = ['#6366f1', '#8b5cf6', '#22d3ee', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#3b82f6'];
-            return `
-              <div class="ap-province-row">
-                <span class="ap-province-name">${name}</span>
-                <div class="ap-province-bar-wrap">
-                  <div class="ap-province-bar-fill" style="width:${pct}%;background:${colors[idx % colors.length]};"></div>
-                </div>
-                <span class="ap-province-count">${count} <small>(${pct}%)</small></span>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-      ` : ''}
-
-      <!-- Result Table -->
-      <div class="ap-table-wrap">
-        <table class="ap-result-table">
-          <thead>
-            <tr>
-              <th class="ap-th-num">#</th>
-              <th class="ap-th-raw">Địa chỉ gốc</th>
-              <th class="ap-th-street">Số nhà & Đường</th>
-              <th class="ap-th-ward">Phường/Xã</th>
-              <th class="ap-th-district">Quận/Huyện (cũ)</th>
-              <th class="ap-th-province">Tỉnh/Thành phố</th>
-              <th class="ap-th-status">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody id="ap-result-tbody">
-            ${result.parsed.slice(0, 50).map((p, i) => this._renderResultRow(p, i)).join('')}
-          </tbody>
-        </table>
-        ${result.parsed.length > 50 ? `
-          <div class="ap-table-footer">
-            <span>Đang hiển thị 50 / ${result.parsed.length} dòng</span>
-            <button class="btn btn-outline btn-sm" onclick="AddressParserUI.showAllRows()">Hiển thị tất cả</button>
-          </div>
-        ` : ''}
       </div>
     `;
 
@@ -1008,54 +969,34 @@ const AddressParserUI = {
     const hasStreet = !!parsed.street;
     const hasWard = !!parsed.ward;
     const hasProvince = !!parsed.province;
-    const hasWarnings = parsed.warnings && parsed.warnings.some(w => w.severity === 'warning');
-    const hasNoise = parsed.warnings && parsed.warnings.some(w => w.type === 'noise_removed');
     const score = (hasStreet ? 1 : 0) + (hasWard ? 1 : 0) + (hasProvince ? 1 : 0);
     
-    let statusClass, statusText, statusIcon;
-    if (hasWarnings) {
-      statusClass = 'ap-status-warning';
-      statusText = 'Cần xác nhận';
-      statusIcon = '⚠';
-    } else if (score === 3) {
-      statusClass = 'ap-status-full';
-      statusText = 'Đầy đủ';
-      statusIcon = '✓';
-    } else if (score >= 1) {
-      statusClass = 'ap-status-partial';
-      statusText = 'Một phần';
-      statusIcon = '◐';
+    let confClass, confText;
+    if (score === 3) {
+      confClass = 'ap-conf-high';
+      confText = 'High';
+    } else if (score >= 2) {
+      confClass = 'ap-conf-medium';
+      confText = 'Medium';
     } else {
-      statusClass = 'ap-status-empty';
-      statusText = 'Không xác định';
-      statusIcon = '✕';
+      confClass = 'ap-conf-low';
+      confText = 'Low';
     }
 
-    // Build warning tooltips
-    const warningItems = (parsed.warnings || []).map(w => {
-      const icon = w.severity === 'warning' ? '⚠️' : w.type === 'noise_removed' ? '🧹' : 'ℹ️';
-      return `${icon} ${w.message}`;
-    });
-    const warningHtml = warningItems.length > 0 ? 
-      `<div class="ap-row-warnings">${warningItems.map(w => `<div class="ap-warning-item">${w}</div>`).join('')}</div>` : '';
+    // Split street into number and name
+    const streetParts = (parsed.street || '').match(/^(\d+[\/\-]?\d*[a-zA-Z]?)\s+(.+)$/);
+    const houseNum = streetParts ? streetParts[1] : '';
+    const streetName = streetParts ? streetParts[2] : (parsed.street || '');
 
     return `
-      <tr class="${hasWarnings ? 'ap-row-warning' : ''} ${score === 0 ? 'ap-row-empty' : ''}">
-        <td class="ap-td-num">${index + 1}</td>
-        <td class="ap-td-raw" title="${(parsed.raw || '').replace(/"/g, '&quot;')}">
-          ${this._truncate(parsed.raw, 60)}
-          ${hasNoise ? '<span class="ap-noise-badge" title="Đã loại bỏ dữ liệu thừa">🧹</span>' : ''}
-        </td>
-        <td class="ap-td-street">${parsed.street || '<span class="ap-empty">—</span>'}</td>
-        <td class="ap-td-ward">${parsed.ward || '<span class="ap-empty">—</span>'}</td>
-        <td class="ap-td-district">${parsed.district || '<span class="ap-empty">—</span>'}</td>
-        <td class="ap-td-province">${parsed.province ? `<span class="ap-province-tag">${parsed.province}</span>` : '<span class="ap-empty">—</span>'}</td>
-        <td>
-          <span class="ap-status-badge ${statusClass}" ${warningItems.length > 0 ? `title="${warningItems.join('\\n')}"` : ''}>
-            ${statusIcon} ${statusText}
-          </span>
-          ${warningHtml}
-        </td>
+      <tr>
+        <td>${this._truncate(parsed.raw, 50) || '<span class="ap-empty">—</span>'}</td>
+        <td>${houseNum || '<span class="ap-empty">—</span>'}</td>
+        <td>${streetName || '<span class="ap-empty">—</span>'}</td>
+        <td>${parsed.ward || '<span class="ap-empty">—</span>'}</td>
+        <td>${parsed.district || '<span class="ap-empty">—</span>'}</td>
+        <td>${parsed.province || '<span class="ap-empty">—</span>'}</td>
+        <td><span class="ap-confidence ${confClass}">● ${confText}</span></td>
       </tr>
     `;
   },
@@ -1079,6 +1020,33 @@ const AddressParserUI = {
 
   toggleAllRows() {
     this.showAllRows();
+  },
+
+  filterResults(query) {
+    if (!this._parsedResult) return;
+    const q = query.toLowerCase().trim();
+    const tbody = document.getElementById('ap-result-tbody');
+    if (!tbody) return;
+
+    if (!q) {
+      tbody.innerHTML = this._parsedResult.parsed
+        .slice(0, 50)
+        .map((p, i) => this._renderResultRow(p, i))
+        .join('');
+      return;
+    }
+
+    const filtered = this._parsedResult.parsed.filter(p =>
+      (p.raw || '').toLowerCase().includes(q) ||
+      (p.street || '').toLowerCase().includes(q) ||
+      (p.ward || '').toLowerCase().includes(q) ||
+      (p.district || '').toLowerCase().includes(q) ||
+      (p.province || '').toLowerCase().includes(q)
+    );
+
+    tbody.innerHTML = filtered.length > 0
+      ? filtered.map((p, i) => this._renderResultRow(p, i)).join('')
+      : '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted);">Không tìm thấy kết quả</td></tr>';
   },
 
   exportResult() {

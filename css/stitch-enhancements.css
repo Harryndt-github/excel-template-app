@@ -1,0 +1,1077 @@
+/* ============================================
+   Stitch Design System — Complete Overhaul
+   "The Digital Architect" v3.0
+   ALL PAGES — Premium Dark-Engine
+   ============================================ */
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   1. AMBIENT ATMOSPHERE
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+body::before {
+  content: '';
+  position: fixed;
+  top: -50%;
+  right: -30%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  bottom: -30%;
+  left: -20%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.03) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sidebar, .main-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   2. SIDEBAR — Glassmorphism
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.sidebar {
+  background: rgba(26, 26, 46, 0.85) !important;
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: 
+    4px 0 24px rgba(17, 17, 37, 0.5),
+    inset -1px 0 0 rgba(192, 193, 255, 0.04);
+}
+
+.sidebar-header {
+  background: rgba(99, 102, 241, 0.05) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20px;
+  right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(192, 193, 255, 0.08), transparent);
+}
+
+.logo-icon {
+  animation: logoPulse 4s ease-in-out infinite;
+}
+
+@keyframes logoPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.15); }
+  50% { box-shadow: 0 0 30px rgba(99, 102, 241, 0.25); }
+}
+
+.nav-item {
+  border-radius: var(--radius-md);
+  margin: 0 4px;
+}
+
+.nav-item::before {
+  background: linear-gradient(180deg, #8083ff, #c0c1ff) !important;
+  border-radius: 0 4px 4px 0;
+}
+
+.nav-item:hover {
+  background: rgba(99, 102, 241, 0.08) !important;
+}
+
+.nav-item.active {
+  background: rgba(99, 102, 241, 0.12) !important;
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.05);
+}
+
+.nav-divider-label::after {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15), transparent) !important;
+}
+
+.sidebar-footer {
+  background: rgba(0, 0, 0, 0.2) !important;
+  position: relative;
+}
+
+.sidebar-footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(192, 193, 255, 0.05), transparent);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   3. PAGE HEADER — Editorial Style (ALL PAGES)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.page-title {
+  font-size: 1.85rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+  background: linear-gradient(135deg, #e2e0fc 30%, #c0c1ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.page-subtitle {
+  color: var(--text-secondary) !important;
+  font-size: 0.88rem !important;
+}
+
+/* Page transition */
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(12px); 
+    filter: blur(4px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+    filter: blur(0);
+  }
+}
+
+.page.active {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   4. BUTTONS — Global Glow & Sweep
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn-primary:hover::before {
+  left: 100%;
+}
+
+.btn-primary:hover {
+  box-shadow: 
+    0 4px 20px rgba(99, 102, 241, 0.45),
+    0 0 40px rgba(99, 102, 241, 0.1) !important;
+  transform: translateY(-2px);
+}
+
+.btn-success {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-success::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn-success:hover::before {
+  left: 100%;
+}
+
+.btn-success:hover {
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.45) !important;
+}
+
+.btn-outline {
+  border-color: rgba(70, 69, 84, 0.25) !important;
+}
+
+.btn-outline:hover {
+  border-color: rgba(192, 193, 255, 0.3) !important;
+  background: rgba(99, 102, 241, 0.06) !important;
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.05);
+}
+
+.btn-danger {
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  background: rgba(239, 68, 68, 0.06) !important;
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.1);
+}
+
+/* Inputs — Neon Focus */
+.input:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 
+    0 0 0 3px rgba(99, 102, 241, 0.1),
+    0 0 20px rgba(99, 102, 241, 0.05) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   5. TEMPLATE CARDS (Quản lý Template + Word)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.template-card {
+  border: 1px solid rgba(70, 69, 84, 0.1) !important;
+  background: var(--bg-card) !important;
+  box-shadow: 0 4px 16px rgba(17, 17, 37, 0.35) !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.template-card:hover {
+  border-color: rgba(99, 102, 241, 0.2) !important;
+  box-shadow: 
+    0 10px 40px rgba(17, 17, 37, 0.5),
+    0 0 0 1px rgba(192, 193, 255, 0.04) !important;
+  transform: translateY(-4px) !important;
+  background: var(--bg-card-hover) !important;
+}
+
+.template-card-header h4 {
+  font-size: 1.08rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em;
+}
+
+.template-card-preview {
+  color: var(--text-secondary) !important;
+}
+
+.template-card-actions {
+  background: rgba(0, 0, 0, 0.2) !important;
+  padding: 14px 20px 16px !important;
+  gap: 10px !important;
+  position: relative;
+}
+
+.template-card-actions::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(192, 193, 255, 0.04), transparent);
+}
+
+.template-card-actions .btn {
+  font-size: 0.78rem !important;
+  padding: 7px 14px !important;
+  border-radius: 6px !important;
+}
+
+.template-card-actions .btn-outline {
+  background: rgba(99, 102, 241, 0.06) !important;
+  border: 1px solid rgba(70, 69, 84, 0.2) !important;
+  color: var(--text-secondary) !important;
+}
+
+.template-card-actions .btn-outline:hover {
+  background: rgba(99, 102, 241, 0.12) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  color: var(--accent) !important;
+}
+
+.template-card-actions .btn-danger {
+  background: rgba(239, 68, 68, 0.08) !important;
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
+  color: #ef4444 !important;
+  font-size: 0.78rem !important;
+}
+
+.template-card-actions .btn-danger:hover {
+  background: rgba(239, 68, 68, 0.18) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+}
+
+.placeholder-count {
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.1);
+}
+
+/* Word Template Cards */
+.word-tpl-card {
+  border-left: 3px solid rgba(37, 99, 235, 0.5) !important;
+}
+
+.word-tpl-card:hover {
+  border-left-color: #2563eb !important;
+}
+
+/* Empty state enhancement */
+.empty-state {
+  padding: 80px 40px !important;
+}
+
+.empty-state h3 {
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  background: linear-gradient(135deg, #e2e0fc 30%, #c7c4d7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   6. SPREADSHEET EDITOR (Tạo Template)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Editor container — Dark theme wrapper */
+.spreadsheet-editor-wrap {
+  border: 1px solid rgba(70, 69, 84, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(17, 17, 37, 0.5) !important;
+}
+
+.editor-container {
+  box-shadow: 0 8px 32px rgba(17, 17, 37, 0.5) !important;
+  border: 1px solid rgba(70, 69, 84, 0.08) !important;
+}
+
+/* Toolbar — Glassmorphism */
+.ss-toolbar,
+.editor-toolbar,
+.we-toolbar {
+  background: rgba(30, 30, 50, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Formula bar */
+.ss-formula-bar-wrap {
+  background: rgba(26, 26, 46, 0.9) !important;
+}
+
+/* Column/Row headers — Dark themed */
+.ss-corner-cell {
+  background: #1e1e32 !important;
+  border-color: rgba(70, 69, 84, 0.2) !important;
+}
+
+.ss-col-header {
+  background: #1e1e32 !important;
+  border-color: rgba(70, 69, 84, 0.2) !important;
+  color: var(--text-muted) !important;
+  font-weight: 700 !important;
+}
+
+.ss-col-header.selected {
+  background: rgba(99, 102, 241, 0.15) !important;
+  color: var(--accent) !important;
+}
+
+.ss-row-header {
+  background: #1e1e32 !important;
+  border-color: rgba(70, 69, 84, 0.2) !important;
+  color: var(--text-muted) !important;
+  font-weight: 700 !important;
+}
+
+.ss-row-header.selected {
+  background: rgba(99, 102, 241, 0.15) !important;
+  color: var(--accent) !important;
+}
+
+/* Grid cells — Dark theme */
+.ss-cell {
+  border-color: rgba(70, 69, 84, 0.15) !important;
+  background: #0c0c1f !important;
+  color: var(--text-primary) !important;
+}
+
+.ss-cell:hover {
+  background: rgba(99, 102, 241, 0.06) !important;
+}
+
+.ss-cell.selected {
+  outline: 2px solid #6366f1 !important;
+  background: rgba(99, 102, 241, 0.08) !important;
+}
+
+.ss-cell.in-range {
+  background: rgba(99, 102, 241, 0.06) !important;
+}
+
+.ss-cell.editing {
+  outline: 2px solid #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+  background: rgba(99, 102, 241, 0.04) !important;
+}
+
+.ss-cell.header-cell {
+  background: rgba(245, 158, 11, 0.08) !important;
+  color: #f59e0b !important;
+  font-weight: 700 !important;
+}
+
+.ss-cell.placeholder-cell {
+  background: rgba(99, 102, 241, 0.06) !important;
+}
+
+.ss-cell-content {
+  color: var(--text-primary) !important;
+}
+
+/* Spreadsheet container background */
+#spreadsheet-container {
+  background: #0c0c1f !important;
+}
+
+/* Column resizer */
+.ss-col-resizer:hover {
+  background: rgba(99, 102, 241, 0.5) !important;
+}
+
+/* Quick actions bar */
+.ss-quick-actions {
+  background: var(--bg-card) !important;
+}
+
+/* Add row/col buttons */
+.ss-add-row-btn,
+.ss-add-col-btn {
+  border-color: rgba(70, 69, 84, 0.2) !important;
+  color: var(--text-muted) !important;
+}
+
+.ss-add-row-btn:hover,
+.ss-add-col-btn:hover {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  background: rgba(99, 102, 241, 0.06) !important;
+}
+
+/* Data Source Panel */
+.placeholders-panel,
+.word-ds-panel {
+  border: 1px solid rgba(70, 69, 84, 0.08) !important;
+}
+
+/* Cell Properties Panel */
+.ss-cell-panel {
+  border: 1px solid rgba(70, 69, 84, 0.08) !important;
+}
+
+/* Editor name bar */
+.editor-name-bar label {
+  color: var(--text-secondary) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.78rem !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   7. GENERATE PAGE — Steps & Upload
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Step Indicator — Glow */
+.step-number {
+  border: 2px solid rgba(70, 69, 84, 0.3) !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.step.active .step-number {
+  box-shadow: 
+    0 0 20px rgba(99, 102, 241, 0.35),
+    0 0 40px rgba(99, 102, 241, 0.1) !important;
+  animation: stepGlow 2s ease-in-out infinite;
+}
+
+@keyframes stepGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(99, 102, 241, 0.3), 0 0 30px rgba(99, 102, 241, 0.1); }
+  50% { box-shadow: 0 0 25px rgba(99, 102, 241, 0.5), 0 0 50px rgba(99, 102, 241, 0.15); }
+}
+
+.step.completed .step-number {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3) !important;
+}
+
+.step span {
+  font-weight: 700 !important;
+}
+
+.step-line {
+  background: linear-gradient(90deg, rgba(70, 69, 84, 0.3), rgba(70, 69, 84, 0.15)) !important;
+}
+
+/* Step Cards */
+.step-card {
+  border: 1px solid rgba(70, 69, 84, 0.08) !important;
+  box-shadow: 0 8px 32px rgba(17, 17, 37, 0.4) !important;
+}
+
+.step-card h3 {
+  font-size: 1.25rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em;
+}
+
+.step-actions {
+  background: rgba(0, 0, 0, 0.15) !important;
+}
+
+.step-actions::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 32px;
+  right: 32px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(192, 193, 255, 0.04), transparent);
+}
+
+/* Upload Zones */
+.upload-slot {
+  border: 2px dashed rgba(70, 69, 84, 0.2) !important;
+  background: rgba(12, 12, 31, 0.4) !important;
+  transition: all 0.3s ease !important;
+}
+
+.upload-slot:hover {
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  background: rgba(99, 102, 241, 0.03) !important;
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.05);
+}
+
+.upload-slot.has-file {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  background: rgba(16, 185, 129, 0.04) !important;
+  border-style: solid !important;
+}
+
+.upload-slot.has-error {
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  background: rgba(239, 68, 68, 0.04) !important;
+}
+
+/* Multi-Sheet Import */
+.multi-sheet-import-zone {
+  border: 1.5px dashed rgba(99, 102, 241, 0.2) !important;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.04), rgba(139, 92, 246, 0.02)) !important;
+}
+
+.multi-sheet-import-zone:hover {
+  border-color: rgba(99, 102, 241, 0.4) !important;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.04)) !important;
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.05);
+}
+
+/* Template Select Dropdown */
+.step-card select,
+.mapping-select,
+.ms-type-select {
+  background: var(--bg-input) !important;
+  border: 1px solid rgba(70, 69, 84, 0.2) !important;
+  transition: all 0.2s ease;
+}
+
+.step-card select:focus,
+.mapping-select:focus,
+.ms-type-select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+}
+
+/* Mapping Table */
+.mapping-table th {
+  background: rgba(26, 26, 46, 0.9) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.mapping-table td {
+  border-bottom: 1px solid rgba(70, 69, 84, 0.08) !important;
+}
+
+.mapping-table tr:hover td {
+  background: rgba(99, 102, 241, 0.04) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   8. WORD EDITOR (Tạo Word Template)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.word-editor-container {
+  border: 1px solid rgba(70, 69, 84, 0.08) !important;
+  box-shadow: 0 8px 32px rgba(17, 17, 37, 0.5) !important;
+}
+
+.word-right-panel .word-ds-panel {
+  border: 1px solid rgba(70, 69, 84, 0.08) !important;
+  transition: all 0.3s ease;
+}
+
+.word-right-panel .word-ds-panel:hover {
+  border-color: rgba(70, 69, 84, 0.15);
+  box-shadow: 0 4px 20px rgba(17, 17, 37, 0.4);
+}
+
+/* Upload zone in data source panel */
+.word-ds-panel .ds-upload-zone {
+  border: 2px dashed rgba(70, 69, 84, 0.2) !important;
+  background: rgba(12, 12, 31, 0.3) !important;
+}
+
+.word-ds-panel .ds-upload-zone:hover,
+.word-ds-panel .ds-upload-zone.dragover {
+  border-color: var(--accent) !important;
+  background: rgba(99, 102, 241, 0.06) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   9. MODALS — Full Glassmorphism
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.modal-overlay {
+  background: rgba(11, 11, 25, 0.75) !important;
+  backdrop-filter: blur(16px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.2) !important;
+}
+
+.modal {
+  background: rgba(30, 30, 50, 0.92) !important;
+  backdrop-filter: blur(24px) saturate(1.3) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.3) !important;
+  border: 1px solid rgba(192, 193, 255, 0.06) !important;
+  box-shadow: 
+    0 24px 64px rgba(11, 11, 25, 0.7),
+    0 0 0 1px rgba(192, 193, 255, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(24px) scale(0.97); 
+    filter: blur(4px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1); 
+    filter: blur(0);
+  }
+}
+
+.modal-header {
+  background: rgba(99, 102, 241, 0.03) !important;
+  position: relative;
+}
+
+.modal-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(192, 193, 255, 0.06), transparent);
+}
+
+.modal-footer {
+  background: rgba(0, 0, 0, 0.18) !important;
+  position: relative;
+}
+
+.modal-footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(192, 193, 255, 0.04), transparent);
+}
+
+/* Spreadsheet placeholder modal */
+.ss-ph-modal {
+  background: rgba(11, 11, 25, 0.75) !important;
+  backdrop-filter: blur(16px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.2) !important;
+}
+
+.ss-ph-modal-body {
+  background: rgba(30, 30, 50, 0.92) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(192, 193, 255, 0.06) !important;
+  box-shadow: 
+    0 24px 64px rgba(11, 11, 25, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
+}
+
+/* Context Menu */
+.ss-context-menu {
+  background: rgba(30, 30, 50, 0.94) !important;
+  backdrop-filter: blur(20px) saturate(1.3) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.3) !important;
+  border: 1px solid rgba(192, 193, 255, 0.06) !important;
+  box-shadow: 0 16px 48px rgba(11, 11, 25, 0.7) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   10. DASHBOARD — KPI Cards & Sections
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.stat-card {
+  border: 1px solid rgba(70, 69, 84, 0.12) !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.stat-card:hover {
+  border-color: rgba(99, 102, 241, 0.15) !important;
+  box-shadow: 
+    0 10px 40px rgba(17, 17, 37, 0.5),
+    0 0 0 1px rgba(192, 193, 255, 0.05) !important;
+  transform: translateY(-3px) !important;
+}
+
+.stat-icon {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover .stat-icon {
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+.stat-value {
+  font-size: 2.2rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em;
+}
+
+/* Glow card */
+.stat-card-glow {
+  border: 1px solid rgba(16, 185, 129, 0.1) !important;
+}
+
+.stat-card-glow:hover {
+  border-color: rgba(16, 185, 129, 0.2) !important;
+  box-shadow: 
+    0 10px 40px rgba(17, 17, 37, 0.5),
+    0 0 30px rgba(16, 185, 129, 0.08) !important;
+}
+
+.stat-glow-bg {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Section cards */
+.dash-section-card {
+  border: 1px solid rgba(70, 69, 84, 0.08) !important;
+  transition: all 0.3s ease;
+}
+
+.dash-section-card:hover {
+  border-color: rgba(70, 69, 84, 0.15);
+  box-shadow: 0 4px 20px rgba(17, 17, 37, 0.3);
+}
+
+.dash-section-header {
+  position: relative;
+}
+
+.dash-section-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.1), rgba(34, 211, 238, 0.05), transparent);
+}
+
+/* Progress bars — Neon glow */
+.dash-fill-indigo {
+  background: linear-gradient(90deg, #6366f1, #8083ff) !important;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.4) !important;
+}
+
+.dash-fill-cyan {
+  background: linear-gradient(90deg, #0891b2, #22d3ee) !important;
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.4) !important;
+}
+
+.dash-fill-purple {
+  background: linear-gradient(90deg, #7c3aed, #a78bfa) !important;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.4) !important;
+}
+
+.dash-storage-fill {
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.3) !important;
+}
+
+/* Action buttons */
+.dash-action-gradient {
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.dash-action-gradient:hover {
+  transform: translateY(-3px) !important;
+}
+
+.dash-action-indigo:hover {
+  box-shadow: 0 12px 32px rgba(79, 70, 229, 0.35) !important;
+}
+
+.dash-action-cyan:hover {
+  box-shadow: 0 12px 32px rgba(8, 145, 178, 0.35) !important;
+}
+
+/* Activity timeline */
+.dash-activity-item:not(:last-child)::after {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.15), rgba(70, 69, 84, 0.08)) !important;
+}
+
+.dash-activity-icon {
+  transition: all 0.25s ease;
+}
+
+.dash-activity-item:hover .dash-activity-icon {
+  transform: scale(1.1);
+}
+
+/* File badges */
+.dash-file-badge {
+  border: 1px solid rgba(70, 69, 84, 0.1) !important;
+  transition: all 0.25s ease;
+}
+
+.dash-file-badge:hover {
+  border-color: rgba(99, 102, 241, 0.15);
+  background: rgba(99, 102, 241, 0.06);
+  transform: translateY(-1px);
+}
+
+/* Date badge */
+.dash-date-badge {
+  background: rgba(30, 30, 50, 0.7) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(70, 69, 84, 0.15) !important;
+}
+
+.dash-time-pill {
+  animation: timePulse 3s ease-in-out infinite;
+}
+
+@keyframes timePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+  50% { box-shadow: 0 0 8px 2px rgba(99, 102, 241, 0.15); }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   11. TOAST NOTIFICATIONS — Premium
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.toast {
+  backdrop-filter: blur(12px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(1.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px rgba(17, 17, 37, 0.6) !important;
+}
+
+@keyframes toastIn {
+  from { 
+    opacity: 0; 
+    transform: translateX(40px) scale(0.95); 
+    filter: blur(4px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateX(0) scale(1); 
+    filter: blur(0);
+  }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   12. TABLE BUILDER MODAL
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.tb-grid-container {
+  background: var(--bg-input) !important;
+  border: 1px solid rgba(70, 69, 84, 0.12) !important;
+}
+
+.tb-grid td,
+.tb-grid th {
+  border: 1px solid rgba(70, 69, 84, 0.1) !important;
+}
+
+/* Cell type btns */
+.tb-type-btn {
+  border: 1px solid rgba(70, 69, 84, 0.2) !important;
+}
+
+.tb-type-btn:hover {
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+/* Cell editor */
+.tb-cell-editor {
+  border: 1px solid var(--accent) !important;
+}
+
+.tb-cell-editor-header {
+  border-bottom: 1px solid rgba(70, 69, 84, 0.12) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   13. PLACEHOLDER CHIPS & TAGS
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.placeholder-tag {
+  border: 1px solid rgba(99, 102, 241, 0.2) !important;
+  transition: all 0.2s ease;
+}
+
+.placeholder-tag:hover {
+  border-color: rgba(99, 102, 241, 0.4) !important;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.1);
+  transform: translateY(-1px);
+}
+
+.ph-source-card {
+  border: 1px solid rgba(70, 69, 84, 0.15) !important;
+  background: rgba(12, 12, 31, 0.5) !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.ph-source-card:hover {
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  background: rgba(99, 102, 241, 0.08) !important;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.1) !important;
+  transform: translateY(-3px) !important;
+}
+
+.ph-field-chip {
+  border: 1px solid rgba(70, 69, 84, 0.15) !important;
+  background: rgba(12, 12, 31, 0.5) !important;
+  transition: all 0.2s ease !important;
+}
+
+.ph-field-chip:hover {
+  border-color: rgba(99, 102, 241, 0.4) !important;
+  background: rgba(99, 102, 241, 0.1) !important;
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.08);
+  transform: translateY(-1px);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   14. PDF PREVIEW
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.preview-wrapper {
+  background: rgba(12, 12, 31, 0.8) !important;
+  box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid rgba(70, 69, 84, 0.08) !important;
+}
+
+.pdf-preview {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   15. MULTI-SHEET RESULT CARDS
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.ms-result-card {
+  border: 1px solid rgba(70, 69, 84, 0.08) !important;
+}
+
+.ms-result-header {
+  background: rgba(99, 102, 241, 0.04) !important;
+}
+
+.ms-match-row {
+  border-bottom: 1px solid rgba(70, 69, 84, 0.08) !important;
+}
+
+.ms-match-header-row {
+  background: rgba(99, 102, 241, 0.03) !important;
+}
+
+.ms-actions {
+  background: rgba(0, 0, 0, 0.18) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   16. DIVIDERS — Luminous Lines
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.multi-sheet-divider::before,
+.multi-sheet-divider::after {
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.1), transparent) !important;
+}
+
+.ph-custom-divider::before,
+.ph-custom-divider::after {
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.08), transparent) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   17. SCROLLBAR — Refined
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.3);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   18. SELECTION & ACCESSIBILITY
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+::selection {
+  background: rgba(99, 102, 241, 0.3);
+  color: #fff;
+}
+
+::-moz-selection {
+  background: rgba(99, 102, 241, 0.3);
+  color: #fff;
+}
+
+*:focus-visible {
+  outline: 2px solid rgba(192, 193, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
