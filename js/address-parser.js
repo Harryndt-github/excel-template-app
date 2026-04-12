@@ -228,7 +228,10 @@ const AddressParser = {
       }},
       // P + CamelCase name at end (PThanh Xuan, PBinh Thanh)
       { regex: /^(.+?)\s+[Pp]\.?([A-ZĐ][a-zàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+(?:\s+[A-Za-zĐđàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵ]+)*)$/, build: (m) => {
-        const name = m[2].replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+        let name = m[2].trim();
+        if (!/\s/.test(name)) {
+          name = name.replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+        }
         return `Phường ${name}`;
       }},
     ];
@@ -281,7 +284,10 @@ const AddressParser = {
       }},
       // Q + CamelCase name at end
       { regex: /^(.+?)\s+[Qq]\.?\s*([A-ZĐ][a-zàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]+(?:\s+[A-Za-zĐđàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵ]+)*)$/, build: (m) => {
-        const name = m[2].replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+        let name = m[2].trim();
+        if (!/\s/.test(name)) {
+          name = name.replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+        }
         return `Quận ${name}`;
       }},
     ];
@@ -322,7 +328,7 @@ const AddressParser = {
   // =============================================
   parseAddress(rawAddress) {
     if (!rawAddress || typeof rawAddress !== 'string') {
-      return { street: '', ward: '', province: '', district: '', newWard: '', warnings: [], raw: rawAddress || '' };
+      return { street: '', ward: '', province: '', district: '', newWard: '', newDistrict: '', isConverted: false, conversionNote: '', warnings: [], raw: rawAddress || '' };
     }
 
     this._buildDictionaries();
@@ -506,17 +512,30 @@ const AddressParser = {
     }
 
     // Capitalize properly
-    let newWard = ward;
     if (ward) ward = this._capitalizeVietnamese(ward);
     if (district) district = this._capitalizeVietnamese(district);
-    if (newWard) newWard = this._capitalizeVietnamese(newWard);
+
+    // Step 11: Convert old 3-tier → new 2-tier address
+    const conversion = VietnamAddressData.convertTo2Tier(ward, district, province);
+    
+    if (conversion.converted) {
+      warnings.push({
+        type: 'address_converted',
+        message: `Đã chuyển đổi sang địa chỉ mới 2 cấp: ${conversion.note}`,
+        severity: 'info'
+      });
+    }
 
     return {
       street: streetParts.join(', ').trim(),
       ward: ward,
       province: province,
       district: district,
-      newWard: newWard,
+      // New 2-tier fields
+      newWard: conversion.newWard || ward,
+      newDistrict: conversion.newDistrict || district,
+      isConverted: conversion.converted,
+      conversionNote: conversion.note,
       warnings: warnings,
       raw: rawAddress
     };
@@ -527,9 +546,8 @@ const AddressParser = {
   // =============================================
   _capitalizeVietnamese(str) {
     if (!str) return '';
-    // Split by spaces and capitalize first letter of each word  
-    // Avoid using \b\w which breaks on Vietnamese diacritics
-    return str.split(/\s+/).map(word => {
+    // Lowercase first to normalize, then capitalize each word
+    return str.toLowerCase().split(/\s+/).map(word => {
       if (!word) return word;
       return word.charAt(0).toUpperCase() + word.slice(1);
     }).join(' ');
@@ -629,22 +647,60 @@ const AddressParser = {
 
   // =============================================
   // EXPORT: Generate Excel with parsed results
+  // Output format: Old 3-tier → New 2-tier (no District)
   // =============================================
   exportToExcel(originalData, parsedResults, filename = 'dia_chi_phan_ra.xlsx') {
     const headers = [...originalData.headers];
     const insertIdx = originalData.addressColumnIndex + 1;
     
-    // Insert new columns
-    headers.splice(insertIdx, 0, 'Số nhà & Đường', 'Phường/Xã', 'Quận/Huyện (cũ)', 'Tỉnh/Thành phố', 'Cảnh báo');
+    // Insert columns: Old 3-tier breakdown + New 2-tier clean output
+    headers.splice(insertIdx, 0, 
+      // --- Phân rã gốc (3 cấp) ---
+      'Số nhà & Đường (gốc)', 
+      'Phường/Xã (gốc)', 
+      'Quận/Huyện (gốc)', 
+      'Tỉnh/TP (gốc)',
+      // --- Địa chỉ mới (2 cấp) ---
+      'Số nhà & Đường (mới)',
+      'Phường/Xã (mới)', 
+      'Tỉnh/TP (mới)',
+      // --- Metadata ---
+      'Đã chuyển đổi',
+      'Ghi chú',
+      'Cảnh báo'
+    );
 
     const rows = originalData.rows.map((row, idx) => {
       const newRow = [...row];
-      const parsed = parsedResults[idx] || { street: '', ward: '', district: '', province: '', warnings: [] };
+      const parsed = parsedResults[idx] || { 
+        street: '', ward: '', district: '', province: '', 
+        newWard: '', newDistrict: '', isConverted: false, conversionNote: '',
+        warnings: [] 
+      };
       const warningText = (parsed.warnings || [])
         .filter(w => w.severity === 'warning')
         .map(w => w.message)
         .join('; ');
-      newRow.splice(insertIdx, 0, parsed.street, parsed.ward, parsed.district, parsed.province, warningText);
+      
+      // New 2-tier: Ward may change, District is REMOVED
+      const finalWard = parsed.newWard || parsed.ward || '';
+      const finalProvince = parsed.province || '';
+
+      newRow.splice(insertIdx, 0, 
+        // Old 3-tier
+        parsed.street, 
+        parsed.ward,
+        parsed.district, 
+        parsed.province,
+        // New 2-tier (no district)
+        parsed.street,
+        finalWard,
+        finalProvince,
+        // Metadata
+        parsed.isConverted ? 'Có' : 'Không',
+        parsed.conversionNote || '',
+        warningText
+      );
       return newRow;
     });
 
@@ -872,6 +928,7 @@ const AddressParserUI = {
     const withWard = result.parsed.filter(p => p.ward).length;
     const withStreet = result.parsed.filter(p => p.street).length;
     const withDistrict = result.parsed.filter(p => p.district).length;
+    const convertedCount = result.parsed.filter(p => p.isConverted).length;
     const accuracy = total > 0 ? ((withProvince / total) * 100).toFixed(1) : 0;
 
     // Update KPI cards
@@ -889,6 +946,7 @@ const AddressParserUI = {
           <div class="ap-result-title-wrap">
             <h3 class="ap-result-title">Kết quả phân tích</h3>
             <span class="ap-live-badge"><span class="ap-live-dot"></span> LIVE DATA</span>
+            ${convertedCount > 0 ? `<span class="ap-converted-badge">🔄 ${convertedCount} đã chuyển đổi 2 cấp</span>` : ''}
           </div>
           <div class="ap-result-controls">
             <input type="text" class="ap-search-input" placeholder="Tìm kiếm địa chỉ..." 
@@ -906,13 +964,19 @@ const AddressParserUI = {
           <table class="ap-result-table">
             <thead>
               <tr>
-                <th>ĐỊA CHỈ GỐC</th>
-                <th>SỐ NHÀ</th>
-                <th>TÊN ĐƯỜNG</th>
-                <th>PHƯỜNG/XÃ</th>
-                <th>QUẬN/HUYỆN</th>
-                <th>TỈNH/THÀNH PHỐ</th>
-                <th>ĐỘ TIN CẬY</th>
+                <th rowspan="2">ĐỊA CHỈ GỐC</th>
+                <th colspan="4" class="ap-th-group-old">📋 ĐỊA CHỈ CŨ (3 CẤP)</th>
+                <th colspan="3" class="ap-th-group-new">✨ ĐỊA CHỈ MỚI (2 CẤP)</th>
+                <th rowspan="2">GHI CHÚ</th>
+              </tr>
+              <tr>
+                <th class="ap-th-old">SỐ NHÀ & ĐƯỜNG</th>
+                <th class="ap-th-old">PHƯỜNG/XÃ</th>
+                <th class="ap-th-old">QUẬN/HUYỆN</th>
+                <th class="ap-th-old">TỈNH/TP</th>
+                <th class="ap-th-new">SỐ NHÀ & ĐƯỜNG</th>
+                <th class="ap-th-new">PHƯỜNG/XÃ</th>
+                <th class="ap-th-new">TỈNH/TP</th>
               </tr>
             </thead>
             <tbody id="ap-result-tbody">
@@ -942,12 +1006,8 @@ const AddressParserUI = {
             <span class="ap-stat-value">${withWard}</span>
           </div>
           <div class="ap-stat-item">
-            <span>Có quận:</span>
-            <span class="ap-stat-value">${withDistrict}</span>
-          </div>
-          <div class="ap-stat-item">
-            <span>Có tỉnh:</span>
-            <span class="ap-stat-value">${withProvince}</span>
+            <span>Đã chuyển 2 cấp:</span>
+            <span class="ap-stat-value ap-stat-converted">${convertedCount}</span>
           </div>
           <button class="btn btn-success ap-download-btn" onclick="AddressParserUI.exportResult()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -971,32 +1031,36 @@ const AddressParserUI = {
     const hasProvince = !!parsed.province;
     const score = (hasStreet ? 1 : 0) + (hasWard ? 1 : 0) + (hasProvince ? 1 : 0);
     
-    let confClass, confText;
-    if (score === 3) {
-      confClass = 'ap-conf-high';
-      confText = 'High';
-    } else if (score >= 2) {
-      confClass = 'ap-conf-medium';
-      confText = 'Medium';
-    } else {
-      confClass = 'ap-conf-low';
-      confText = 'Low';
+    // Determine if this row was converted from 3-tier to 2-tier
+    const isConverted = parsed.isConverted;
+    const rowClass = isConverted ? 'ap-row-converted' : '';
+
+    // New 2-tier: Ward may change, District is REMOVED
+    const newWard = parsed.newWard || parsed.ward || '';
+    const province = parsed.province || '';
+
+    // Build conversion note for display
+    let noteHtml = '';
+    if (isConverted && parsed.conversionNote) {
+      noteHtml = `<span class="ap-note-converted">🔄 ${parsed.conversionNote}</span>`;
+    } else if (parsed.warnings && parsed.warnings.length > 0) {
+      const warns = parsed.warnings.filter(w => w.severity === 'warning');
+      if (warns.length > 0) {
+        noteHtml = `<span class="ap-note-warning">⚠️ ${warns[0].message}</span>`;
+      }
     }
 
-    // Split street into number and name
-    const streetParts = (parsed.street || '').match(/^(\d+[\/\-]?\d*[a-zA-Z]?)\s+(.+)$/);
-    const houseNum = streetParts ? streetParts[1] : '';
-    const streetName = streetParts ? streetParts[2] : (parsed.street || '');
-
     return `
-      <tr>
-        <td>${this._truncate(parsed.raw, 50) || '<span class="ap-empty">—</span>'}</td>
-        <td>${houseNum || '<span class="ap-empty">—</span>'}</td>
-        <td>${streetName || '<span class="ap-empty">—</span>'}</td>
-        <td>${parsed.ward || '<span class="ap-empty">—</span>'}</td>
-        <td>${parsed.district || '<span class="ap-empty">—</span>'}</td>
-        <td>${parsed.province || '<span class="ap-empty">—</span>'}</td>
-        <td><span class="ap-confidence ${confClass}">● ${confText}</span></td>
+      <tr class="${rowClass}">
+        <td>${this._truncate(parsed.raw, 45) || '<span class="ap-empty">—</span>'}</td>
+        <td class="ap-td-old">${parsed.street || '<span class="ap-empty">—</span>'}</td>
+        <td class="ap-td-old">${parsed.ward || '<span class="ap-empty">—</span>'}</td>
+        <td class="ap-td-old">${parsed.district || '<span class="ap-empty">—</span>'}</td>
+        <td class="ap-td-old">${province || '<span class="ap-empty">—</span>'}</td>
+        <td class="ap-td-new">${parsed.street || '<span class="ap-empty">—</span>'}</td>
+        <td class="ap-td-new">${newWard || '<span class="ap-empty">—</span>'}</td>
+        <td class="ap-td-new">${province || '<span class="ap-empty">—</span>'}</td>
+        <td>${noteHtml || '<span class="ap-empty">—</span>'}</td>
       </tr>
     `;
   },
@@ -1046,7 +1110,7 @@ const AddressParserUI = {
 
     tbody.innerHTML = filtered.length > 0
       ? filtered.map((p, i) => this._renderResultRow(p, i)).join('')
-      : '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted);">Không tìm thấy kết quả</td></tr>';
+      : '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted);">Không tìm thấy kết quả</td></tr>';
   },
 
   exportResult() {
@@ -1066,5 +1130,52 @@ const AddressParserUI = {
       console.error(err);
       App.toast('Lỗi xuất file: ' + err.message, 'error');
     }
+  },
+
+  // Parse manual address input
+  parseManual() {
+    const input = document.getElementById('ap-manual-input');
+    if (!input || !input.value.trim()) {
+      App.toast('Vui lòng nhập địa chỉ cần phân rã', 'warning');
+      return;
+    }
+
+    const addresses = input.value.trim().split('\n').filter(a => a.trim());
+    const parsed = AddressParser.parseAddresses(addresses);
+
+    // Create a mock result similar to file upload
+    this._parsedResult = {
+      headers: ['Địa chỉ'],
+      rows: addresses.map(a => [a]),
+      addressColumnIndex: 0,
+      addressColumnName: 'Địa chỉ',
+      addresses: addresses,
+      parsed: parsed,
+      rowIndices: addresses.map((_, i) => i)
+    };
+
+    this._renderResults(this._parsedResult);
+    App.toast(`Đã phân rã ${parsed.length} địa chỉ thành công!`, 'success');
+  },
+
+  // Load sample data for testing
+  loadSampleData() {
+    const sampleAddresses = [
+      '123 Trần Não, P. Bình An, Q2, TP.HCM',
+      '45/5 Võ Văn Ngân, P. Linh Chiểu, Q. Thủ Đức, HCM',
+      '789 Lê Văn Việt, P. Tăng Nhơn Phú A, Q9, TP HCM',
+      '12 Nguyễn Huệ, P. Bến Nghé, Q1, TP. Hồ Chí Minh',
+      '56 Quang Trung, P15, Gò Vấp, HCM',
+      '90 Cộng Hòa, P4, Q. Tân Bình, Hồ Chí Minh',
+      '34 Kha Vạn Cân, Linh Đông, Thủ Đức, HCM',
+      '88 Nguyễn Duy Trinh, P. Long Trường, Quận 9, TP.HCM',
+    ];
+
+    const input = document.getElementById('ap-manual-input');
+    if (input) {
+      input.value = sampleAddresses.join('\n');
+    }
+
+    App.toast('Đã tải dữ liệu mẫu — bấm "PHÂN RÃ NGAY" để phân tích', 'info');
   }
 };

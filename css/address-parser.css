@@ -173,7 +173,7 @@
   cursor: pointer;
 }
 
-/* Drop overlay */
+/* Drop overlay — pointer-events: none so clicks pass through to the upload button */
 .ap-drop-overlay {
   position: absolute;
   top: 0;
@@ -182,10 +182,12 @@
   bottom: 0;
   border-radius: 12px;
   z-index: 5;
+  pointer-events: none;
   transition: all 0.2s ease;
 }
 
 .ap-drop-overlay.dragover {
+  pointer-events: auto;
   background: rgba(99, 102, 241, 0.06);
   border: 2px dashed rgba(99, 102, 241, 0.4);
 }
@@ -465,6 +467,111 @@
   align-items: center;
   gap: 10px;
   padding: 16px 24px 20px;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   3-TIER → 2-TIER CONVERSION INDICATORS
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Group header — Old (3 cấp) */
+.ap-th-group-old {
+  text-align: center !important;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted) !important;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Group header — New (2 cấp) */
+.ap-th-group-new {
+  text-align: center !important;
+  background: rgba(99, 102, 241, 0.06);
+  color: #818cf8 !important;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+/* Converted badge in header */
+.ap-converted-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* Old columns — dimmed styling */
+.ap-th-old {
+  color: var(--text-muted) !important;
+  opacity: 0.7;
+  font-size: 0.72rem;
+}
+
+.ap-td-old {
+  opacity: 0.55;
+  font-size: 0.8rem;
+}
+
+/* New columns — accent highlight */
+.ap-th-new {
+  color: #818cf8 !important;
+  font-size: 0.72rem;
+}
+
+.ap-td-new {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Converted row indicator */
+.ap-row-converted td:first-child {
+  border-left: 3px solid #818cf8;
+}
+
+.ap-row-converted .ap-td-new {
+  color: #818cf8;
+}
+
+/* Notes column */
+.ap-note-converted {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.1);
+  color: #818cf8;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ap-note-warning {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* Converted stat value */
+.ap-stat-converted {
+  color: #818cf8 !important;
+}
+
+/* Empty cell placeholder */
+.ap-empty {
+  color: var(--text-muted);
+  opacity: 0.4;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

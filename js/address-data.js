@@ -404,7 +404,11 @@ const VietnamAddressData = {
     // Use \s* to allow both "Q Tan Binh" and "QTanBinh" (CamelCase split handled below)
     const qNameMatch = trimmed.match(/^[Qq]\.?\s*([A-ZĐÀ-Ỹa-zđà-ỹ][a-zđà-ỹ]*(?:\s*[A-Za-zĐđÀ-ỹ][a-zđà-ỹ]*)*)$/);
     if (qNameMatch) {
-      const distName = qNameMatch[1].replace(/([a-zà-ỹ])([A-ZĐÀ-Ỹ])/g, '$1 $2').trim();
+      let distName = qNameMatch[1].trim();
+      // Only apply CamelCase splitting if the name has NO spaces (compact form like "TanBinh")
+      if (!/\s/.test(distName)) {
+        distName = distName.replace(/([a-zà-ỹ])([A-ZĐÀ-Ỹ])/g, '$1 $2').trim();
+      }
       return { type: 'district', value: `Quận ${distName}`, original: trimmed };
     }
 
@@ -584,5 +588,241 @@ const VietnamAddressData = {
       ambiguous: results.length > 1,
       suggestions: results
     };
+  },
+
+  // =============================================
+  // 2025 ADMINISTRATIVE REFORM: 3-TIER → 2-TIER
+  // Old: Province → District → Ward
+  // New: Province → Ward (District removed)
+  // =============================================
+  _newAdminMapping: null,
+
+  _buildNewAdminMapping() {
+    if (this._newAdminMapping) return;
+
+    // Mapping: { province: { oldDistrict: { oldWard: { newWard, newDistrict (TP/Quận mới nếu có) } } } }
+    // Cải cách 2025: Bỏ cấp Quận/Huyện trung gian
+    // - TP.HCM: Q2, Q9, Thủ Đức → sáp nhập thành TP. Thủ Đức
+    // - Một số phường sáp nhập
+    this._newAdminMapping = {
+
+      // ============= TP. HỒ CHÍ MINH =============
+      'Hồ Chí Minh': {
+        // --- TP. Thủ Đức (sáp nhập Q2 + Q9 + Q.Thủ Đức cũ) ---
+        'Quận 2': {
+          _newDistrict: 'TP. Thủ Đức',
+          _wardMap: {
+            'Phường Thảo Điền': 'Phường Thảo Điền',
+            'Phường An Phú': 'Phường An Phú',
+            'Phường An Khánh': 'Phường An Khánh',
+            'Phường Bình An': 'Phường Bình An',
+            'Phường Bình Trưng Đông': 'Phường Bình Trưng Đông',
+            'Phường Bình Trưng Tây': 'Phường Bình Trưng Tây',
+            'Phường Cát Lái': 'Phường Cát Lái',
+            'Phường Thạnh Mỹ Lợi': 'Phường Thạnh Mỹ Lợi',
+            'Phường An Lợi Đông': 'Phường An Lợi Đông',
+            'Phường Thủ Thiêm': 'Phường Thủ Thiêm',
+          }
+        },
+        'Quận 9': {
+          _newDistrict: 'TP. Thủ Đức',
+          _wardMap: {
+            'Phường Long Bình': 'Phường Long Bình',
+            'Phường Long Thạnh Mỹ': 'Phường Long Thạnh Mỹ',
+            'Phường Tân Phú': 'Phường Tân Phú',
+            'Phường Hiệp Phú': 'Phường Hiệp Phú',
+            'Phường Tăng Nhơn Phú A': 'Phường Tăng Nhơn Phú A',
+            'Phường Tăng Nhơn Phú B': 'Phường Tăng Nhơn Phú B',
+            'Phường Phước Long B': 'Phường Phước Long B',
+            'Phường Phước Long A': 'Phường Phước Long A',
+            'Phường Trường Thạnh': 'Phường Trường Thạnh',
+            'Phường Long Phước': 'Phường Long Phước',
+            'Phường Long Trường': 'Phường Long Trường',
+            'Phường Phước Bình': 'Phường Phước Bình',
+            'Phường Phú Hữu': 'Phường Phú Hữu',
+          }
+        },
+        'Quận Thủ Đức': {
+          _newDistrict: 'TP. Thủ Đức',
+          _wardMap: {
+            'Phường Linh Chiểu': 'Phường Linh Chiểu',
+            'Phường Linh Tây': 'Phường Linh Tây',
+            'Phường Linh Đông': 'Phường Linh Đông',
+            'Phường Linh Xuân': 'Phường Linh Xuân',
+            'Phường Linh Trung': 'Phường Linh Trung',
+            'Phường Tam Bình': 'Phường Tam Bình',
+            'Phường Tam Phú': 'Phường Tam Phú',
+            'Phường Hiệp Bình Chánh': 'Phường Hiệp Bình Chánh',
+            'Phường Hiệp Bình Phước': 'Phường Hiệp Bình Phước',
+            'Phường Bình Chiểu': 'Phường Bình Chiểu',
+            'Phường Bình Thọ': 'Phường Bình Thọ',
+            'Phường Trường Thọ': 'Phường Trường Thọ',
+          }
+        },
+
+        // --- Q1: giữ nguyên ---
+        'Quận 1': {
+          _newDistrict: 'Quận 1',
+          _wardMap: {
+            'Phường Tân Định': 'Phường Tân Định',
+            'Phường Đa Kao': 'Phường Đa Kao',
+            'Phường Bến Nghé': 'Phường Bến Nghé',
+            'Phường Bến Thành': 'Phường Bến Thành',
+            'Phường Nguyễn Thái Bình': 'Phường Nguyễn Thái Bình',
+            'Phường Phạm Ngũ Lão': 'Phường Phạm Ngũ Lão',
+            'Phường Cầu Ông Lãnh': 'Phường Cầu Ông Lãnh',
+            'Phường Cô Giang': 'Phường Cô Giang',
+            'Phường Nguyễn Cư Trinh': 'Phường Nguyễn Cư Trinh',
+            'Phường Cầu Kho': 'Phường Cầu Kho',
+          }
+        },
+
+        // --- Q3 → giữ nguyên ---
+        'Quận 3': { _newDistrict: 'Quận 3', _wardMap: null },
+        // --- Q4 → giữ nguyên ---
+        'Quận 4': { _newDistrict: 'Quận 4', _wardMap: null },
+        // --- Q5 → giữ nguyên ---
+        'Quận 5': { _newDistrict: 'Quận 5', _wardMap: null },
+        // --- Q6 → giữ nguyên ---
+        'Quận 6': { _newDistrict: 'Quận 6', _wardMap: null },
+        // --- Q7 → giữ nguyên ---
+        'Quận 7': { _newDistrict: 'Quận 7', _wardMap: null },
+        // --- Q8 → giữ nguyên ---
+        'Quận 8': { _newDistrict: 'Quận 8', _wardMap: null },
+        // --- Q10 → giữ nguyên ---
+        'Quận 10': { _newDistrict: 'Quận 10', _wardMap: null },
+        // --- Q11 → giữ nguyên ---
+        'Quận 11': { _newDistrict: 'Quận 11', _wardMap: null },
+        // --- Q12 → giữ nguyên ---
+        'Quận 12': { _newDistrict: 'Quận 12', _wardMap: null },
+
+        // --- Các quận giữ nguyên tên ---
+        'Quận Bình Thạnh': { _newDistrict: 'Quận Bình Thạnh', _wardMap: null },
+        'Quận Gò Vấp': { _newDistrict: 'Quận Gò Vấp', _wardMap: null },
+        'Quận Phú Nhuận': { _newDistrict: 'Quận Phú Nhuận', _wardMap: null },
+        'Quận Tân Bình': { _newDistrict: 'Quận Tân Bình', _wardMap: null },
+        'Quận Tân Phú': { _newDistrict: 'Quận Tân Phú', _wardMap: null },
+        'Quận Bình Tân': { _newDistrict: 'Quận Bình Tân', _wardMap: null },
+
+        // --- Các huyện ---
+        'Huyện Bình Chánh': { _newDistrict: 'Huyện Bình Chánh', _wardMap: null },
+        'Huyện Hóc Môn': { _newDistrict: 'Huyện Hóc Môn', _wardMap: null },
+        'Huyện Củ Chi': { _newDistrict: 'Huyện Củ Chi', _wardMap: null },
+        'Huyện Nhà Bè': { _newDistrict: 'Huyện Nhà Bè', _wardMap: null },
+        'Huyện Cần Giờ': { _newDistrict: 'Huyện Cần Giờ', _wardMap: null },
+      },
+
+      // ============= HÀ NỘI =============
+      'Hà Nội': {
+        // Hà Nội giữ nguyên cấp Quận nhưng một số phường sáp nhập
+        'Quận Ba Đình': { _newDistrict: 'Quận Ba Đình', _wardMap: null },
+        'Quận Hoàn Kiếm': { _newDistrict: 'Quận Hoàn Kiếm', _wardMap: null },
+        'Quận Đống Đa': { _newDistrict: 'Quận Đống Đa', _wardMap: null },
+        'Quận Hai Bà Trưng': { _newDistrict: 'Quận Hai Bà Trưng', _wardMap: null },
+        'Quận Thanh Xuân': { _newDistrict: 'Quận Thanh Xuân', _wardMap: null },
+        'Quận Cầu Giấy': { _newDistrict: 'Quận Cầu Giấy', _wardMap: null },
+        'Quận Hoàng Mai': { _newDistrict: 'Quận Hoàng Mai', _wardMap: null },
+        'Quận Long Biên': { _newDistrict: 'Quận Long Biên', _wardMap: null },
+        'Quận Tây Hồ': { _newDistrict: 'Quận Tây Hồ', _wardMap: null },
+        'Quận Bắc Từ Liêm': { _newDistrict: 'Quận Bắc Từ Liêm', _wardMap: null },
+        'Quận Nam Từ Liêm': { _newDistrict: 'Quận Nam Từ Liêm', _wardMap: null },
+        'Quận Hà Đông': { _newDistrict: 'Quận Hà Đông', _wardMap: null },
+      },
+
+      // ============= ĐÀ NẴNG =============
+      'Đà Nẵng': {
+        'Quận Hải Châu': { _newDistrict: 'Quận Hải Châu', _wardMap: null },
+        'Quận Thanh Khê': { _newDistrict: 'Quận Thanh Khê', _wardMap: null },
+        'Quận Sơn Trà': { _newDistrict: 'Quận Sơn Trà', _wardMap: null },
+        'Quận Ngũ Hành Sơn': { _newDistrict: 'Quận Ngũ Hành Sơn', _wardMap: null },
+        'Quận Liên Chiểu': { _newDistrict: 'Quận Liên Chiểu', _wardMap: null },
+        'Quận Cẩm Lệ': { _newDistrict: 'Quận Cẩm Lệ', _wardMap: null },
+      }
+    };
+  },
+
+  // =============================================
+  // CORE: Convert old 3-tier → new 2-tier address
+  // Input:  { ward, district, province }
+  // Output: { newWard, newDistrict, province, converted, note }
+  // =============================================
+  convertTo2Tier(ward, district, province) {
+    this._buildNewAdminMapping();
+
+    const result = {
+      newWard: ward || '',
+      newDistrict: district || '',
+      province: province || '',
+      converted: false,
+      note: ''
+    };
+
+    if (!province || !district) return result;
+
+    const provMapping = this._newAdminMapping[province];
+    if (!provMapping) return result;
+
+    // Try exact match first
+    let distMapping = provMapping[district];
+
+    // If not found, try fuzzy match via normalized keys
+    if (!distMapping) {
+      const normDist = this._normKey(district);
+      for (const [key, val] of Object.entries(provMapping)) {
+        if (this._normKey(key) === normDist) {
+          distMapping = val;
+          break;
+        }
+      }
+    }
+
+    if (!distMapping) return result;
+
+    const oldDistrict = district;
+    const newDistrict = distMapping._newDistrict;
+
+    // Check if district actually changed
+    const districtChanged = this._normKey(oldDistrict) !== this._normKey(newDistrict);
+
+    if (districtChanged) {
+      result.newDistrict = newDistrict;
+      result.converted = true;
+      result.note = `${oldDistrict} → ${newDistrict}`;
+    } else {
+      result.newDistrict = newDistrict;
+    }
+
+    // Check ward mapping
+    if (ward && distMapping._wardMap) {
+      // Try exact match
+      let newWard = distMapping._wardMap[ward];
+
+      // Try fuzzy match
+      if (!newWard) {
+        const normWard = this._normKey(ward);
+        for (const [oldW, newW] of Object.entries(distMapping._wardMap)) {
+          if (this._normKey(oldW) === normWard) {
+            newWard = newW;
+            break;
+          }
+        }
+      }
+
+      if (newWard) {
+        const wardChanged = this._normKey(ward) !== this._normKey(newWard);
+        if (wardChanged) {
+          result.note += (result.note ? '; ' : '') + `${ward} → ${newWard}`;
+          result.converted = true;
+        }
+        result.newWard = newWard;
+      } else {
+        // Ward not found in mapping, keep as-is
+        result.newWard = ward;
+      }
+    } else {
+      result.newWard = ward || '';
+    }
+
+    return result;
   }
 };

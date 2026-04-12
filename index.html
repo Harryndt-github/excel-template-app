@@ -1054,7 +1054,10 @@
       <!-- Upload + Manual Input Side-by-Side -->
       <div class="ap-input-grid">
         <!-- Left: Upload Zone -->
-        <div class="ap-upload-card">
+        <div class="ap-upload-card"
+             ondragover="event.preventDefault(); document.getElementById('ap-upload-zone').classList.add('dragover')"
+             ondragleave="document.getElementById('ap-upload-zone').classList.remove('dragover')"
+             ondrop="event.preventDefault(); document.getElementById('ap-upload-zone').classList.remove('dragover'); AddressParserUI.handleDrop(event)">
           <div class="ap-upload-icon-wrap">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -1071,12 +1074,8 @@
             </label>
             <button class="btn btn-outline" onclick="AddressParserUI.loadSampleData && AddressParserUI.loadSampleData()">Mẫu dữ liệu</button>
           </div>
-          <!-- Invisible drag-drop overlay -->
-          <div class="ap-drop-overlay" id="ap-upload-zone"
-               ondragover="event.preventDefault(); this.classList.add('dragover')"
-               ondragleave="this.classList.remove('dragover')"
-               ondrop="event.preventDefault(); this.classList.remove('dragover'); AddressParserUI.handleDrop(event)">
-          </div>
+          <!-- Visual drag-drop overlay (pointer-events: none, only visual) -->
+          <div class="ap-drop-overlay" id="ap-upload-zone"></div>
         </div>
 
         <!-- Right: Manual Input -->
