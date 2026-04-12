@@ -31,7 +31,7 @@ body::after {
   z-index: 0;
 }
 
-.sidebar, .main-content {
+.main-content {
   position: relative;
   z-index: 1;
 }
@@ -58,8 +58,8 @@ body::after {
   content: '';
   position: absolute;
   bottom: 0;
-  left: 20px;
-  right: 20px;
+  left: 16px;
+  right: 16px;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(192, 193, 255, 0.08), transparent);
 }
@@ -105,8 +105,8 @@ body::after {
   content: '';
   position: absolute;
   top: 0;
-  left: 20px;
-  right: 20px;
+  left: 16px;
+  right: 16px;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(192, 193, 255, 0.05), transparent);
 }
@@ -115,7 +115,7 @@ body::after {
    3. PAGE HEADER — Editorial Style (ALL PAGES)
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 .page-title {
-  font-size: 1.85rem !important;
+  font-size: 1.6rem !important;
   font-weight: 800 !important;
   letter-spacing: -0.03em !important;
   background: linear-gradient(135deg, #e2e0fc 30%, #c0c1ff 100%);
@@ -126,7 +126,7 @@ body::after {
 
 .page-subtitle {
   color: var(--text-secondary) !important;
-  font-size: 0.88rem !important;
+  font-size: 0.82rem !important;
 }
 
 /* Page transition */
@@ -754,7 +754,7 @@ body::after {
 }
 
 .stat-value {
-  font-size: 2.2rem !important;
+  font-size: 1.85rem !important;
   font-weight: 800 !important;
   letter-spacing: -0.03em;
 }

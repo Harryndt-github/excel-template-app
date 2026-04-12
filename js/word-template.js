@@ -358,21 +358,33 @@ const WordEditor = {
       tmp.innerHTML = tpl.content;
       const preview = tmp.textContent.substring(0, 200);
       return `
-        <div class="template-card word-tpl-card">
-          <div class="template-card-header">
-            <div><h4>📝 ${_wEsc(tpl.name)}</h4><div class="template-card-meta">${dateStr}</div></div>
-            <span class="placeholder-count word-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              ${tpl.placeholders ? tpl.placeholders.length : 0} trường
-            </span>
+        <div class="template-row" onclick="WordEditor.editTemplate('${tpl.id}')">
+          <div class="t-col-name">
+            <div class="t-icon word">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <path d="M9 15l2 2 4-4"/>
+              </svg>
+            </div>
+            <div class="t-name-text">
+              <h4>${_wEsc(tpl.name)}</h4>
+              <p>${tpl.placeholders ? tpl.placeholders.length : 0} metadata fields</p>
+            </div>
           </div>
-          <div class="template-card-preview">${preview || 'Không có nội dung'}</div>
-          <div class="template-card-actions">
-            <button class="btn btn-sm btn-outline" onclick="WordEditor.editTemplate('${tpl.id}')">✎ Sửa</button>
-            <button class="btn btn-sm btn-outline" onclick="WordEditor.duplicateTemplate('${tpl.id}')">⧉ Nhân bản</button>
-            <button class="btn btn-sm btn-danger" onclick="WordEditor.deleteTemplate('${tpl.id}')">✕ Xóa</button>
+          <div class="t-col-type">Document</div>
+          <div class="t-col-status"><span class="t-status-badge">Active</span></div>
+          <div class="t-col-date">${dateStr}</div>
+          <div class="t-col-actions" onclick="event.stopPropagation();">
+            <button class="action-btn" onclick="WordEditor.duplicateTemplate('${tpl.id}')" title="Nhân bản">
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+            <button class="action-btn delete" onclick="WordEditor.deleteTemplate('${tpl.id}')" title="Xóa">
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
           </div>
-        </div>`;
+        </div>
+      `;
     }).join('');
   }
 };

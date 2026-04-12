@@ -1,0 +1,310 @@
+/* ============================================
+   EXCELMAPPER SLATE - DIGITAL ARCHITECT UI
+   Specific Overrides for Top Nav & Templates List
+   ============================================ */
+
+/* ── Top Navigation ── */
+.top-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  background: rgba(12, 12, 31, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--ghost-border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  margin: -14px -18px 24px -18px; /* Offset the main content padding */
+}
+
+.top-nav-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card);
+  padding: 8px 16px;
+  border-radius: var(--radius-xl);
+  width: 320px;
+  border: 1px solid var(--ghost-border);
+  transition: var(--transition);
+}
+
+.top-nav-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.top-nav-search svg {
+  color: var(--text-muted);
+}
+
+.top-nav-search input {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  width: 100%;
+  outline: none;
+}
+
+.top-nav-search input::placeholder {
+  color: var(--text-muted);
+}
+
+.top-nav-profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.nav-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  transition: var(--transition);
+}
+
+.nav-icon-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.badg-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--danger);
+  border-radius: 50%;
+  border: 2px solid var(--bg-primary);
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--ghost-border);
+  cursor: pointer;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Smart Filters Toolbar ── */
+.template-filters-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  margin-bottom: 24px;
+  background: var(--bg-card);
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--ghost-border);
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--ghost-border);
+  padding: 6px 14px;
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.filter-chip:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.filter-chip.active {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.status-indicator.active {
+  background: var(--emerald);
+  box-shadow: 0 0 10px var(--emerald-container);
+}
+
+.status-indicator.draft {
+  background: var(--warning);
+  box-shadow: 0 0 10px var(--warning-light);
+}
+
+.filter-group span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* ── Templates List View ── */
+.templates-list-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 80px;
+  padding: 0 24px 12px;
+  border-bottom: 1px solid var(--ghost-border);
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.templates-list-view {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 80px;
+  align-items: center;
+  background: var(--bg-card);
+  padding: 16px 24px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.template-row:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--ghost-border);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(4px);
+}
+
+.t-col-name {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.t-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--accent-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.t-icon.excel { background: rgba(16, 185, 129, 0.1); color: var(--emerald); }
+.t-icon.word { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+
+.t-name-text h4 {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.t-name-text p {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.t-col-type, .t-col-date {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.t-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--success-light);
+  color: var(--success);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.t-status-badge.draft {
+  background: var(--warning-light);
+  color: var(--warning);
+}
+
+.t-col-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.template-row:hover .t-col-actions {
+  opacity: 1;
+}
+
+.action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: var(--transition);
+}
+
+.action-btn:hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-primary);
+}
+
+.action-btn.delete:hover {
+  color: var(--danger);
+  background: var(--danger-light);
+}
+
+/* Fix main-content offset due to Top Nav */
+.main-content {
+  padding-top: 0 !important; /* Top nav handles the top spacing */
+}
+
+/* Adjust page-header inside pages to account for the new layout */
+.page-header.editorial {
+  margin-top: 16px;
+  margin-bottom: 0;
+}

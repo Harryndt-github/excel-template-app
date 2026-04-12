@@ -1401,29 +1401,31 @@ const TemplateBuilder = {
       const textPreview = temp.textContent.substring(0, 200);
 
       return `
-        <div class="template-card">
-          <div class="template-card-header">
-            <div>
-              <h4>${this.escapeHtml(tpl.name)}</h4>
-              <div class="template-card-meta">${dateStr}</div>
-            </div>
-            <span class="placeholder-count">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M7 8l-4 4 4 4"/><path d="M17 8l4 4-4 4"/>
+        <div class="template-row" onclick="TemplateBuilder.editTemplate('${tpl.id}')">
+          <div class="t-col-name">
+            <div class="t-icon excel">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="8" y1="13" x2="16" y2="13"/>
+                <line x1="8" y1="17" x2="16" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
               </svg>
-              ${tpl.placeholders ? tpl.placeholders.length : 0} trường
-            </span>
+            </div>
+            <div class="t-name-text">
+              <h4>${this.escapeHtml(tpl.name)}</h4>
+              <p>${tpl.placeholders ? tpl.placeholders.length : 0} metadata fields</p>
+            </div>
           </div>
-          <div class="template-card-preview">${textPreview || 'Không có nội dung'}</div>
-          <div class="template-card-actions">
-            <button class="btn btn-sm btn-outline" onclick="TemplateBuilder.editTemplate('${tpl.id}')">
-              ✎ Chỉnh sửa
+          <div class="t-col-type">Spreadsheet</div>
+          <div class="t-col-status"><span class="t-status-badge">Active</span></div>
+          <div class="t-col-date">${dateStr}</div>
+          <div class="t-col-actions" onclick="event.stopPropagation();">
+            <button class="action-btn" onclick="TemplateBuilder.duplicateTemplate('${tpl.id}')" title="Nhân bản">
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
-            <button class="btn btn-sm btn-outline" onclick="TemplateBuilder.duplicateTemplate('${tpl.id}')">
-              ⧉ Nhân bản
-            </button>
-            <button class="btn btn-sm btn-danger" onclick="TemplateBuilder.deleteTemplate('${tpl.id}')">
-              ✕ Xóa
+            <button class="action-btn delete" onclick="TemplateBuilder.deleteTemplate('${tpl.id}')" title="Xóa">
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
             </button>
           </div>
         </div>
