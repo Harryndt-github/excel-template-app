@@ -627,14 +627,19 @@ const AddressParser = {
       }
 
       // Try district extraction from remaining (only if there's still content)
+      // IMPORTANT: First check if the segment is a province abbreviation to avoid
+      // false-positives like "Hnoi" → "Huyện noi" instead of "Hà Nội"
       if (current.trim()) {
-        const distResult = this._detectDistrict(current);
-        if (distResult) {
-          extracted.push({ type: 'district', value: distResult.district });
-          if (distResult.remainder) {
-            current = distResult.remainder;
-          } else {
-            current = '';
+        const isProvince = this._detectProvince(current.trim());
+        if (!isProvince) {
+          const distResult = this._detectDistrict(current);
+          if (distResult) {
+            extracted.push({ type: 'district', value: distResult.district });
+            if (distResult.remainder) {
+              current = distResult.remainder;
+            } else {
+              current = '';
+            }
           }
         }
       }

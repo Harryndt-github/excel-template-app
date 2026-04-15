@@ -439,9 +439,20 @@ const VietnamAddressData = {
       return { type: 'district', value: `Quận ${distName}`, original: trimmed };
     }
 
-    // Pattern 3: H + Name → "Huyện " + Name (but NOT HCM, HN)
+    // Pattern 3: H + Name → "Huyện " + Name (but NOT province abbreviations)
     const hNameMatch = trimmed.match(/^[Hh]\.?\s*([A-ZĐÀ-Ỹa-zđà-ỹ][a-zđà-ỹ]+(?:\s+[A-Za-zĐđÀ-ỹ]+)*)$/);
-    if (hNameMatch && !trimmed.match(/^[Hh]([Cc][Mm]|[Nn])$/i)) {
+    if (hNameMatch && !trimmed.match(/^[Hh]([Cc][Mm]|[Nn]|[Nn][Oo][Ii]|[Uu][Ee]|[Pp])$/i)) {
+      // SAFETY CHECK: Before tagging as district, verify it's not a province abbreviation
+      // This prevents "Hnoi" → "Huyện noi" instead of "Hà Nội"
+      const normalized = trimmed.toLowerCase();
+      const noDiacritics = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd').replace(/Đ/g, 'D');
+      // Check against known province aliases
+      if (typeof AddressParser !== 'undefined' && AddressParser._provinceAliases) {
+        if (AddressParser._provinceAliases.has(normalized) || AddressParser._provinceAliases.has(noDiacritics)) {
+          return null; // It's a province, not a district
+        }
+      }
       const distName = hNameMatch[1].replace(/([a-zỹỵ])([A-ZĐ])/g, '$1 $2').trim();
       return { type: 'district', value: `Huyện ${distName}`, original: trimmed };
     }
