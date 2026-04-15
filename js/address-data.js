@@ -1028,7 +1028,10 @@ const VietnamAddressData = {
    * @returns {{ valid: boolean, canonicalWard: string|null, province: string|null }}
    */
   isValidWard2025(wardName, province) {
-    if (typeof MASTER_WARDS_2025 === 'undefined') return { valid: false, canonicalWard: null, province: null };
+    if (typeof MASTER_WARDS_2025 === 'undefined') {
+      console.warn('VietnamAddressData: MASTER_WARDS_2025 is not defined. Make sure data/master-wards-2025.js is loaded.');
+      return { valid: false, canonicalWard: null, province: null };
+    }
 
     const normKey = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().replace(/\s+/g, '');
     const normWard = normKey(wardName);

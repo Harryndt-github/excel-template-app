@@ -491,6 +491,7 @@ const AddressParser = {
     const lower = text.toLowerCase().trim();
     if (lower.length < 2) return false;
     const noDiacritics = this._removeDiacritics(lower);
+    const normalized = lower;
 
     // Exact match noise words
     const noiseWords = [
@@ -514,11 +515,14 @@ const AddressParser = {
     }
 
     // Partial/truncated match — segment STARTS WITH a noise phrase
-    const noiseStartPatterns = [
-      'dia danh hanh', 'dia danh', 'di a danh',
-      'theo dia', 'theo dia chi', 'theo dia danh',
+    const noisePatterns = [
+      /\b(dia danh hanh chinh moi|địa danh hành chính mới|dia danh hanh chinh|địa danh hành chính)\b/gi,
+      /\b(di\s*a\s*danh\s*h|di\s+a\s+danh)\b.*/gi,
+      /\b(theo\s*dia\s*ch|theo\s*địa\s*ch|theo\s*dia\s*ch|theo\s*địa\s*ch)[A-ZĐa-zđÀ-ỹ\s….]*/gi,
+      /\b(theo\s*dia\s*danh|theo\s*địa\s*danh|theo\s*dia\s*danh|theo\s*địa\s*danh)[A-ZĐa-zđÀ-ỹ\s….]*/gi,
     ];
-    if (noiseStartPatterns.some(p => noDiacritics.startsWith(this._removeDiacritics(p)))) {
+
+    if (noisePatterns.some(p => p.test(normalized))) {
       return true;
     }
 
@@ -608,49 +612,48 @@ const AddressParser = {
     const removedNoise = rawSegments.filter(s => this._isNoise(s));
     const allRemovedNoise = [...(cleanResult.noiseRemoved || []), ...removedNoise];
 
-    // Step 4: Pre-expand segments — detect embedded abbreviations
-    // e.g., "45/5 Tran Thai Tong P15 Q Tan Binh" → separate pieces
+    // Step 4: Pre-expand segments — aggressively detect embedded abbreviations
+    // This phase ensures "Phường 15", "Quận 1" etc. are MOVED to tagged segments
+    // and NOT left in the street name part.
     const segments = [];
     for (const seg of filteredSegments) {
-      let current = seg;
+      let current = seg.trim();
       let extracted = [];
+      let found = true;
 
-      // Try ward extraction
-      const wardResult = this._detectWard(current);
-      if (wardResult) {
-        extracted.push({ type: 'ward', value: wardResult.ward });
-        if (wardResult.remainder) {
-          current = wardResult.remainder; // Street part remains
-        } else {
-          current = ''; // Entire segment was a ward
+      // Keep extracting wards/districts as long as we find them in this segment
+      while (found && current.length > 0) {
+        found = false;
+
+        // 1. Try ward extraction (e.g., "... Phường 15")
+        const wardResult = this._detectWard(current);
+        if (wardResult) {
+          extracted.push({ type: 'ward', value: wardResult.ward });
+          current = wardResult.remainder.trim();
+          found = true;
+          continue;
         }
-      }
 
-      // Try district extraction from remaining (only if there's still content)
-      // IMPORTANT: First check if the segment is a province abbreviation to avoid
-      // false-positives like "Hnoi" → "Huyện noi" instead of "Hà Nội"
-      if (current.trim()) {
-        const isProvince = this._detectProvince(current.trim());
-        if (!isProvince) {
+        // 2. Try district extraction (e.g., "... Quận Tân Bình")
+        const isProv = this._detectProvince(current);
+        if (!isProv) {
           const distResult = this._detectDistrict(current);
           if (distResult) {
             extracted.push({ type: 'district', value: distResult.district });
-            if (distResult.remainder) {
-              current = distResult.remainder;
-            } else {
-              current = '';
-            }
+            current = distResult.remainder.trim();
+            found = true;
+            continue;
           }
         }
       }
 
-      // Push street part if any
+      // Remaining part of the segment (if any) is likely the street part
       if (current.trim()) {
         segments.push(current.trim());
       }
 
-      // Push extracted items as separate tagged segments
-      for (const item of extracted.reverse()) {
+      // Add all extracted items as tagged segments
+      for (const item of extracted) {
         segments.push(`__${item.type.toUpperCase()}__:${item.value}`);
       }
     }
