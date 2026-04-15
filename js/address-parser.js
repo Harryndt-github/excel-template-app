@@ -162,7 +162,7 @@ const AddressParser = {
       return this._provinceAliases.get(noDiacritics);
     }
 
-    // Strategy 2: Remove common prefixes
+    // Strategy 2: Remove common prefixes and exact match remainder
     const prefixes = ['tp.', 'tp ', 'tỉnh ', 'tinh ', 'thanh pho ', 'thành phố ', 't.', 'th.'];
     for (const prefix of prefixes) {
       for (const source of [noDiacritics, normalized]) {
@@ -175,17 +175,158 @@ const AddressParser = {
       }
     }
 
-    // Strategy 3: Fuzzy — longest alias match
-    let bestMatch = null;
-    let bestLen = 0;
-    for (const [alias, canonical] of this._provinceAliases) {
-      if (alias.length < 3) continue;
-      if (noDiacritics.includes(alias) && alias.length > bestLen) {
-        bestMatch = canonical;
-        bestLen = alias.length;
+    // Strategy 3: Fuzzy substring match (strict — not for streets)
+    const hasHouseNumber = /^\d+[A-Za-z]?\s/.test(text.trim()) || /^\d+\//.test(text.trim());
+    if (!hasHouseNumber) {
+      let bestMatch = null;
+      let bestLen = 0;
+      for (const [alias, canonical] of this._provinceAliases) {
+        if (alias.length < 3) continue;
+        if (noDiacritics.includes(alias) && alias.length > bestLen) {
+          const coverage = alias.length / noDiacritics.replace(/\s+/g, '').length;
+          if (coverage >= 0.6) {
+            bestMatch = canonical;
+            bestLen = alias.length;
+          }
+        }
+      }
+      if (bestMatch) return bestMatch;
+    }
+
+    // Strategy 4: PREFIX-based fuzzy match for truncated data
+    // e.g., "Tinh Nghe" → strip prefix "tinh " → "nghe" → matches "nghe an" (Nghệ An)
+    // e.g., "TP. HC" → strip prefix "tp. " → "hc" → matches "hcm" (Hồ Chí Minh)
+    for (const prefix of prefixes) {
+      for (const source of [noDiacritics, normalized]) {
+        if (source.startsWith(prefix)) {
+          const remainder = source.substring(prefix.length).trim();
+          if (remainder.length >= 2) {
+            const match = this._fuzzyMatchProvince(remainder);
+            if (match) return match;
+          }
+        }
       }
     }
+
+    // Strategy 5: Bare prefix match (no "tinh/tp" prefix, just the name fragment)
+    if (!hasHouseNumber && noDiacritics.length >= 3) {
+      const match = this._fuzzyMatchProvince(noDiacritics);
+      if (match) return match;
+    }
+
+    return null;
+  },
+
+  // =============================================
+  // FUZZY: Match truncated province name via prefix
+  // "nghe" → "Nghệ An", "hc" → "Hồ Chí Minh"
+  // =============================================
+  _fuzzyMatchProvince(fragment) {
+    this._buildDictionaries();
+    const fragNorm = this._removeDiacritics(fragment).toLowerCase().trim();
+    if (fragNorm.length < 2) return null;
+
+    let bestMatch = null;
+    let bestScore = 0;
+
+    for (const [alias, canonical] of this._provinceAliases) {
+      if (alias.length < 3) continue;
+      const aliasNorm = this._removeDiacritics(alias).toLowerCase();
+
+      // Check if alias STARTS WITH the fragment (truncated input)
+      if (aliasNorm.startsWith(fragNorm)) {
+        // Score: how much of the alias does the fragment cover?
+        const score = fragNorm.length / aliasNorm.length;
+        // Require at least 40% coverage for short aliases, 30% for longer ones
+        const minCoverage = aliasNorm.length <= 5 ? 0.5 : 0.3;
+        if (score >= minCoverage && score > bestScore) {
+          bestMatch = canonical;
+          bestScore = score;
+        }
+      }
+
+      // Also check space-insensitive match: "nghean" starts with "nghe"
+      const aliasCompact = aliasNorm.replace(/\s+/g, '');
+      const fragCompact = fragNorm.replace(/\s+/g, '');
+      if (aliasCompact.startsWith(fragCompact) && fragCompact.length >= 2) {
+        const score = fragCompact.length / aliasCompact.length;
+        const minCoverage = aliasCompact.length <= 5 ? 0.5 : 0.3;
+        if (score >= minCoverage && score > bestScore) {
+          bestMatch = canonical;
+          bestScore = score;
+        }
+      }
+    }
+
     return bestMatch;
+  },
+
+  // =============================================
+  // UTILITY: Normalize ward/district name — fix broken spacing
+  // "Truong V inh" → "Truong Vinh", "Thanh X uan" → "Thanh Xuan"
+  // =============================================
+  _normalizeAdminName(name) {
+    if (!name) return '';
+    // Merge single-character fragments with the next word
+    // "Truong V inh" → Split: ["Truong", "V", "inh"] → Merge: ["Truong", "Vinh"]
+    // Also handles capitalized: "Truong V Inh" → ["Truong", "VInh"] → capitalize → "Truong Vinh"
+    const words = name.split(/\s+/);
+    const merged = [];
+    for (let i = 0; i < words.length; i++) {
+      if (words[i].length === 1 && i + 1 < words.length) {
+        // Single char + next word → merge them (regardless of case)
+        const combined = words[i] + words[i + 1].toLowerCase();
+        merged.push(combined.charAt(0).toUpperCase() + combined.slice(1));
+        i++; // skip next
+      } else {
+        merged.push(words[i]);
+      }
+    }
+    return merged.join(' ');
+  },
+
+  // =============================================
+  // FUZZY: Match ward name against system database
+  // Returns best canonical ward name or null
+  // =============================================
+  _fuzzyMatchWard(wardName, province) {
+    if (!wardName || !province) return null;
+
+    const normWard = this._removeDiacritics(wardName).toLowerCase().replace(/\s+/g, '');
+    const results = [];
+
+    // Search all wards in the province's admin data
+    const provData = VietnamAddressData._oldAdminData?.[province];
+    if (!provData) return null;
+
+    for (const [distName, distData] of Object.entries(provData.districts)) {
+      for (const w of distData.wards) {
+        // Extract just the name part (after "Phường/Xã/Thị trấn")
+        const wName = w.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
+        const wNorm = this._removeDiacritics(wName).toLowerCase().replace(/\s+/g, '');
+
+        // Exact match (space-insensitive)
+        if (wNorm === normWard) {
+          return { canonicalWard: w, district: distName, confidence: 1.0 };
+        }
+
+        // Prefix match (truncated ward name)
+        if (wNorm.startsWith(normWard) && normWard.length >= 3) {
+          const score = normWard.length / wNorm.length;
+          results.push({ canonicalWard: w, district: distName, confidence: score });
+        }
+
+        // Reverse prefix (database is shorter, input has extra chars)
+        if (normWard.startsWith(wNorm) && wNorm.length >= 3) {
+          const score = wNorm.length / normWard.length;
+          results.push({ canonicalWard: w, district: distName, confidence: score });
+        }
+      }
+    }
+
+    if (results.length === 0) return null;
+    results.sort((a, b) => b.confidence - a.confidence);
+    return results[0];
   },
 
   // =============================================
@@ -307,20 +448,98 @@ const AddressParser = {
   // =============================================
   _isNoise(text) {
     const lower = text.toLowerCase().trim();
-    if (lower.length < 3) return false;
-    const noiseWords = [
-      'dia chi moi', 'đia chi moi', 'địa chỉ mới',
-      'dia chi cu', 'địa chỉ cũ',
-      'nha moi', 'nhà mới', 'nha cu', 'nhà cũ',
-      'giao hang', 'giao hàng', 'nhan tai', 'nhận tại',
-      'lien he', 'liên hệ', 'ghi chu', 'ghi chú',
-      'note', 'luu y', 'lưu ý',
-    ];
+    if (lower.length < 2) return false;
     const noDiacritics = this._removeDiacritics(lower);
-    return noiseWords.some(n => {
-      const normNoise = this._removeDiacritics(n);
-      return noDiacritics === normNoise;
-    });
+
+    // Exact match noise words
+    const noiseWords = [
+      'dia chi moi', 'dia chi moi', 'dia chi moi',
+      'dia chi cu', 'dia chi cu',
+      'nha moi', 'nha moi', 'nha cu', 'nha cu',
+      'giao hang', 'giao hang', 'nhan tai', 'nhan tai',
+      'lien he', 'lien he', 'ghi chu', 'ghi chu',
+      'note', 'luu y', 'luu y',
+      // Metadata annotations
+      'dia danh hanh chinh moi', 'dia danh hanh chinh',
+      'theo dia chi moi', 'theo dia chi cu', 'theo dia chi',
+      'theo dia danh hanh chinh moi', 'theo dia danh hanh chinh',
+      'theo dia danh', 'theo',
+      'di a danh hanh chinh moi', 'di a danh h',
+    ];
+
+    // Exact match (after removing diacritics)
+    if (noiseWords.some(n => this._removeDiacritics(n) === noDiacritics)) {
+      return true;
+    }
+
+    // Partial/truncated match — segment STARTS WITH a noise phrase
+    const noiseStartPatterns = [
+      'dia danh hanh', 'dia danh', 'di a danh',
+      'theo dia', 'theo dia chi', 'theo dia danh',
+    ];
+    if (noiseStartPatterns.some(p => noDiacritics.startsWith(this._removeDiacritics(p)))) {
+      return true;
+    }
+
+    // Standalone "THEO" at word level  
+    if (noDiacritics === 'theo') {
+      return true;
+    }
+
+    return false;
+  },
+
+  // =============================================
+  // Post-process: Clean leftover noise from street output
+  // =============================================
+  _cleanStreetOutput(street) {
+    if (!street) return '';
+    let cleaned = street;
+
+    // Remove known trailing/inline noise phrases (longest match first)
+    const noiseFragments = [
+      'DIA DANH HANH CHINH MOI', 'DIA DANH HANH CHINH', 'DIA DANH HANH',
+      'DIA DANH', 'DI A DANH HANH CHINH MOI', 'DI A DANH H', 'DI A DANH',
+      'THEO DIA CHI MOI', 'THEO DIA CHI CU', 'THEO DIA CHI',
+      'THEO DIA DANH HANH CHINH MOI', 'THEO DIA DANH HANH CHINH',
+      'THEO DIA DANH', 'THEO DIA CH',
+      'dia danh hanh chinh moi', 'dia danh hanh chinh', 'dia danh hanh',
+      'dia danh', 'di a danh',
+      'theo dia chi moi', 'theo dia chi cu', 'theo dia chi',
+      'theo dia danh', 'theo dia ch',
+      'ĐỊA DANH HÀNH CHÍNH MỚI', 'ĐỊA DANH HÀNH CHÍNH',
+      'THEO ĐỊA CHỈ MỚI', 'THEO ĐỊA CHỈ CŨ', 'THEO ĐỊA CHỈ',
+      'THEO ĐỊA DANH', 'địa danh hành chính mới',
+      'theo địa chỉ mới', 'theo địa chỉ', 'theo địa danh',
+    ];
+
+    // Sort longest first for greedy matching
+    noiseFragments.sort((a, b) => b.length - a.length);
+
+    for (const frag of noiseFragments) {
+      const fragNorm = this._removeDiacritics(frag).toUpperCase();
+      const cleanedNorm = this._removeDiacritics(cleaned).toUpperCase();
+      const idx = cleanedNorm.indexOf(fragNorm);
+      if (idx >= 0) {
+        cleaned = cleaned.substring(0, idx) + cleaned.substring(idx + frag.length);
+      }
+    }
+
+    // Remove standalone "THEO" at the end of street (after comma or as last word)
+    cleaned = cleaned.replace(/,\s*THEO\s*$/i, '');
+    cleaned = cleaned.replace(/\s+THEO\s*$/i, '');
+
+    // Remove truncated province/city abbreviations that leaked into street
+    // e.g., "TP. HC…", "TP. H…", "TP. HCM", "TP HCM", "Q. …", "Tinh …"
+    cleaned = cleaned.replace(/,\s*TP\.?\s+[A-ZĐa-zđÀ-ỹ]*[…\.]*\s*$/i, '');
+    cleaned = cleaned.replace(/,\s*Tinh\s+[A-ZĐa-zđÀ-ỹ]*[…\.]*\s*$/i, '');
+
+    // Clean up trailing/leading commas, spaces, dots, ellipsis
+    cleaned = cleaned.replace(/[,\s…]+$/g, '').replace(/^[,\s…]+/g, '').trim();
+    // Remove double commas or comma-space patterns
+    cleaned = cleaned.replace(/,\s*,/g, ',').replace(/,\s*$/g, '').trim();
+
+    return cleaned;
   },
 
   // =============================================
@@ -515,6 +734,52 @@ const AddressParser = {
     if (ward) ward = this._capitalizeVietnamese(ward);
     if (district) district = this._capitalizeVietnamese(district);
 
+    // Step 8.5: Normalize ward name (fix broken spacing) and fuzzy match
+    if (ward) {
+      // Extract the ward name part (after Phường/Xã/Thị trấn prefix)
+      const wardPrefixMatch = ward.match(/^(Phường|Xã|Thị Trấn)\s+(.+)$/i);
+      if (wardPrefixMatch) {
+        const prefix = this._capitalizeVietnamese(wardPrefixMatch[1]);
+        let wardNamePart = wardPrefixMatch[2];
+        
+        // Fix broken spacing: "Truong V inh" → "Truong Vinh"
+        const normalized = this._normalizeAdminName(wardNamePart);
+        if (normalized !== wardNamePart) {
+          wardNamePart = normalized;
+          ward = `${prefix} ${this._capitalizeVietnamese(wardNamePart)}`;
+          warnings.push({
+            type: 'ward_name_fixed',
+            message: `Sửa lỗi khoảng trắng: "${wardPrefixMatch[2]}" → "${wardNamePart}"`,
+            severity: 'info'
+          });
+        }
+
+        // Try fuzzy match against database to get canonical name
+        if (province) {
+          VietnamAddressData._buildOldAdminData();
+          const fuzzyResult = this._fuzzyMatchWard(wardNamePart, province);
+          if (fuzzyResult && fuzzyResult.confidence >= 0.7) {
+            const oldWard = ward;
+            ward = fuzzyResult.canonicalWard;
+            if (!district) {
+              district = fuzzyResult.district;
+              warnings.push({
+                type: 'ward_fuzzy_matched',
+                message: `Suy luận: "${oldWard}" → "${ward}" (${district})`,
+                severity: 'info'
+              });
+            } else {
+              warnings.push({
+                type: 'ward_fuzzy_matched',
+                message: `Suy luận: "${oldWard}" → "${ward}"`,
+                severity: 'info'
+              });
+            }
+          }
+        }
+      }
+    }
+
     // Step 11: Convert old 3-tier → new 2-tier address
     const conversion = VietnamAddressData.convertTo2Tier(ward, district, province);
     
@@ -526,8 +791,12 @@ const AddressParser = {
       });
     }
 
+    // Step 12: Post-process street — remove any leftover noise fragments
+    const rawStreet = streetParts.join(', ').trim();
+    const cleanedStreet = this._cleanStreetOutput(rawStreet);
+
     return {
-      street: streetParts.join(', ').trim(),
+      street: cleanedStreet,
       ward: ward,
       province: province,
       district: district,

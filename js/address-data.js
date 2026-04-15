@@ -25,6 +25,12 @@ const VietnamAddressData = {
     /\(\s*(moi|mới|cu|cũ|tam|tạm)\s*\)/gi,
     /\b(dia chi giao hang|địa chỉ giao hàng)\s*:?\s*/gi,
     /\b(gan|gần|doi dien|đối diện|ben canh|bên cạnh|truoc|trước|sau)\s+(nha|nhà|toa nha|tòa nhà|cong vien|công viên)\b/gi,
+    // --- Metadata annotations commonly found in admin datasets ---
+    /\b(DIA\s*DANH\s*HANH\s*CHINH\s*MOI|ĐỊA\s*DANH\s*HÀNH\s*CHÍNH\s*MỚI|dia\s*danh\s*hanh\s*chinh\s*moi|địa\s*danh\s*hành\s*chính\s*mới)\b/gi,
+    /\b(DI\s*A\s*DANH\s*H|DI\s+A\s+DANH)\b.*/gi,
+    /\b(THEO\s*DIA\s*CH|THEO\s*ĐỊA\s*CH|theo\s*dia\s*ch|theo\s*địa\s*ch)[A-ZĐa-zđÀ-ỹ\s….]*/gi,
+    /\b(THEO\s*DIA\s*DANH|THEO\s*ĐỊA\s*DANH|theo\s*dia\s*danh|theo\s*địa\s*danh)[A-ZĐa-zđÀ-ỹ\s….]*/gi,
+    /\bTHEO\b\s*$/gi,
   ],
 
   // =============================================
@@ -334,7 +340,22 @@ const VietnamAddressData = {
       'GHI CHU', 'ghi chu', 'GHI CHÚ', 'ghi chú',
       'NHA MOI', 'nha moi', 'NHÀ MỚI', 'nhà mới',
       'NHA CU', 'nha cu', 'NHÀ CŨ', 'nhà cũ',
+      // --- Metadata annotations ---
+      'DIA DANH HANH CHINH MOI', 'dia danh hanh chinh moi',
+      'ĐỊA DANH HÀNH CHÍNH MỚI', 'địa danh hành chính mới',
+      'DIA DANH HANH CHINH', 'dia danh hanh chinh',
+      'THEO DIA CHI MOI', 'theo dia chi moi',
+      'THEO ĐỊA CHỈ MỚI', 'theo địa chỉ mới',
+      'THEO DIA CHI CU', 'theo dia chi cu',
+      'THEO ĐỊA CHỈ CŨ', 'theo địa chỉ cũ',
+      'THEO DIA CHI', 'theo dia chi',
+      'THEO ĐỊA CHỈ', 'theo địa chỉ',
+      'THEO DIA DANH', 'theo dia danh',
+      'THEO ĐỊA DANH', 'theo địa danh',
     ];
+    
+    // Sort by length descending so longer phrases are matched first
+    inlineNoiseWords.sort((a, b) => b.length - a.length);
     
     for (const noise of inlineNoiseWords) {
       const idx = cleaned.toUpperCase().indexOf(noise.toUpperCase());
@@ -356,6 +377,12 @@ const VietnamAddressData = {
   // =============================================
   parseWardAbbreviation(segment) {
     const trimmed = segment.trim();
+
+    // Guard: If segment starts with full-word "Phuong"/"Phường", it's NOT an abbreviation
+    // Let the caller's fullPatterns handle it (e.g., "Phuong Thanh Xuan" → Phường Thanh Xuan)
+    if (/^(phuong|phường)\s+/i.test(trimmed)) {
+      return null;
+    }
 
     // Pattern 1: P + number → "Phường " + number (e.g., P15 → Phường 15)
     const pNumMatch = trimmed.match(/^[Pp]\.?\s*(\d+)$/);
