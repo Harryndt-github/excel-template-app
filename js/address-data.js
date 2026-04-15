@@ -971,5 +971,88 @@ const VietnamAddressData = {
     }
 
     return result;
+  },
+
+  // =============================================
+  // 2025 MASTER DATA HELPERS
+  // Access the 3,321 post-merger wards
+  // =============================================
+
+  /**
+   * Get all known wards for a province (combining old + 2025 data)
+   * @param {string} province - Canonical province name
+   * @returns {string[]} Array of ward names
+   */
+  getWardsForProvince(province) {
+    const wards = new Set();
+    const normKey = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().replace(/\s+/g, '');
+    const normProv = normKey(province);
+
+    // From legacy _oldAdminData
+    this._buildOldAdminData();
+    const oldProv = this._oldAdminData?.[province];
+    if (oldProv) {
+      for (const distData of Object.values(oldProv.districts)) {
+        for (const w of distData.wards) wards.add(w);
+      }
+    }
+
+    // From 2025 master data
+    if (typeof MASTER_WARDS_2025 !== 'undefined') {
+      for (const [masterProv, masterWards] of Object.entries(MASTER_WARDS_2025)) {
+        const masterNorm = normKey(masterProv);
+        if (masterNorm === normProv || masterNorm.includes(normProv) || normProv.includes(masterNorm)) {
+          for (const w of masterWards) wards.add(w);
+        }
+      }
+    }
+
+    return [...wards];
+  },
+
+  /**
+   * Check if a ward name exists in the 2025 master data for a province
+   * @param {string} wardName - Ward name to check
+   * @param {string} province - Province name (optional - searches all if not given)
+   * @returns {{ valid: boolean, canonicalWard: string|null, province: string|null }}
+   */
+  isValidWard2025(wardName, province) {
+    if (typeof MASTER_WARDS_2025 === 'undefined') return { valid: false, canonicalWard: null, province: null };
+
+    const normKey = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().replace(/\s+/g, '');
+    const normWard = normKey(wardName);
+    // Also try without prefix
+    const normWardNoPfx = normWard.replace(/^(phuong|xa|thitran)/, '');
+
+    const searchIn = province
+      ? Object.entries(MASTER_WARDS_2025).filter(([p]) => {
+          const np = normKey(p);
+          const nProv = normKey(province);
+          return np === nProv || np.includes(nProv) || nProv.includes(np);
+        })
+      : Object.entries(MASTER_WARDS_2025);
+
+    for (const [prov, wards] of searchIn) {
+      for (const w of wards) {
+        const nw = normKey(w);
+        const nwNoPfx = nw.replace(/^(phuong|xa|thitran)/, '');
+        if (nw === normWard || nwNoPfx === normWardNoPfx || nw === normWardNoPfx || nwNoPfx === normWard) {
+          return { valid: true, canonicalWard: w, province: prov };
+        }
+      }
+    }
+
+    return { valid: false, canonicalWard: null, province: null };
+  },
+
+  /**
+   * Get statistics about the 2025 master data
+   */
+  getMasterDataStats() {
+    if (typeof MASTER_WARDS_2025 === 'undefined') return { provinces: 0, totalWards: 0, loaded: false };
+    const provinces = Object.keys(MASTER_WARDS_2025).length;
+    let totalWards = 0;
+    for (const wards of Object.values(MASTER_WARDS_2025)) totalWards += wards.length;
+    return { provinces, totalWards, loaded: true };
   }
 };

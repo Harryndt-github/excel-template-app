@@ -297,31 +297,70 @@ const AddressParser = {
     const normWard = this._removeDiacritics(wardName).toLowerCase().replace(/\s+/g, '');
     const results = [];
 
-    // Search all wards in the province's admin data
+    // === Strategy 1: Search legacy _oldAdminData (detailed district mapping) ===
     const provData = VietnamAddressData._oldAdminData?.[province];
-    if (!provData) return null;
+    if (provData) {
+      for (const [distName, distData] of Object.entries(provData.districts)) {
+        for (const w of distData.wards) {
+          const wName = w.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
+          const wNorm = this._removeDiacritics(wName).toLowerCase().replace(/\s+/g, '');
 
-    for (const [distName, distData] of Object.entries(provData.districts)) {
-      for (const w of distData.wards) {
-        // Extract just the name part (after "Phường/Xã/Thị trấn")
-        const wName = w.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
-        const wNorm = this._removeDiacritics(wName).toLowerCase().replace(/\s+/g, '');
-
-        // Exact match (space-insensitive)
-        if (wNorm === normWard) {
-          return { canonicalWard: w, district: distName, confidence: 1.0 };
+          if (wNorm === normWard) {
+            return { canonicalWard: w, district: distName, confidence: 1.0, source: 'legacy' };
+          }
+          if (wNorm.startsWith(normWard) && normWard.length >= 3) {
+            results.push({ canonicalWard: w, district: distName, confidence: normWard.length / wNorm.length, source: 'legacy' });
+          }
+          if (normWard.startsWith(wNorm) && wNorm.length >= 3) {
+            results.push({ canonicalWard: w, district: distName, confidence: wNorm.length / normWard.length, source: 'legacy' });
+          }
         }
+      }
+    }
 
-        // Prefix match (truncated ward name)
-        if (wNorm.startsWith(normWard) && normWard.length >= 3) {
-          const score = normWard.length / wNorm.length;
-          results.push({ canonicalWard: w, district: distName, confidence: score });
+    // === Strategy 2: Search 2025 Master Ward Data (3,321 wards, 34 provinces) ===
+    if (typeof MASTER_WARDS_2025 !== 'undefined') {
+      // Normalize province name for lookup
+      const provAliases = [province];
+      // Try common province name variations
+      const normProv = this._removeDiacritics(province).toLowerCase().replace(/\s+/g, '');
+      
+      for (const [masterProv, wards] of Object.entries(MASTER_WARDS_2025)) {
+        const masterNorm = this._removeDiacritics(masterProv).toLowerCase().replace(/\s+/g, '');
+        
+        // Check if this province matches
+        if (masterNorm !== normProv && 
+            !masterNorm.includes(normProv) && 
+            !normProv.includes(masterNorm)) continue;
+
+        for (const w of wards) {
+          const wName = w.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
+          const wNorm = this._removeDiacritics(wName).toLowerCase().replace(/\s+/g, '');
+          // Also match against the full ward name (including prefix)
+          const wFullNorm = this._removeDiacritics(w).toLowerCase().replace(/\s+/g, '');
+
+          if (wNorm === normWard || wFullNorm === normWard) {
+            return { canonicalWard: w, district: null, confidence: 1.0, source: '2025' };
+          }
+          if (wNorm.startsWith(normWard) && normWard.length >= 3) {
+            results.push({ canonicalWard: w, district: null, confidence: normWard.length / wNorm.length, source: '2025' });
+          }
+          if (normWard.startsWith(wNorm) && wNorm.length >= 3) {
+            results.push({ canonicalWard: w, district: null, confidence: wNorm.length / normWard.length, source: '2025' });
+          }
         }
+      }
 
-        // Reverse prefix (database is shorter, input has extra chars)
-        if (normWard.startsWith(wNorm) && wNorm.length >= 3) {
-          const score = wNorm.length / normWard.length;
-          results.push({ canonicalWard: w, district: distName, confidence: score });
+      // If no province match, try global search across all provinces
+      if (results.length === 0) {
+        for (const [masterProv, wards] of Object.entries(MASTER_WARDS_2025)) {
+          for (const w of wards) {
+            const wName = w.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
+            const wNorm = this._removeDiacritics(wName).toLowerCase().replace(/\s+/g, '');
+            if (wNorm === normWard) {
+              results.push({ canonicalWard: w, district: null, confidence: 0.9, source: '2025', inferredProvince: masterProv });
+            }
+          }
         }
       }
     }
