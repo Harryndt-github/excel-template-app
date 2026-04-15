@@ -555,6 +555,126 @@ const VietnamAddressData = {
   },
 
   // =============================================
+  // CORE: Standardize street name from database
+  // "ng t minh khai" → "Nguyễn Thị Minh Khai"
+  // "dien bien phu" → "Điện Biên Phủ"
+  // Uses token-prefix abbreviation matching
+  // =============================================
+  standardizeStreetName(rawStreet, provinceName) {
+    this._buildOldAdminData();
+    if (!rawStreet) return null;
+
+    // Extract house number and street name
+    const houseMatch = rawStreet.match(/^(\d+[A-Za-z]?(?:\/\d+[A-Za-z]?)*)\s+(.+)$/);
+    const houseNumber = houseMatch ? houseMatch[1] : '';
+    const streetName = houseMatch ? houseMatch[2] : rawStreet;
+
+    const inputNorm = this._normKey(streetName);
+    if (inputNorm.length < 2) return null;
+
+    let bestMatch = null;
+    let bestScore = 0;
+
+    // Search in specific province, or across ALL provinces
+    const provincesToSearch = provinceName && this._oldAdminData[provinceName]
+      ? { [provinceName]: this._oldAdminData[provinceName] }
+      : this._oldAdminData;
+
+    for (const [provName, provData] of Object.entries(provincesToSearch)) {
+      for (const [distName, distData] of Object.entries(provData.districts)) {
+        if (!distData.streets) continue;
+        for (const canonicalStreet of distData.streets) {
+          const canonNorm = this._normKey(canonicalStreet);
+
+          // Strategy 1: Exact match (diacritics-insensitive)
+          if (inputNorm === canonNorm) {
+            return {
+              canonical: canonicalStreet,
+              houseNumber: houseNumber,
+              full: houseNumber ? `${houseNumber} ${canonicalStreet}` : canonicalStreet,
+              district: distName,
+              province: provName,
+              confidence: 1.0
+            };
+          }
+
+          // Strategy 2: Token-prefix match (abbreviation expansion)
+          // "ng t minh khai" → tokens: [ng, t, minh, khai]
+          // "nguyen thi minh khai" → tokens: [nguyen, thi, minh, khai]
+          // Each input token must be a prefix of the corresponding canonical token
+          const score = this._tokenPrefixScore(inputNorm, canonNorm);
+          if (score > bestScore && score >= 0.6) {
+            bestScore = score;
+            bestMatch = {
+              canonical: canonicalStreet,
+              houseNumber: houseNumber,
+              full: houseNumber ? `${houseNumber} ${canonicalStreet}` : canonicalStreet,
+              district: distName,
+              province: provName,
+              confidence: score
+            };
+          }
+
+          // Strategy 3: Compact match (remove all spaces)
+          // "ngtminhkhai" vs "nguyenthiminhkhai"
+          const inputCompact = inputNorm.replace(/\s+/g, '');
+          const canonCompact = canonNorm.replace(/\s+/g, '');
+          if (inputCompact.length >= 4 && canonCompact.startsWith(inputCompact)) {
+            const compactScore = inputCompact.length / canonCompact.length;
+            if (compactScore > bestScore && compactScore >= 0.5) {
+              bestScore = compactScore;
+              bestMatch = {
+                canonical: canonicalStreet,
+                houseNumber: houseNumber,
+                full: houseNumber ? `${houseNumber} ${canonicalStreet}` : canonicalStreet,
+                district: distName,
+                province: provName,
+                confidence: compactScore
+              };
+            }
+          }
+        }
+      }
+    }
+
+    return bestMatch;
+  },
+
+  // =============================================
+  // UTILITY: Token-prefix score for abbreviation matching
+  // "ng t minh khai" vs "nguyen thi minh khai" → 1.0
+  // Each input token must be a prefix of corresponding canonical token
+  // =============================================
+  _tokenPrefixScore(inputNorm, canonNorm) {
+    const inputTokens = inputNorm.split(/\s+/);
+    const canonTokens = canonNorm.split(/\s+/);
+
+    // Token count must match
+    if (inputTokens.length !== canonTokens.length) return 0;
+    if (inputTokens.length === 0) return 0;
+
+    let matchedTokens = 0;
+    let totalCoverage = 0;
+
+    for (let i = 0; i < inputTokens.length; i++) {
+      const inp = inputTokens[i];
+      const can = canonTokens[i];
+
+      if (can.startsWith(inp)) {
+        matchedTokens++;
+        totalCoverage += inp.length / can.length;
+      } else {
+        return 0; // Any non-matching token → fail
+      }
+    }
+
+    // All tokens matched as prefixes
+    // Score = average coverage × match ratio
+    const avgCoverage = totalCoverage / inputTokens.length;
+    return avgCoverage;
+  },
+
+  // =============================================
   // UTILITY: Simple string similarity (Dice coefficient)  
   // =============================================
   _stringSimilarity(s1, s2) {

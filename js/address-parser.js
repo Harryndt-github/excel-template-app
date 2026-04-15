@@ -223,7 +223,9 @@ const AddressParser = {
   // =============================================
   _fuzzyMatchProvince(fragment) {
     this._buildDictionaries();
-    const fragNorm = this._removeDiacritics(fragment).toLowerCase().trim();
+    // Strip ellipsis, dots, and truncation artifacts: "hc…" → "hc"
+    const cleanFrag = fragment.replace(/[…\.·]+$/g, '').replace(/[^a-zA-ZÀ-ỹđĐ\s]/g, '');
+    const fragNorm = this._removeDiacritics(cleanFrag).toLowerCase().trim();
     if (fragNorm.length < 2) return null;
 
     let bestMatch = null;
@@ -574,18 +576,28 @@ const AddressParser = {
       let current = seg;
       let extracted = [];
 
-      // Try ward extraction from end first
+      // Try ward extraction
       const wardResult = this._detectWard(current);
-      if (wardResult && wardResult.remainder) {
+      if (wardResult) {
         extracted.push({ type: 'ward', value: wardResult.ward });
-        current = wardResult.remainder;
+        if (wardResult.remainder) {
+          current = wardResult.remainder; // Street part remains
+        } else {
+          current = ''; // Entire segment was a ward
+        }
       }
 
-      // Try district extraction from end of remaining
-      const distResult = this._detectDistrict(current);
-      if (distResult && distResult.remainder) {
-        extracted.push({ type: 'district', value: distResult.district });
-        current = distResult.remainder;
+      // Try district extraction from remaining (only if there's still content)
+      if (current.trim()) {
+        const distResult = this._detectDistrict(current);
+        if (distResult) {
+          extracted.push({ type: 'district', value: distResult.district });
+          if (distResult.remainder) {
+            current = distResult.remainder;
+          } else {
+            current = '';
+          }
+        }
       }
 
       // Push street part if any
@@ -596,11 +608,6 @@ const AddressParser = {
       // Push extracted items as separate tagged segments
       for (const item of extracted.reverse()) {
         segments.push(`__${item.type.toUpperCase()}__:${item.value}`);
-      }
-
-      // If nothing was extracted, push original segment
-      if (extracted.length === 0 && !current.trim()) {
-        segments.push(seg);
       }
     }
 
@@ -793,7 +800,34 @@ const AddressParser = {
 
     // Step 12: Post-process street — remove any leftover noise fragments
     const rawStreet = streetParts.join(', ').trim();
-    const cleanedStreet = this._cleanStreetOutput(rawStreet);
+    let cleanedStreet = this._cleanStreetOutput(rawStreet);
+
+    // Step 12.5: Standardize street name from database
+    // "ng t minh khai" → "Nguyễn Thị Minh Khai"
+    // "dien bien phu" → "Điện Biên Phủ"
+    if (cleanedStreet) {
+      const stdResult = VietnamAddressData.standardizeStreetName(cleanedStreet, province || null);
+      if (stdResult && stdResult.confidence >= 0.6) {
+        const oldStreet = cleanedStreet;
+        cleanedStreet = stdResult.full;
+        
+        // Auto-fill missing district/province from street match
+        if (!district && stdResult.district) {
+          district = stdResult.district;
+        }
+        if (!province && stdResult.province) {
+          province = stdResult.province;
+        }
+        
+        if (oldStreet.toLowerCase() !== cleanedStreet.toLowerCase()) {
+          warnings.push({
+            type: 'street_standardized',
+            message: `Chuẩn hóa đường: "${oldStreet}" → "${cleanedStreet}"`,
+            severity: 'info'
+          });
+        }
+      }
+    }
 
     return {
       street: cleanedStreet,
