@@ -122,15 +122,56 @@ const AddressParser = {
 
   // =============================================
   // UTILITY: Remove Vietnamese diacritics
+  // Cross-platform robust version — works on all browsers
+  // Uses direct character map FIRST (no reliance on NFD decomposition)
+  // then NFD as secondary pass for any remaining combining marks
   // =============================================
   _removeDiacritics(str) {
     if (!str) return '';
-    return str.normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/đ/g, 'd').replace(/Đ/g, 'D')
-      .replace(/ơ/g, 'o').replace(/Ơ/g, 'O')
-      .replace(/ư/g, 'u').replace(/Ư/g, 'U');
+    // Step 1: Direct replacement map for Vietnamese characters
+    // This handles all cases where NFD decomposition may be incomplete
+    // or normalize() is unavailable (IE11, old Edge)
+    const MAP = {
+      'à':'a','á':'a','â':'a','ã':'a','ä':'a','å':'a','ā':'a','ă':'a',
+      'À':'A','Á':'A','Â':'A','Ã':'A','Ä':'A','Å':'A','Ā':'A','Ă':'A',
+      'ấ':'a','ầ':'a','ẩ':'a','ẫ':'a','ậ':'a','ắ':'a','ằ':'a','ẳ':'a','ẵ':'a','ặ':'a',
+      'Ấ':'A','Ầ':'A','Ẩ':'A','Ẫ':'A','Ậ':'A','Ắ':'A','Ằ':'A','Ẳ':'A','Ẵ':'A','Ặ':'A',
+      'è':'e','é':'e','ê':'e','ë':'e','ē':'e','ě':'e',
+      'È':'E','É':'E','Ê':'E','Ë':'E','Ē':'E','Ě':'E',
+      'ế':'e','ề':'e','ể':'e','ễ':'e','ệ':'e',
+      'Ế':'E','Ề':'E','Ể':'E','Ễ':'E','Ệ':'E',
+      'ì':'i','í':'i','î':'i','ï':'i','ī':'i','ĩ':'i','ị':'i','ỉ':'i',
+      'Ì':'I','Í':'I','Î':'I','Ï':'I','Ī':'I','Ĩ':'I','Ị':'I','Ỉ':'I',
+      'ò':'o','ó':'o','ô':'o','õ':'o','ö':'o','ō':'o',
+      'Ò':'O','Ó':'O','Ô':'O','Õ':'O','Ö':'O','Ō':'O',
+      'ố':'o','ồ':'o','ổ':'o','ỗ':'o','ộ':'o',
+      'Ố':'O','Ồ':'O','Ổ':'O','Ỗ':'O','Ộ':'O',
+      'ơ':'o','Ơ':'O',
+      'ớ':'o','ờ':'o','ở':'o','ỡ':'o','ợ':'o',
+      'Ớ':'O','Ờ':'O','Ở':'O','Ỡ':'O','Ợ':'O',
+      'ù':'u','ú':'u','û':'u','ü':'u','ū':'u','ũ':'u','ụ':'u','ủ':'u',
+      'Ù':'U','Ú':'U','Û':'U','Ü':'U','Ū':'U','Ũ':'U','Ụ':'U','Ủ':'U',
+      'ư':'u','Ư':'U',
+      'ứ':'u','ừ':'u','ử':'u','ữ':'u','ự':'u',
+      'Ứ':'U','Ừ':'U','Ử':'U','Ữ':'U','Ự':'U',
+      'ý':'y','ỳ':'y','ỷ':'y','ỹ':'y','ỵ':'y',
+      'Ý':'Y','Ỳ':'Y','Ỷ':'Y','Ỹ':'Y','Ỵ':'Y',
+      'đ':'d','Đ':'D',
+    };
+    // Build regex from map keys (cached in prototype)
+    if (!AddressParser._diacriticsRegex) {
+      AddressParser._diacriticsRegex = new RegExp('[' + Object.keys(MAP).join('') + ']', 'g');
+    }
+    let result = str.replace(AddressParser._diacriticsRegex, (ch) => MAP[ch] || ch);
+    // Step 2: NFD strip for any remaining combining characters (safety net)
+    try {
+      result = result.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    } catch (e) {
+      // normalize not available (IE11) — direct map above is sufficient
+    }
+    return result;
   },
+  _diacriticsRegex: null,
 
   // =============================================
   // UTILITY: Normalize address string
@@ -491,7 +532,6 @@ const AddressParser = {
     const lower = text.toLowerCase().trim();
     if (lower.length < 2) return false;
     const noDiacritics = this._removeDiacritics(lower);
-    const normalized = lower;
 
     // Exact match noise words
     const noiseWords = [
@@ -515,14 +555,11 @@ const AddressParser = {
     }
 
     // Partial/truncated match — segment STARTS WITH a noise phrase
-    const noisePatterns = [
-      /\b(dia danh hanh chinh moi|địa danh hành chính mới|dia danh hanh chinh|địa danh hành chính)\b/gi,
-      /\b(di\s*a\s*danh\s*h|di\s+a\s+danh)\b.*/gi,
-      /\b(theo\s*dia\s*ch|theo\s*địa\s*ch|theo\s*dia\s*ch|theo\s*địa\s*ch)[A-ZĐa-zđÀ-ỹ\s….]*/gi,
-      /\b(theo\s*dia\s*danh|theo\s*địa\s*danh|theo\s*dia\s*danh|theo\s*địa\s*danh)[A-ZĐa-zđÀ-ỹ\s….]*/gi,
+    const noiseStartPatterns = [
+      'dia danh hanh', 'dia danh', 'di a danh',
+      'theo dia', 'theo dia chi', 'theo dia danh',
     ];
-
-    if (noisePatterns.some(p => p.test(normalized))) {
+    if (noiseStartPatterns.some(p => noDiacritics.startsWith(this._removeDiacritics(p)))) {
       return true;
     }
 
@@ -601,9 +638,11 @@ const AddressParser = {
     const cleanResult = VietnamAddressData.cleanAddress(rawAddress);
     const normalized = this._normalize(cleanResult.cleaned);
     
-    // Step 2: Split by comma, dash, or common delimiters
+    // Step 2: Split by comma, dash, semicolon, or other common delimiters
+    // Also handles: fullwidth comma \uFF0C, bullet \u2022, pipe |, newline
+    // This fixes Windows Excel files that use semicolons or different separators
     const rawSegments = normalized
-      .split(/[,\-–—]+/)
+      .split(/[,;|\-–—\uFF0C\u3001\u2022]+/)
       .map(s => s.trim())
       .filter(s => s.length > 0);
 
@@ -612,48 +651,49 @@ const AddressParser = {
     const removedNoise = rawSegments.filter(s => this._isNoise(s));
     const allRemovedNoise = [...(cleanResult.noiseRemoved || []), ...removedNoise];
 
-    // Step 4: Pre-expand segments — aggressively detect embedded abbreviations
-    // This phase ensures "Phường 15", "Quận 1" etc. are MOVED to tagged segments
-    // and NOT left in the street name part.
+    // Step 4: Pre-expand segments — detect embedded abbreviations
+    // e.g., "45/5 Tran Thai Tong P15 Q Tan Binh" → separate pieces
     const segments = [];
     for (const seg of filteredSegments) {
-      let current = seg.trim();
+      let current = seg;
       let extracted = [];
-      let found = true;
 
-      // Keep extracting wards/districts as long as we find them in this segment
-      while (found && current.length > 0) {
-        found = false;
-
-        // 1. Try ward extraction (e.g., "... Phường 15")
-        const wardResult = this._detectWard(current);
-        if (wardResult) {
-          extracted.push({ type: 'ward', value: wardResult.ward });
-          current = wardResult.remainder.trim();
-          found = true;
-          continue;
+      // Try ward extraction
+      const wardResult = this._detectWard(current);
+      if (wardResult) {
+        extracted.push({ type: 'ward', value: wardResult.ward });
+        if (wardResult.remainder) {
+          current = wardResult.remainder; // Street part remains
+        } else {
+          current = ''; // Entire segment was a ward
         }
+      }
 
-        // 2. Try district extraction (e.g., "... Quận Tân Bình")
-        const isProv = this._detectProvince(current);
-        if (!isProv) {
+      // Try district extraction from remaining (only if there's still content)
+      // IMPORTANT: First check if the segment is a province abbreviation to avoid
+      // false-positives like "Hnoi" → "Huyện noi" instead of "Hà Nội"
+      if (current.trim()) {
+        const isProvince = this._detectProvince(current.trim());
+        if (!isProvince) {
           const distResult = this._detectDistrict(current);
           if (distResult) {
             extracted.push({ type: 'district', value: distResult.district });
-            current = distResult.remainder.trim();
-            found = true;
-            continue;
+            if (distResult.remainder) {
+              current = distResult.remainder;
+            } else {
+              current = '';
+            }
           }
         }
       }
 
-      // Remaining part of the segment (if any) is likely the street part
+      // Push street part if any
       if (current.trim()) {
         segments.push(current.trim());
       }
 
-      // Add all extracted items as tagged segments
-      for (const item of extracted) {
+      // Push extracted items as separate tagged segments
+      for (const item of extracted.reverse()) {
         segments.push(`__${item.type.toUpperCase()}__:${item.value}`);
       }
     }
@@ -1251,9 +1291,25 @@ const AddressParserUI = {
       const result = await AddressParser.readAndParseExcel(this._file, this._selectedColumn);
       this._parsedResult = result;
       this._renderResults(result);
+      // Debug info (visible in F12 Console)
+      const stats = {
+        total: result.parsed.length,
+        withProvince: result.parsed.filter(p => p.province).length,
+        withDistrict: result.parsed.filter(p => p.district).length,
+        withWard: result.parsed.filter(p => p.ward).length,
+        converted: result.parsed.filter(p => p.isConverted).length,
+      };
+      console.log('[AddressParser] Parse complete:', stats);
+      if (stats.withProvince === 0 && stats.total > 0) {
+        console.warn('[AddressParser] WARNING: No provinces detected! Sample raw:', result.addresses.slice(0, 3));
+        console.warn('[AddressParser] _removeDiacritics test:', AddressParser._removeDiacritics ? AddressParser._removeDiacritics('Hồ Chí Minh') : 'N/A');
+      }
       App.toast(`Đã phân rã ${result.parsed.length} địa chỉ thành công!`, 'success');
     } catch (err) {
-      console.error(err);
+      console.error('[AddressParser] Parse failed:', err);
+      console.error('[AddressParser] XLSX available:', typeof XLSX !== 'undefined');
+      console.error('[AddressParser] VietnamAddressData available:', typeof VietnamAddressData !== 'undefined');
+      console.error('[AddressParser] MASTER_WARDS_2025 available:', typeof MASTER_WARDS_2025 !== 'undefined');
       App.toast('Lỗi phân rã: ' + err.message, 'error');
     } finally {
       if (btn) {

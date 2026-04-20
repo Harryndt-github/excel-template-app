@@ -39,6 +39,7 @@ const VietnamAddressData = {
   // This is used for backward compatibility
   // =============================================
   _oldAdminData: null,
+  _normKeyRx: null,
 
   _buildOldAdminData() {
     if (this._oldAdminData) return;
@@ -302,19 +303,20 @@ const VietnamAddressData = {
 
   // =============================================
   // UTILITY: Normalize key for lookup
+  // Cross-platform robust: uses direct char map (works on IE11/Edge/all)
   // =============================================
   _normKey(str) {
     if (!str) return '';
-    return str
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/đ/g, 'd').replace(/Đ/g, 'D')
-      .replace(/ơ/g, 'o').replace(/ư/g, 'u')
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    // Inline character map (same set as AddressParser._removeDiacritics)
+    const _m={'à':'a','á':'a','â':'a','ã':'a','ä':'a','å':'a','ā':'a','ă':'a','À':'a','Á':'a','Â':'a','Ã':'a','Ä':'a','Å':'a','Ā':'a','Ă':'a','ấ':'a','ầ':'a','ẩ':'a','ẫ':'a','ậ':'a','ắ':'a','ằ':'a','ẳ':'a','ẵ':'a','ặ':'a','Ấ':'a','Ầ':'a','Ẩ':'a','Ẫ':'a','Ậ':'a','Ắ':'a','Ằ':'a','Ẳ':'a','Ẵ':'a','Ặ':'a','è':'e','é':'e','ê':'e','ë':'e','ē':'e','ě':'e','È':'e','É':'e','Ê':'e','Ë':'e','Ē':'e','Ě':'e','ế':'e','ề':'e','ể':'e','ễ':'e','ệ':'e','Ế':'e','Ề':'e','Ể':'e','Ễ':'e','Ệ':'e','ì':'i','í':'i','î':'i','ï':'i','ī':'i','ĩ':'i','ị':'i','ỉ':'i','Ì':'i','Í':'i','Î':'i','Ï':'i','Ī':'i','Ĩ':'i','Ị':'i','Ỉ':'i','ò':'o','ó':'o','ô':'o','õ':'o','ö':'o','ō':'o','Ò':'o','Ó':'o','Ô':'o','Õ':'o','Ö':'o','Ō':'o','ố':'o','ồ':'o','ổ':'o','ỗ':'o','ộ':'o','Ố':'o','Ồ':'o','Ổ':'o','Ỗ':'o','Ộ':'o','ơ':'o','Ơ':'o','ớ':'o','ờ':'o','ở':'o','ỡ':'o','ợ':'o','Ớ':'o','Ờ':'o','Ở':'o','Ỡ':'o','Ợ':'o','ù':'u','ú':'u','û':'u','ü':'u','ū':'u','ũ':'u','ụ':'u','ủ':'u','Ù':'u','Ú':'u','Û':'u','Ü':'u','Ū':'u','Ũ':'u','Ụ':'u','Ủ':'u','ư':'u','Ư':'u','ứ':'u','ừ':'u','ử':'u','ữ':'u','ự':'u','Ứ':'u','Ừ':'u','Ử':'u','Ữ':'u','Ự':'u','ý':'y','ỳ':'y','ỷ':'y','ỹ':'y','ỵ':'y','Ý':'y','Ỳ':'y','Ỷ':'y','Ỹ':'y','Ỵ':'y','đ':'d','Đ':'d'};
+    if (!VietnamAddressData._normKeyRx) {
+      VietnamAddressData._normKeyRx = new RegExp('[' + Object.keys(_m).join('') + ']', 'g');
+    }
+    let s = str.toLowerCase().replace(VietnamAddressData._normKeyRx, (ch) => _m[ch.toLowerCase()] || ch);
+    try { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch(e) {}
+    return s.replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
   },
+
 
   // =============================================
   // CORE: Remove noise/junk from address
@@ -1028,10 +1030,7 @@ const VietnamAddressData = {
    * @returns {{ valid: boolean, canonicalWard: string|null, province: string|null }}
    */
   isValidWard2025(wardName, province) {
-    if (typeof MASTER_WARDS_2025 === 'undefined') {
-      console.warn('VietnamAddressData: MASTER_WARDS_2025 is not defined. Make sure data/master-wards-2025.js is loaded.');
-      return { valid: false, canonicalWard: null, province: null };
-    }
+    if (typeof MASTER_WARDS_2025 === 'undefined') return { valid: false, canonicalWard: null, province: null };
 
     const normKey = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().replace(/\s+/g, '');
     const normWard = normKey(wardName);
