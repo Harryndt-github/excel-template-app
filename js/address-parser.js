@@ -333,31 +333,34 @@ const AddressParser = {
   // Returns best canonical ward name or null
   // =============================================
   _fuzzyMatchWard(wardName, province) {
-    if (!wardName || !province) return null;
+    if (!wardName) return null;
+    // NOTE: province can be empty/null — in that case we do a global search
+    // across all provinces and infer province from the matched ward.
 
-    // Strip prefix (Phường/Xã/Thị trấn) before normalizing for matching
-    // This is critical when wardName = "Phường Yen Hoa" (from ALL CAPS "P.YEN HOA")
+    // Strip prefix (Phường/Xã/Thị trấn) before normalizing — critical for correct matching
     const wardNameNoPfx = wardName.replace(/^(Phường|Phong|Xã|Thị trấn|Phuong|Xa|Thi tran)\s+/i, '').trim();
     const normWard = this._removeDiacritics(wardNameNoPfx).toLowerCase().replace(/\s+/g, '');
+    if (normWard.length < 2) return null;
     const results = [];
 
+    // === Strategy 1: Search legacy _oldAdminData (province-specific, only if province known) ===
+    if (province) {
+      const provData = VietnamAddressData._oldAdminData?.[province];
+      if (provData) {
+        for (const [distName, distData] of Object.entries(provData.districts)) {
+          for (const w of distData.wards) {
+            const wName = w.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
+            const wNorm = this._removeDiacritics(wName).toLowerCase().replace(/\s+/g, '');
 
-    // === Strategy 1: Search legacy _oldAdminData (detailed district mapping) ===
-    const provData = VietnamAddressData._oldAdminData?.[province];
-    if (provData) {
-      for (const [distName, distData] of Object.entries(provData.districts)) {
-        for (const w of distData.wards) {
-          const wName = w.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
-          const wNorm = this._removeDiacritics(wName).toLowerCase().replace(/\s+/g, '');
-
-          if (wNorm === normWard) {
-            return { canonicalWard: w, district: distName, confidence: 1.0, source: 'legacy' };
-          }
-          if (wNorm.startsWith(normWard) && normWard.length >= 3) {
-            results.push({ canonicalWard: w, district: distName, confidence: normWard.length / wNorm.length, source: 'legacy' });
-          }
-          if (normWard.startsWith(wNorm) && wNorm.length >= 3) {
-            results.push({ canonicalWard: w, district: distName, confidence: wNorm.length / normWard.length, source: 'legacy' });
+            if (wNorm === normWard) {
+              return { canonicalWard: w, district: distName, confidence: 1.0, source: 'legacy' };
+            }
+            if (wNorm.startsWith(normWard) && normWard.length >= 3) {
+              results.push({ canonicalWard: w, district: distName, confidence: normWard.length / wNorm.length, source: 'legacy' });
+            }
+            if (normWard.startsWith(wNorm) && wNorm.length >= 3) {
+              results.push({ canonicalWard: w, district: distName, confidence: wNorm.length / normWard.length, source: 'legacy' });
+            }
           }
         }
       }
@@ -545,7 +548,7 @@ const AddressParser = {
 
     // Exact match noise words
     const noiseWords = [
-      'dia chi moi', 'dia chi moi', 'dia chi moi',
+      'dia chi moi', 'dia chi moi',
       'dia chi cu', 'dia chi cu',
       'nha moi', 'nha moi', 'nha cu', 'nha cu',
       'giao hang', 'giao hang', 'nhan tai', 'nhan tai',
@@ -556,7 +559,10 @@ const AddressParser = {
       'theo dia chi moi', 'theo dia chi cu', 'theo dia chi',
       'theo dia danh hanh chinh moi', 'theo dia danh hanh chinh',
       'theo dia danh', 'theo',
-      'di a danh hanh chinh moi', 'di a danh h',
+      'di a danh hanh chinh moi', 'di a danh hanh chinh',
+      'di a danh h',
+      // Residual fragments left after partial 'DI A DANH' removal
+      'hanh chinh moi', 'hanh chinh',
     ];
 
     // Exact match (after removing diacritics)
@@ -862,29 +868,27 @@ const AddressParser = {
           });
         }
 
-        // Try fuzzy match against database to get canonical name
-        if (province) {
-          VietnamAddressData._buildOldAdminData();
-          const fuzzyResult = this._fuzzyMatchWard(wardNamePart, province);
-          if (fuzzyResult && fuzzyResult.confidence >= 0.7) {
-            const oldWard = ward;
-            ward = fuzzyResult.canonicalWard;
-            // Only infer district if not already set
-            if (!district && fuzzyResult.district) {
-              district = fuzzyResult.district;
-            }
-            // IMPORTANT: Do NOT override an already-detected province with inferredProvince.
-            // Global fuzzy search may find the ward in a different province (e.g., 'Cao Lãnh'
-            // in Long An instead of An Giang) — this would corrupt an explicitly detected province.
-            if (!province && fuzzyResult.inferredProvince) {
-              province = fuzzyResult.inferredProvince;
-            }
-            warnings.push({
-              type: 'ward_fuzzy_matched',
-              message: `Suy luận: "${oldWard}" → "${ward}"${district ? ` (${district})` : ''}`,
-              severity: 'info'
-            });
+        // Try fuzzy match — ALWAYS run, even when province is unknown.
+        // When province is empty, _fuzzyMatchWard does a global search and
+        // returns inferredProvince so we can fill in missing province from ward.
+        VietnamAddressData._buildOldAdminData();
+        const fuzzyResult = this._fuzzyMatchWard(wardNamePart, province || null);
+        if (fuzzyResult && fuzzyResult.confidence >= 0.7) {
+          const oldWard = ward;
+          ward = fuzzyResult.canonicalWard;
+          // Only infer district if not already set
+          if (!district && fuzzyResult.district) {
+            district = fuzzyResult.district;
           }
+          // Use inferredProvince only when province was not already explicitly detected
+          if (!province && fuzzyResult.inferredProvince) {
+            province = fuzzyResult.inferredProvince;
+          }
+          warnings.push({
+            type: 'ward_fuzzy_matched',
+            message: `Suy luận: "${oldWard}" → "${ward}"${district ? ` (${district})` : ''}${!province ? '' : ` - ${province}`}`,
+            severity: 'info'
+          });
         }
 
       }

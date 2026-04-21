@@ -353,7 +353,15 @@ const VietnamAddressData = {
       'THEO DIA CHI', 'theo dia chi',
       'THEO ĐỊA CHỈ', 'theo địa chỉ',
       'THEO DIA DANH', 'theo dia danh',
-      'THEO ĐỊA DANH', 'theo địa danh',
+      // Space-variant: 'DI A DANH' (with space) instead of 'DIA DANH'
+      // Must list LONGEST patterns first within this group so sort-by-length works
+      'DI A DANH HANH CHINH MOI', 'di a danh hanh chinh moi',
+      'DI A DANH HANH CHINH', 'di a danh hanh chinh',
+      'DI A DANH HANH', 'di a danh hanh',
+      'DI A DANH', 'di a danh',
+      // Residual fragments from partial removal
+      'HANH CHINH MOI', 'hanh chinh moi',
+      'HANH CHINH', 'hanh chinh',
     ];
     
     // Sort by length descending so longer phrases are matched first
@@ -473,9 +481,12 @@ const VietnamAddressData = {
       return { type: 'district', value: `Quận ${distName}`, original: trimmed };
     }
 
-    // Pattern 3: H + Name → "Huyện " + Name (but NOT province abbreviations)
-    const hNameMatch = trimmed.match(/^[Hh]\.?\s*([A-ZĐÀ-ỹa-zđà-ỹ][A-ZĐÀ-ỹa-zđà-ỹ]+(?:\s+[A-Za-zĐđÀ-ỹ]+)*)$/);
-    if (hNameMatch && !trimmed.match(/^[Hh]([Cc][Mm]|[Nn]|[Nn][Oo][Ii]|[Uu][Ee]|[Pp])$/i)) {
+    // Pattern 3: H. + Name → "Huyện " + Name
+    // IMPORTANT: Require explicit dot (H.) to avoid false positives on words like:
+    // 'HANH CHINH MOI' (residual noise), 'HA NOI' (province), 'HOA THANH' (district full name)
+    // Only abbreviated form H.DISTRICT is safe to interpret as Huyện.
+    const hNameMatch = trimmed.match(/^[Hh]\.\s*([A-ZĐÀ-ỹa-zđà-ỹ][A-ZĐÀ-ỹa-zđà-ỹ]+(?:\s+[A-Za-zĐđÀ-ỹ]+)*)$/);
+    if (hNameMatch) {
       const normalized = trimmed.toLowerCase();
       const noDiacritics = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .replace(/đ/g, 'd').replace(/Đ/g, 'D');
