@@ -368,50 +368,53 @@ const AddressParser = {
 
     // === Strategy 2: Search 2025 Master Ward Data (3,321 wards, 34 provinces) ===
     if (typeof MASTER_WARDS_2025 !== 'undefined') {
-      // Normalize province name for lookup
-      const provAliases = [province];
-      // Try common province name variations
-      const normProv = this._removeDiacritics(province).toLowerCase().replace(/\s+/g, '');
-      
-      for (const [masterProv, wards] of Object.entries(MASTER_WARDS_2025)) {
-        const masterNorm = this._removeDiacritics(masterProv).toLowerCase().replace(/\s+/g, '');
-        
-        // Check if this province matches
-        if (masterNorm !== normProv && 
-            !masterNorm.includes(normProv) && 
-            !normProv.includes(masterNorm)) continue;
+      // Province-specific search (only run when province is known)
+      if (province) {
+        const normProv = this._removeDiacritics(province).toLowerCase().replace(/\s+/g, '');
 
-        for (const w of wards) {
-          const wName = w.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
-          const wNorm = this._removeDiacritics(wName).toLowerCase().replace(/\s+/g, '');
-          // Also match against the full ward name (including prefix)
-          const wFullNorm = this._removeDiacritics(w).toLowerCase().replace(/\s+/g, '');
+        for (const [masterProv, wards] of Object.entries(MASTER_WARDS_2025)) {
+          const masterNorm = this._removeDiacritics(masterProv).toLowerCase().replace(/\s+/g, '');
 
-          if (wNorm === normWard || wFullNorm === normWard) {
-            return { canonicalWard: w, district: null, confidence: 1.0, source: '2025' };
-          }
-          if (wNorm.startsWith(normWard) && normWard.length >= 3) {
-            results.push({ canonicalWard: w, district: null, confidence: normWard.length / wNorm.length, source: '2025' });
-          }
-          if (normWard.startsWith(wNorm) && wNorm.length >= 3) {
-            results.push({ canonicalWard: w, district: null, confidence: wNorm.length / normWard.length, source: '2025' });
+          // Check if this province matches
+          if (masterNorm !== normProv &&
+              !masterNorm.includes(normProv) &&
+              !normProv.includes(masterNorm)) continue;
+
+          for (const w of wards) {
+            const wName = w.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
+            const wNorm = this._removeDiacritics(wName).toLowerCase().replace(/\s+/g, '');
+            const wFullNorm = this._removeDiacritics(w).toLowerCase().replace(/\s+/g, '');
+
+            if (wNorm === normWard || wFullNorm === normWard) {
+              // Province already known — no need for inferredProvince
+              return { canonicalWard: w, district: null, confidence: 1.0, source: '2025' };
+            }
+            if (wNorm.startsWith(normWard) && normWard.length >= 3) {
+              results.push({ canonicalWard: w, district: null, confidence: normWard.length / wNorm.length, source: '2025' });
+            }
+            if (normWard.startsWith(wNorm) && wNorm.length >= 3) {
+              results.push({ canonicalWard: w, district: null, confidence: wNorm.length / normWard.length, source: '2025' });
+            }
           }
         }
       }
 
-      // If no province match, try global search across all provinces
+      // Global search when: (a) province is unknown, OR (b) province-specific search found nothing
+      // CRITICAL: Results from global search MUST have inferredProvince so parseAddress can fill province
       if (results.length === 0) {
         for (const [masterProv, wards] of Object.entries(MASTER_WARDS_2025)) {
           for (const w of wards) {
             const wName = w.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
             const wNorm = this._removeDiacritics(wName).toLowerCase().replace(/\s+/g, '');
             if (wNorm === normWard) {
+              // Set inferredProvince so parseAddress can fill in missing province
               results.push({ canonicalWard: w, district: null, confidence: 0.9, source: '2025', inferredProvince: masterProv });
             }
           }
         }
       }
     }
+
 
     if (results.length === 0) return null;
     results.sort((a, b) => b.confidence - a.confidence);
