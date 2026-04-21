@@ -381,7 +381,6 @@ const VietnamAddressData = {
     const trimmed = segment.trim();
 
     // Guard: If segment starts with full-word "Phuong"/"Phường", it's NOT an abbreviation
-    // Let the caller's fullPatterns handle it (e.g., "Phuong Thanh Xuan" → Phường Thanh Xuan)
     if (/^(phuong|phường)\s+/i.test(trimmed)) {
       return null;
     }
@@ -392,22 +391,36 @@ const VietnamAddressData = {
       return { type: 'ward', value: `Phường ${pNumMatch[1]}`, original: trimmed };
     }
 
-    // Pattern 2: P + Name (no space or with space) → "Phường " + Name
-    // e.g., PThanh Xuan → Phường Thanh Xuân, PBinh Thanh → Phường Bình Thạnh
-    const pNameMatch = trimmed.match(/^[Pp]\.?\s*([A-ZĐÀ-Ỹa-zđà-ỹ][a-zđà-ỹ]+(?:\s*[A-Za-zĐđÀ-ỹ][a-zđà-ỹ]*)*)$/);
+    // Pattern 2: P + Name → "Phường " + Name
+    // FIX: Handle ALL CAPS input like P.YEN HOA, P.THANH XUAN, P.BINH PHU
+    // Original regex only matched CamelCase/lowercase — missed Windows ALL CAPS data
+    const pNameMatch = trimmed.match(
+      /^[Pp]\.?\s*([A-ZĐÀ-ỹa-zđà-ỹ][A-ZĐÀ-ỹa-zđà-ỹ]+(?:[ _-]+[A-Za-zĐđÀ-ỹ][A-Za-zĐđÀ-ỹ]*)*)$/
+    );
     if (pNameMatch) {
-      const wardName = pNameMatch[1].replace(/([a-zỹỵ])([A-ZĐ])/g, '$1 $2').trim();
+      // Convert ALL CAPS to Title Case: YEN HOA → Yen Hoa
+      let wardName = pNameMatch[1].trim();
+      if (wardName === wardName.toUpperCase() && wardName.length > 1) {
+        wardName = wardName.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
+      } else {
+        wardName = wardName.replace(/([a-zỹỵ])([A-ZĐ])/g, '$1 $2').trim();
+      }
       return { type: 'ward', value: `Phường ${wardName}`, original: trimmed };
     }
 
-    // Pattern 3: X + name → "Xã " + name (e.g., XBinh Chanh)  
+    // Pattern 3: X + name → "Xã " + name (e.g., XBinh Chanh, X.BINH CHANH)
     const xNameMatch = trimmed.match(/^[Xx]\.?\s*([A-ZĐa-zđ].+)$/);
     if (xNameMatch) {
-      const wardName = xNameMatch[1].replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+      let wardName = xNameMatch[1].trim();
+      if (wardName === wardName.toUpperCase() && wardName.length > 1) {
+        wardName = wardName.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
+      } else {
+        wardName = wardName.replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+      }
       return { type: 'ward', value: `Xã ${wardName}`, original: trimmed };
     }
 
-    // Pattern 4: TT + name → "Thị trấn " + name  
+    // Pattern 4: TT + name → "Thị trấn " + name
     const ttNameMatch = trimmed.match(/^[Tt][Tt]\.?\s*(.+)$/);
     if (ttNameMatch) {
       return { type: 'ward', value: `Thị trấn ${ttNameMatch[1].trim()}`, original: trimmed };
@@ -429,33 +442,38 @@ const VietnamAddressData = {
       return { type: 'district', value: `Quận ${qNumMatch[1]}`, original: trimmed };
     }
 
-    // Pattern 2: Q + Name → "Quận " + Name (e.g., QTan Binh, QTanBinh → Quận Tan Binh)
-    // Use \s* to allow both "Q Tan Binh" and "QTanBinh" (CamelCase split handled below)
-    const qNameMatch = trimmed.match(/^[Qq]\.?\s*([A-ZĐÀ-Ỹa-zđà-ỹ][a-zđà-ỹ]*(?:\s*[A-Za-zĐđÀ-ỹ][a-zđà-ỹ]*)*)$/);
+    // Pattern 2: Q + Name → "Quận " + Name
+    // FIX: Handle ALL CAPS like Q.BA DINH, Q.TAN BINH
+    const qNameMatch = trimmed.match(
+      /^[Qq]\.?\s*([A-ZĐÀ-ỹa-zđà-ỹ][A-ZĐÀ-ỹa-zđà-ỹ]+(?:[ _-]*[A-Za-zĐđÀ-ỹ][A-Za-zĐđÀ-ỹ]*)*)$/
+    );
     if (qNameMatch) {
       let distName = qNameMatch[1].trim();
-      // Only apply CamelCase splitting if the name has NO spaces (compact form like "TanBinh")
-      if (!/\s/.test(distName)) {
-        distName = distName.replace(/([a-zà-ỹ])([A-ZĐÀ-Ỹ])/g, '$1 $2').trim();
+      if (distName === distName.toUpperCase() && distName.length > 1) {
+        distName = distName.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
+      } else if (!/\s/.test(distName)) {
+        distName = distName.replace(/([a-zà-ỹ])([A-ZĐÀ-ỹ])/g, '$1 $2').trim();
       }
       return { type: 'district', value: `Quận ${distName}`, original: trimmed };
     }
 
     // Pattern 3: H + Name → "Huyện " + Name (but NOT province abbreviations)
-    const hNameMatch = trimmed.match(/^[Hh]\.?\s*([A-ZĐÀ-Ỹa-zđà-ỹ][a-zđà-ỹ]+(?:\s+[A-Za-zĐđÀ-ỹ]+)*)$/);
+    const hNameMatch = trimmed.match(/^[Hh]\.?\s*([A-ZĐÀ-ỹa-zđà-ỹ][A-ZĐÀ-ỹa-zđà-ỹ]+(?:\s+[A-Za-zĐđÀ-ỹ]+)*)$/);
     if (hNameMatch && !trimmed.match(/^[Hh]([Cc][Mm]|[Nn]|[Nn][Oo][Ii]|[Uu][Ee]|[Pp])$/i)) {
-      // SAFETY CHECK: Before tagging as district, verify it's not a province abbreviation
-      // This prevents "Hnoi" → "Huyện noi" instead of "Hà Nội"
       const normalized = trimmed.toLowerCase();
       const noDiacritics = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .replace(/đ/g, 'd').replace(/Đ/g, 'D');
-      // Check against known province aliases
       if (typeof AddressParser !== 'undefined' && AddressParser._provinceAliases) {
         if (AddressParser._provinceAliases.has(normalized) || AddressParser._provinceAliases.has(noDiacritics)) {
-          return null; // It's a province, not a district
+          return null;
         }
       }
-      const distName = hNameMatch[1].replace(/([a-zỹỵ])([A-ZĐ])/g, '$1 $2').trim();
+      let distName = hNameMatch[1].trim();
+      if (distName === distName.toUpperCase() && distName.length > 1) {
+        distName = distName.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
+      } else {
+        distName = distName.replace(/([a-zỹỵ])([A-ZĐ])/g, '$1 $2').trim();
+      }
       return { type: 'district', value: `Huyện ${distName}`, original: trimmed };
     }
 

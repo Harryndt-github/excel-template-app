@@ -335,8 +335,12 @@ const AddressParser = {
   _fuzzyMatchWard(wardName, province) {
     if (!wardName || !province) return null;
 
-    const normWard = this._removeDiacritics(wardName).toLowerCase().replace(/\s+/g, '');
+    // Strip prefix (Phường/Xã/Thị trấn) before normalizing for matching
+    // This is critical when wardName = "Phường Yen Hoa" (from ALL CAPS "P.YEN HOA")
+    const wardNameNoPfx = wardName.replace(/^(Phường|Phong|Xã|Thị trấn|Phuong|Xa|Thi tran)\s+/i, '').trim();
+    const normWard = this._removeDiacritics(wardNameNoPfx).toLowerCase().replace(/\s+/g, '');
     const results = [];
+
 
     // === Strategy 1: Search legacy _oldAdminData (detailed district mapping) ===
     const provData = VietnamAddressData._oldAdminData?.[province];
@@ -435,9 +439,15 @@ const AddressParser = {
     for (const { regex, prefix } of fullPatterns) {
       const match = trimmed.match(regex);
       if (match) {
-        return { ward: `${prefix} ${match[2].trim()}`, remainder: '' };
+        let name = match[2].trim();
+        // Handle ALL CAPS ward names: THANH XUAN → Thanh Xuan
+        if (name === name.toUpperCase() && name.length > 1 && /\s/.test(name)) {
+          name = name.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
+        }
+        return { ward: `${prefix} ${name}`, remainder: '' };
       }
     }
+
 
     // Strategy 3: Ward abbreviation is embedded at END of segment
     // e.g., "45/5 Tran Thai Tong P15"
