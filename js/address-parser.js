@@ -81,17 +81,17 @@ const AddressParser = {
       { canonical: "Bình Phước", aliases: ["binh phuoc", "binhphuoc", "bp", "bphuoc", "bình phước"] },
       { canonical: "Tây Ninh", aliases: ["tay ninh", "tayninh", "tninh", "tây ninh"] },
       { canonical: "Bình Dương", aliases: ["binh duong", "binhduong", "bduong", "bình dương"] },
-      { canonical: "Đồng Nai", aliases: ["dong nai", "dongnai", "dnai", "đồng nai"] },
+      { canonical: "Đồng Nai", aliases: ["dong nai", "dongnai", "dnai", "đồng nai", "t. dong nai", "t.dong nai", "tinh dong nai"] },
       { canonical: "Bà Rịa - Vũng Tàu", aliases: ["ba ria vung tau", "bariavungtau", "brvt", "br-vt", "vung tau", "vungtau", "bà rịa - vũng tàu", "bà rịa vũng tàu", "bà rịa", "vũng tàu"] },
 
       // ===== Mekong Delta =====
-      { canonical: "Long An", aliases: ["long an", "longan", "la", "lan"] },
-      { canonical: "Tiền Giang", aliases: ["tien giang", "tiengiang", "tg", "tgiang", "tiền giang"] },
-      { canonical: "Bến Tre", aliases: ["ben tre", "bentre", "btre", "bến tre"] },
-      { canonical: "Trà Vinh", aliases: ["tra vinh", "travinh", "tv", "tvinh", "trà vinh"] },
-      { canonical: "Vĩnh Long", aliases: ["vinh long", "vinhlong", "vl", "vlong", "vĩnh long"] },
-      { canonical: "Đồng Tháp", aliases: ["dong thap", "dongthap", "dt", "dthap", "đồng tháp"] },
-      { canonical: "An Giang", aliases: ["an giang", "angiang", "ag", "agiang"] },
+      { canonical: "Long An", aliases: ["long an", "longan", "la", "lan", "t. long an", "t.long an"] },
+      { canonical: "Tiền Giang", aliases: ["tien giang", "tiengiang", "tg", "tgiang", "tiền giang", "t. tien giang", "t.tien giang"] },
+      { canonical: "Bến Tre", aliases: ["ben tre", "bentre", "btre", "bến tre", "t. ben tre", "t.ben tre"] },
+      { canonical: "Trà Vinh", aliases: ["tra vinh", "travinh", "tv", "tvinh", "trà vinh", "t. tra vinh", "t.tra vinh"] },
+      { canonical: "Vĩnh Long", aliases: ["vinh long", "vinhlong", "vl", "vlong", "vĩnh long", "t. vinh long", "t.vinh long"] },
+      { canonical: "Đồng Tháp", aliases: ["dong thap", "dongthap", "dt", "dthap", "đồng tháp", "t. dong thap", "t.dong thap"] },
+      { canonical: "An Giang", aliases: ["an giang", "angiang", "ag", "agiang", "t. an giang", "t.an giang", "tinh an giang"] },
       { canonical: "Kiên Giang", aliases: ["kien giang", "kiengiang", "kg", "kgiang", "kiên giang", "phu quoc", "phú quốc"] },
       { canonical: "Hậu Giang", aliases: ["hau giang", "haugiang", "hgiang2", "hậu giang"] },
       { canonical: "Sóc Trăng", aliases: ["soc trang", "soctrang", "st", "strang", "sóc trăng"] },
@@ -407,8 +407,25 @@ const AddressParser = {
             const wName = w.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
             const wNorm = this._removeDiacritics(wName).toLowerCase().replace(/\s+/g, '');
             if (wNorm === normWard) {
-              // Set inferredProvince so parseAddress can fill in missing province
+              // Exact match — highest confidence
               results.push({ canonicalWard: w, district: null, confidence: 0.9, source: '2025', inferredProvince: masterProv });
+            } else if (normWard.length >= 5 && wNorm.length >= 5) {
+              // Near-miss: allow 1-character difference for data entry errors
+              // e.g. "nhantrach" vs "nhontrach" (a→o, 1 char diff at pos 2)
+              // e.g. "diennien"  vs "diennanh"  etc.
+              const lenDiff = Math.abs(normWard.length - wNorm.length);
+              if (lenDiff <= 1) {
+                const shorter = normWard.length <= wNorm.length ? normWard : wNorm;
+                const longer  = normWard.length <= wNorm.length ? wNorm   : normWard;
+                let diffs = longer.length - shorter.length; // count length diff as 1 error
+                for (let i = 0; i < shorter.length && diffs <= 1; i++) {
+                  if (shorter[i] !== longer[i]) diffs++;
+                }
+                if (diffs === 1) {
+                  // Near-miss: confidence just above 0.7 threshold
+                  results.push({ canonicalWard: w, district: null, confidence: 0.72, source: '2025-fuzzy', inferredProvince: masterProv });
+                }
+              }
             }
           }
         }
