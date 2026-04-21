@@ -440,8 +440,8 @@ const AddressParser = {
       const match = trimmed.match(regex);
       if (match) {
         let name = match[2].trim();
-        // Handle ALL CAPS ward names: THANH XUAN → Thanh Xuan
-        if (name === name.toUpperCase() && name.length > 1 && /\s/.test(name)) {
+        // Handle ALL CAPS ward names (with or without spaces): ME LINH → Me Linh, THANH XUAN → Thanh Xuan
+        if (name === name.toUpperCase() && name.length > 1) {
           name = name.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
         }
         return { ward: `${prefix} ${name}`, remainder: '' };
@@ -621,10 +621,12 @@ const AddressParser = {
     cleaned = cleaned.replace(/,\s*THEO\s*$/i, '');
     cleaned = cleaned.replace(/\s+THEO\s*$/i, '');
 
-    // Remove truncated province/city abbreviations that leaked into street
-    // e.g., "TP. HC…", "TP. H…", "TP. HCM", "TP HCM", "Q. …", "Tinh …"
-    cleaned = cleaned.replace(/,\s*TP\.?\s+[A-ZĐa-zđÀ-ỹ]*[…\.]*\s*$/i, '');
-    cleaned = cleaned.replace(/,\s*Tinh\s+[A-ZĐa-zđÀ-ỹ]*[…\.]*\s*$/i, '');
+    // Remove ONLY truncated province abbreviations leaked into street (e.g. "TP. HC…", "TP. H…")
+    // DO NOT remove full province names like "TP. HA NOI", "T. AN GIANG" — these are needed for province detection
+    // Truncated = province initials (1-4 chars) followed by ellipsis or end-of-string
+    cleaned = cleaned.replace(/,\s*TP\.?\s+[A-ZĐa-zđÀ-ỹ]{1,4}[…\.]+\s*$/i, '');
+    cleaned = cleaned.replace(/,\s*T\.?\s+[A-ZĐa-zđÀ-ỹ]{1,4}[…\.]+\s*$/i, '');
+
 
     // Clean up trailing/leading commas, spaces, dots, ellipsis
     cleaned = cleaned.replace(/[,\s…]+$/g, '').replace(/^[,\s…]+/g, '').trim();
@@ -648,11 +650,13 @@ const AddressParser = {
     const cleanResult = VietnamAddressData.cleanAddress(rawAddress);
     const normalized = this._normalize(cleanResult.cleaned);
     
-    // Step 2: Split by comma, dash, semicolon, or other common delimiters
-    // Also handles: fullwidth comma \uFF0C, bullet \u2022, pipe |, newline
-    // This fixes Windows Excel files that use semicolons or different separators
+    // Step 2: Split by comma, semicolon or fullwidth punctuation ONLY
+    // IMPORTANT: Do NOT split on plain hyphen (-) — it breaks:
+    //   'Lo 5-6 Cho Nong San' → ['Lo 5', '6 Cho Nong San']
+    //   'P95-162 TON DUC THANG' → ['P95', '162...']
+    // En-dash (–) and em-dash (—) are safe address-component separators.
     const rawSegments = normalized
-      .split(/[,;|\-–—\uFF0C\u3001\u2022]+/)
+      .split(/[,;|\uFF0C\u3001\u2022]+|[\s]+[–—][\s]+/)
       .map(s => s.trim())
       .filter(s => s.length > 0);
 
@@ -865,22 +869,24 @@ const AddressParser = {
           if (fuzzyResult && fuzzyResult.confidence >= 0.7) {
             const oldWard = ward;
             ward = fuzzyResult.canonicalWard;
-            if (!district) {
+            // Only infer district if not already set
+            if (!district && fuzzyResult.district) {
               district = fuzzyResult.district;
-              warnings.push({
-                type: 'ward_fuzzy_matched',
-                message: `Suy luận: "${oldWard}" → "${ward}" (${district})`,
-                severity: 'info'
-              });
-            } else {
-              warnings.push({
-                type: 'ward_fuzzy_matched',
-                message: `Suy luận: "${oldWard}" → "${ward}"`,
-                severity: 'info'
-              });
             }
+            // IMPORTANT: Do NOT override an already-detected province with inferredProvince.
+            // Global fuzzy search may find the ward in a different province (e.g., 'Cao Lãnh'
+            // in Long An instead of An Giang) — this would corrupt an explicitly detected province.
+            if (!province && fuzzyResult.inferredProvince) {
+              province = fuzzyResult.inferredProvince;
+            }
+            warnings.push({
+              type: 'ward_fuzzy_matched',
+              message: `Suy luận: "${oldWard}" → "${ward}"${district ? ` (${district})` : ''}`,
+              severity: 'info'
+            });
           }
         }
+
       }
     }
 

@@ -398,7 +398,6 @@ const VietnamAddressData = {
       /^[Pp]\.?\s*([A-ZĐÀ-ỹa-zđà-ỹ][A-ZĐÀ-ỹa-zđà-ỹ]+(?:[ _-]+[A-Za-zĐđÀ-ỹ][A-Za-zĐđÀ-ỹ]*)*)$/
     );
     if (pNameMatch) {
-      // Convert ALL CAPS to Title Case: YEN HOA → Yen Hoa
       let wardName = pNameMatch[1].trim();
       if (wardName === wardName.toUpperCase() && wardName.length > 1) {
         wardName = wardName.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
@@ -408,8 +407,25 @@ const VietnamAddressData = {
       return { type: 'ward', value: `Phường ${wardName}`, original: trimmed };
     }
 
-    // Pattern 3: X + name → "Xã " + name (e.g., XBinh Chanh, X.BINH CHANH)
-    const xNameMatch = trimmed.match(/^[Xx]\.?\s*([A-ZĐa-zđ].+)$/);
+    // Pattern 2b: P + single-char initial + multiple following words
+    // e.g., "P. O CHO DUA" → "Phường O Cho Dua" (Phường Ô Chợ Dừa)
+    // Requires: dot OR explicit space after P, single char, then ≥2 more words
+    const pSingleMatch = trimmed.match(
+      /^[Pp][.\s]\s*([A-ZĐÀ-ỹa-zđà-ỹ])(?=\s)((?:\s+[A-Za-zĐđÀ-ỹ]{2,}){1,})$/
+    );
+    if (pSingleMatch) {
+      let wardName = (pSingleMatch[1] + pSingleMatch[2]).trim();
+      if (wardName === wardName.toUpperCase()) {
+        wardName = wardName.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
+      }
+      return { type: 'ward', value: `Phường ${wardName}`, original: trimmed };
+    }
+
+    // Pattern 3: X. + name → "Xã " + name
+    // IMPORTANT: Only match when there's a DOT after X (X.ME LINH)
+    // Without dot, "Xom", "Xuan", "Xanh" would be falsely matched as Xã!
+    // Full-form "XA ME LINH" / "xã mê linh" is handled by _detectWard Strategy 2 fullPatterns
+    const xNameMatch = trimmed.match(/^[Xx]\.\s*([A-ZĐa-zđÀ-ỹ].+)$/);
     if (xNameMatch) {
       let wardName = xNameMatch[1].trim();
       if (wardName === wardName.toUpperCase() && wardName.length > 1) {
