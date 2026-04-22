@@ -1000,6 +1000,12 @@
                 </svg>
                 Bản ghi
               </button>
+              <button class="md-view-btn" data-view="config" onclick="MasterData.setView('config')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="4" height="18" rx="1"/><rect x="10" y="3" width="4" height="18" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/>
+                </svg>
+                ✨ Cấu hình
+              </button>
             </div>
           </div>
           <div class="md-view-panel" id="md-view-mindmap" style="display:block;position:relative;">
@@ -1007,6 +1013,40 @@
           </div>
           <div class="md-view-panel" id="md-view-matrix" style="display:none;"></div>
           <div class="md-view-panel" id="md-view-records" style="display:none;"></div>
+          <div class="md-view-panel" id="md-view-config" style="display:none;overflow:hidden;padding:0;">
+            <div class="md-config-layout">
+              <!-- Panel 1: Entity -->
+              <div class="md-cfg-panel md-cfg-entities">
+                <div class="md-cfg-panel-hd">
+                  <div class="md-cfg-panel-label"><span class="md-cfg-num">1</span> Entity</div>
+                  <button class="md-cfg-add-btn" onclick="MasterData.showAddEntity()">＋ Thêm</button>
+                </div>
+                <p class="md-cfg-hint">Khai báo loại dữ liệu (VD: Khách hàng, Hợp đồng…)</p>
+                <div class="md-cfg-entity-list" id="md-cfg-entity-list"></div>
+              </div>
+              <!-- Panel 2: Columns -->
+              <div class="md-cfg-panel md-cfg-columns">
+                <div class="md-cfg-panel-hd">
+                  <div class="md-cfg-panel-label"><span class="md-cfg-num">2</span><span id="md-cfg-col-title">Cột dữ liệu</span></div>
+                  <button class="md-cfg-add-btn" id="md-cfg-add-col-btn" onclick="MasterData.cfgAddColumn()" style="display:none;">＋ Cột</button>
+                </div>
+                <p class="md-cfg-hint" id="md-cfg-col-hint">← Chọn Entity để cấu hình các cột</p>
+                <div id="md-cfg-columns-list"></div>
+              </div>
+              <!-- Panel 3: Data -->
+              <div class="md-cfg-panel md-cfg-data">
+                <div class="md-cfg-panel-hd">
+                  <div class="md-cfg-panel-label"><span class="md-cfg-num">3</span><span id="md-cfg-data-title">Nhập dữ liệu</span></div>
+                  <div id="md-cfg-data-actions" style="display:none;gap:6px;">
+                    <button class="md-cfg-add-btn" onclick="MasterData.cfgAddRecord()">＋ Thêm</button>
+                    <button class="md-cfg-icon-btn" onclick="MasterData.importRecordsFromExcel(MasterDataState.selectedEntity)" title="Import Excel">&#128229;</button>
+                  </div>
+                </div>
+                <p class="md-cfg-hint" id="md-cfg-data-hint">← Chọn Entity và cấu hình cột trước</p>
+                <div id="md-cfg-data-area"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

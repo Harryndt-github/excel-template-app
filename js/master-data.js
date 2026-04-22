@@ -156,6 +156,7 @@ const MasterData = {
     if (mode === 'mindmap') this.renderMindmap();
     if (mode === 'matrix') this.renderMatrix();
     if (mode === 'records') this.renderRecords();
+    if (mode === 'config') this.cfgRenderEntityList();
   },
 
   // ── Entity List (sidebar on master data page) ──
@@ -1438,4 +1439,222 @@ const MasterData = {
 // Init when DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   MasterData.init();
+});
+
+// ══════════════════════════════════════════════════
+//  3-PANEL CONFIG VIEW — cfgXxx methods
+// ══════════════════════════════════════════════════
+Object.assign(MasterData, {
+
+  // ── Panel 1: render entity list ──────────────────
+  cfgRenderEntityList() {
+    const list = document.getElementById('md-cfg-entity-list');
+    if (!list) return;
+    const ents = MasterDataState.entities;
+    if (!ents.length) {
+      list.innerHTML = `<div class="md-cfg-empty"><span class="md-cfg-empty-icon">🗂️</span>Chưa có Entity nào.<br>Nhấn <b>＋ Thêm</b> để bắt đầu.</div>`;
+      return;
+    }
+    list.innerHTML = ents.map(e => {
+      const active = MasterDataState.selectedEntity === e.id ? ' active' : '';
+      const rCount = (MasterDataState.records[e.id] || []).length;
+      return `<div class="md-cfg-entity-item${active}" onclick="MasterData.cfgSelectEntity('${e.id}')">
+        <span class="md-cfg-entity-dot" style="background:${e.color};"></span>
+        <div class="md-cfg-entity-info">
+          <span class="md-cfg-entity-name">${_mdEsc(e.name)}</span>
+          <span class="md-cfg-entity-meta">${e.fields.length} cột · ${rCount} bản ghi</span>
+        </div>
+        <div class="md-cfg-entity-actions">
+          <button class="md-cfg-ent-btn" onclick="event.stopPropagation();MasterData.showEditEntity('${e.id}')" title="Sửa">✎</button>
+          <button class="md-cfg-ent-btn del" onclick="event.stopPropagation();MasterData.deleteEntity('${e.id}')" title="Xóa">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  },
+
+  // ── Panel 1 → select entity ───────────────────────
+  cfgSelectEntity(id) {
+    MasterDataState.selectedEntity = id;
+    MasterDataState.selectedRecord = 0;
+    this.cfgRenderEntityList();
+    this.cfgRenderColumns(id);
+    this.cfgRenderData(id);
+  },
+
+  // ── Panel 2: render columns ───────────────────────
+  cfgRenderColumns(entityId) {
+    const ent = MasterDataState.entities.find(e => e.id === entityId);
+    const titleEl = document.getElementById('md-cfg-col-title');
+    const hintEl  = document.getElementById('md-cfg-col-hint');
+    const addBtn  = document.getElementById('md-cfg-add-col-btn');
+    const listEl  = document.getElementById('md-cfg-columns-list');
+    if (!listEl) return;
+
+    if (!ent) {
+      if (titleEl) titleEl.textContent = 'Cột dữ liệu';
+      if (hintEl)  hintEl.textContent  = '← Chọn Entity để cấu hình các cột';
+      if (addBtn)  addBtn.style.display = 'none';
+      listEl.innerHTML = '';
+      return;
+    }
+    if (titleEl) titleEl.textContent = ent.name;
+    if (hintEl)  hintEl.textContent  = `Định nghĩa các cột dữ liệu cho "${ent.name}"`;
+    if (addBtn)  addBtn.style.display = '';
+
+    const icons = {text:'Aa',number:'#',date:'📅',select:'▼',currency:'₫',percent:'%',phone:'☎',email:'@'};
+    listEl.innerHTML = ent.fields.map((f, i) => `
+      <div class="md-col-row" data-field-id="${f.id}" data-entity-id="${entityId}">
+        <span class="md-col-drag">⠿</span>
+        <span class="md-col-type-badge">${icons[f.type]||'Aa'}</span>
+        <input class="md-col-name-in" value="${_mdEsc(f.name)}" placeholder="Tên cột…"
+          onchange="MasterData.cfgUpdateField('${entityId}','${f.id}','name',this.value)"
+          onblur="MasterData.cfgRenderData('${entityId}')">
+        <select class="md-col-type-sel"
+          onchange="MasterData.cfgUpdateField('${entityId}','${f.id}','type',this.value);MasterData.cfgRenderColumns('${entityId}')">
+          ${FIELD_TYPES.map(t=>`<option value="${t.value}"${f.type===t.value?' selected':''}>${t.label}</option>`).join('')}
+        </select>
+        <button class="md-col-del" onclick="MasterData.cfgRemoveField('${entityId}','${f.id}')" title="Xóa cột">✕</button>
+      </div>`).join('') +
+      `<div class="md-col-add-row" onclick="MasterData.cfgAddColumn()">＋ Thêm cột mới</div>`;
+  },
+
+  cfgUpdateField(entityId, fieldId, key, val) {
+    const ent = MasterDataState.entities.find(e => e.id === entityId);
+    if (!ent) return;
+    const f = ent.fields.find(f => f.id === fieldId);
+    if (f) { f[key] = val; this.saveState(); }
+  },
+
+  cfgRemoveField(entityId, fieldId) {
+    const ent = MasterDataState.entities.find(e => e.id === entityId);
+    if (!ent) return;
+    if (ent.fields.length <= 1) { App.toast('Phải có ít nhất 1 cột', 'warning'); return; }
+    ent.fields = ent.fields.filter(f => f.id !== fieldId);
+    this.saveState();
+    this.cfgRenderColumns(entityId);
+    this.cfgRenderData(entityId);
+  },
+
+  cfgAddColumn() {
+    const entityId = MasterDataState.selectedEntity;
+    const ent = MasterDataState.entities.find(e => e.id === entityId);
+    if (!ent) { App.toast('Chọn Entity trước', 'warning'); return; }
+    ent.fields.push({ id: _mdId(), name: '', type: 'text' });
+    this.saveState();
+    this.cfgRenderColumns(entityId);
+    // focus last input
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('#md-cfg-columns-list .md-col-name-in');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    }, 60);
+  },
+
+  // ── Panel 3: render data records ─────────────────
+  cfgRenderData(entityId) {
+    const ent = MasterDataState.entities.find(e => e.id === entityId);
+    const titleEl   = document.getElementById('md-cfg-data-title');
+    const hintEl    = document.getElementById('md-cfg-data-hint');
+    const actionsEl = document.getElementById('md-cfg-data-actions');
+    const areaEl    = document.getElementById('md-cfg-data-area');
+    if (!areaEl) return;
+
+    if (!ent) {
+      if (titleEl)   titleEl.textContent  = 'Nhập dữ liệu';
+      if (hintEl)    hintEl.textContent   = '← Chọn Entity và cấu hình cột trước';
+      if (actionsEl) actionsEl.style.display = 'none';
+      areaEl.innerHTML = '';
+      return;
+    }
+    if (titleEl)   titleEl.textContent  = `Dữ liệu: ${ent.name}`;
+    if (hintEl)    hintEl.textContent   = '';
+    if (actionsEl) { actionsEl.style.display = 'flex'; }
+
+    const records = MasterDataState.records[entityId] || [];
+
+    if (!records.length) {
+      areaEl.innerHTML = `<div class="md-data-empty">
+        <span class="md-data-empty-icon">📋</span>
+        <h4>Chưa có bản ghi nào</h4>
+        <p>Nhấn <b>＋ Thêm</b> để tạo bản ghi đầu tiên cho <b>${_mdEsc(ent.name)}</b></p>
+        <button class="md-cfg-add-btn" onclick="MasterData.cfgAddRecord()" style="margin-top:14px;">＋ Thêm bản ghi</button>
+      </div>`;
+      return;
+    }
+
+    const selIdx = Math.min(MasterDataState.selectedRecord || 0, records.length - 1);
+    const rec = records[selIdx];
+
+    const tabs = records.map((r, i) => {
+      const label = this._cfgRecLabel(ent, r, i);
+      return `<button class="md-data-tab${i === selIdx ? ' active' : ''}" onclick="MasterData.cfgSelectRecord(${i})">${_mdEsc(label)}</button>`;
+    }).join('');
+
+    const fields = ent.fields.map(f => {
+      const val = rec[f.id] || '';
+      const icon = {text:'Aa',number:'#',date:'📅',select:'▼',currency:'₫',percent:'%',phone:'☎',email:'@'}[f.type] || 'Aa';
+      const inp = f.type === 'select'
+        ? `<select class="md-data-input" onchange="MasterData.cfgSetVal('${entityId}',${selIdx},'${f.id}',this.value)">
+            <option value=""></option>
+            ${(val ? [val] : []).map(v => `<option selected>${_mdEsc(v)}</option>`).join('')}
+           </select>`
+        : `<input class="md-data-input" type="${f.type==='number'||f.type==='currency'||f.type==='percent'?'number':f.type==='date'?'date':'text'}"
+            value="${_mdEsc(val)}"
+            onchange="MasterData.cfgSetVal('${entityId}',${selIdx},'${f.id}',this.value)">`;
+      return `<div class="md-data-field-row">
+        <div class="md-data-field-label"><span class="md-data-type-icon">${icon}</span>${_mdEsc(f.name||'(chưa đặt tên)')}</div>
+        <div class="md-data-field-val">${inp}</div>
+      </div>`;
+    }).join('');
+
+    areaEl.innerHTML = `
+      <div class="md-data-tabs-bar">${tabs}</div>
+      <div class="md-data-form">${fields}</div>
+      <div class="md-data-rec-actions">
+        <button class="md-data-del-btn" onclick="MasterData.cfgDeleteRecord('${entityId}',${selIdx})">✕ Xóa bản ghi này</button>
+      </div>`;
+  },
+
+  _cfgRecLabel(ent, rec, idx) {
+    for (const f of ent.fields) {
+      const v = rec[f.id];
+      if (v && String(v).trim()) return String(v).substring(0, 18);
+    }
+    return `Bản ghi ${idx + 1}`;
+  },
+
+  cfgSelectRecord(idx) {
+    MasterDataState.selectedRecord = idx;
+    this.cfgRenderData(MasterDataState.selectedEntity);
+  },
+
+  cfgSetVal(entityId, recIdx, fieldId, value) {
+    if (!MasterDataState.records[entityId]) MasterDataState.records[entityId] = [];
+    const rec = MasterDataState.records[entityId][recIdx];
+    if (rec) { rec[fieldId] = value; this.saveState(); }
+  },
+
+  cfgAddRecord() {
+    const entityId = MasterDataState.selectedEntity;
+    const ent = MasterDataState.entities.find(e => e.id === entityId);
+    if (!ent) { App.toast('Chọn Entity trước', 'warning'); return; }
+    if (!MasterDataState.records[entityId]) MasterDataState.records[entityId] = [];
+    const rec = {};
+    ent.fields.forEach(f => { rec[f.id] = ''; });
+    MasterDataState.records[entityId].push(rec);
+    MasterDataState.selectedRecord = MasterDataState.records[entityId].length - 1;
+    this.saveState();
+    this.cfgRenderData(entityId);
+    this.cfgRenderEntityList();
+    App.toast('Đã thêm bản ghi mới', 'success');
+  },
+
+  cfgDeleteRecord(entityId, idx) {
+    if (!confirm('Xóa bản ghi này?')) return;
+    MasterDataState.records[entityId].splice(idx, 1);
+    MasterDataState.selectedRecord = 0;
+    this.saveState();
+    this.cfgRenderData(entityId);
+    this.cfgRenderEntityList();
+    App.toast('Đã xóa bản ghi', 'info');
+  }
 });
