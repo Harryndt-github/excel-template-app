@@ -1349,3 +1349,22 @@
 .md-data-empty-icon { font-size: 2.2rem; opacity: 0.38; margin-bottom: 10px; }
 .md-data-empty h4 { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; }
 .md-data-empty p { font-size: 0.77rem; line-height: 1.5; max-width: 240px; }
+
+/* ── Config view fills the full main area ── */
+#md-view-config {
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+.md-config-layout {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  flex: 1;
+}
+
+/* When sidebar is hidden, md-main takes full width */
+.md-page-layout .md-sidebar[style*="display: none"],
+.md-page-layout .md-sidebar[style*="display:none"] {
+  display: none !important;
+}

@@ -9,7 +9,7 @@ const MasterDataState = {
   records: {},       // { entityId: [ {fieldId: value, ...} ] }
   selectedEntity: null,
   selectedRecord: null,
-  viewMode: 'mindmap', // 'mindmap' | 'matrix' | 'records'
+  viewMode: 'config',  // 'config' (main) | 'mindmap' (diagram view)
   // Mindmap dragging
   _drag: null,
   _pan: { x: 0, y: 0 },
@@ -140,8 +140,7 @@ const MasterData = {
 
   // ── Page Init ──
   initPage() {
-    this.setView(MasterDataState.viewMode);
-    this.renderEntityList();
+    this.setView('config');
   },
 
   setView(mode) {
@@ -149,14 +148,17 @@ const MasterData = {
     document.querySelectorAll('.md-view-btn').forEach(b => {
       b.classList.toggle('active', b.getAttribute('data-view') === mode);
     });
+    // Hide all panels
     document.querySelectorAll('.md-view-panel').forEach(p => p.style.display = 'none');
     const panel = document.getElementById(`md-view-${mode}`);
-    if (panel) panel.style.display = 'block';
+    if (panel) panel.style.display = (mode === 'config') ? 'flex' : 'block';
 
-    if (mode === 'mindmap') this.renderMindmap();
-    if (mode === 'matrix') this.renderMatrix();
-    if (mode === 'records') this.renderRecords();
-    if (mode === 'config') this.cfgRenderEntityList();
+    // Sidebar: hide for config (it has its own entity panel), show for mindmap
+    const sidebar = document.querySelector('.md-sidebar');
+    if (sidebar) sidebar.style.display = (mode === 'config') ? 'none' : '';
+
+    if (mode === 'mindmap') { this.renderMindmap(); this.renderEntityList(); }
+    if (mode === 'config')  this.cfgRenderEntityList();
   },
 
   // ── Entity List (sidebar on master data page) ──
