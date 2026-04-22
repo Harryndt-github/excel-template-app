@@ -1,49 +1,1518 @@
-<!-- ========== MASTER DATA PAGE ========== -->
-    <div class="page" id="page-master-data">
-      <div class="md-page-layout">
-
-        <!-- Panel 1: Entity -->
-        <div class="md-cfg-panel md-cfg-entities">
-          <div class="md-cfg-panel-hd">
-            <div class="md-cfg-panel-label">
-              <span class="md-cfg-num">1</span> Entity
-            </div>
-            <button class="md-cfg-add-btn" onclick="MasterData.showAddEntity()">+ Thêm</button>
-          </div>
-          <p class="md-cfg-hint">Khai báo loại dữ liệu (VD: Khách hàng, Hợp đồng…)</p>
-          <div class="md-cfg-entity-list" id="md-cfg-entity-list"></div>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExcelMapper - Ghép Dữ Liệu Excel Vào Template</title>
+  <meta name="description" content="Ứng dụng nhận dữ liệu từ file Excel và ghép vào template chuẩn, xuất PDF chuyên nghiệp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/spreadsheet.css">
+  <link rel="stylesheet" href="css/master-data.css">
+  <link rel="stylesheet" href="css/address-parser.css">
+  <link rel="stylesheet" href="css/stitch-enhancements.css">
+  <link rel="stylesheet" href="css/templates-slate.css">
+</head>
+<body>
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect x="2" y="2" width="10" height="10" rx="2" fill="#6366f1"/>
+            <rect x="16" y="2" width="10" height="10" rx="2" fill="#8b5cf6" opacity="0.7"/>
+            <rect x="2" y="16" width="10" height="10" rx="2" fill="#22d3ee" opacity="0.7"/>
+            <rect x="16" y="16" width="10" height="10" rx="2" fill="#6366f1" opacity="0.4"/>
+          </svg>
         </div>
-
-        <!-- Panel 2: Cột dữ liệu -->
-        <div class="md-cfg-panel md-cfg-columns">
-          <div class="md-cfg-panel-hd">
-            <div class="md-cfg-panel-label">
-              <span class="md-cfg-num">2</span>
-              <span id="md-cfg-col-title">Cột dữ liệu</span>
-            </div>
-            <button class="md-cfg-add-btn" id="md-cfg-add-col-btn" onclick="MasterData.cfgAddColumn()" style="display:none;">+ Cột</button>
-          </div>
-          <p class="md-cfg-hint" id="md-cfg-col-hint">← Chọn Entity để cấu hình các cột</p>
-          <div id="md-cfg-columns-list"></div>
+        <div class="logo-text">
+          <h1>ExcelMapper</h1>
+          <span>Template Engine</span>
         </div>
-
-        <!-- Panel 3: Nhập dữ liệu -->
-        <div class="md-cfg-panel md-cfg-data">
-          <div class="md-cfg-panel-hd">
-            <div class="md-cfg-panel-label">
-              <span class="md-cfg-num">3</span>
-              <span id="md-cfg-data-title">Nhập dữ liệu</span>
-            </div>
-            <div id="md-cfg-data-actions" style="display:none;">
-              <button class="md-cfg-add-btn" onclick="MasterData.cfgAddRecord()">+ Thêm</button>
-              <button class="md-cfg-icon-btn" onclick="MasterData.importRecordsFromExcel(MasterDataState.selectedEntity)" title="Import Excel">&#128229;</button>
-            </div>
-          </div>
-          <p class="md-cfg-hint" id="md-cfg-data-hint">← Chọn Entity và cấu hình cột trước</p>
-          <div id="md-cfg-data-area"></div>
-        </div>
-
       </div>
     </div>
 
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard" id="nav-dashboard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        <span>Tổng quan</span>
+      </a>
+      <a href="#" class="nav-item" data-page="templates" id="nav-templates">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <span>Quản lý Template</span>
+      </a>
+      <a href="#" class="nav-item" data-page="editor" id="nav-editor">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        <span>Tạo Template</span>
+      </a>
+      <a href="#" class="nav-item" data-page="generate" id="nav-generate">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <span>Ghép & Xuất PDF</span>
+      </a>
+      <div class="nav-divider-label"><span>Dữ Liệu</span></div>
+      <a href="#" class="nav-item" data-page="master-data" id="nav-master-data">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <circle cx="5" cy="6" r="2"/><line x1="7" y1="7" x2="9" y2="9"/>
+          <circle cx="19" cy="6" r="2"/><line x1="17" y1="7" x2="15" y2="9"/>
+          <circle cx="5" cy="18" r="2"/><line x1="7" y1="17" x2="9" y2="15"/>
+          <circle cx="19" cy="18" r="2"/><line x1="17" y1="17" x2="15" y2="15"/>
+        </svg>
+        <span>Master Data</span>
+      </a>
+      <a href="#" class="nav-item" data-page="address-parser" id="nav-address-parser">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        <span>Phân rã Địa chỉ</span>
+      </a>
+      <div class="nav-divider-label"><span>Word</span></div>
+      <a href="#" class="nav-item" data-page="word-templates" id="nav-word-templates">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/>
+        </svg>
+        <span>Word Templates</span>
+      </a>
+      <a href="#" class="nav-item" data-page="word-editor" id="nav-word-editor">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        <span>Tạo Word Template</span>
+      </a>
+      <a href="#" class="nav-item" data-page="word-generate" id="nav-word-generate">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span>Ghép & Xuất PDF</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="version-info">
+        <span>v1.0.0</span>
+        <span class="dot">•</span>
+        <span>Made with ❤️</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content" id="mainContent">
     
+    <!-- Top Navigation (Glassmorphism) -->
+    <header class="top-nav">
+      <div class="top-nav-search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" placeholder="Tìm kiếm thư mục, template, dữ liệu...">
+      </div>
+      <div class="top-nav-profile">
+        <button class="nav-icon-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span class="badg-dot"></span>
+        </button>
+        <div class="avatar">
+          <img src="https://ui-avatars.com/api/?name=Admin+User&background=6366f1&color=fff" alt="User Profile">
+        </div>
+      </div>
+    </header>
+
+    <!-- ========== DASHBOARD PAGE ========== -->
+    <section id="page-dashboard" class="page active">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Tổng quan</h2>
+          <p class="page-subtitle">Chào mừng bạn đến với ExcelMapper</p>
+        </div>
+        <div class="dash-date-badge" id="dash-date-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <span id="dash-current-date"></span>
+          <span class="dash-time-pill" id="dash-current-time"></span>
+        </div>
+      </div>
+
+      <!-- KPI Stats Row — 4 cards -->
+      <div class="stats-grid stats-grid-4">
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+            </div>
+            <span class="stat-trend stat-trend-indigo" id="stat-templates-trend">+0 tháng này</span>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label-upper">Templates đã tạo</span>
+            <span class="stat-value" id="stat-templates">0</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #22d3ee, #06b6d4);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </div>
+            <span class="stat-trend stat-trend-cyan" id="stat-exports-trend">+0 tuần này</span>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label-upper">PDF đã xuất</span>
+            <span class="stat-value" id="stat-exports">0</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/>
+              </svg>
+            </div>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label-upper">Word Templates</span>
+            <span class="stat-value" id="stat-word-templates">0</span>
+          </div>
+        </div>
+        <div class="stat-card stat-card-glow">
+          <div class="stat-glow-bg"></div>
+          <div class="stat-card-top">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label-upper">Tỷ lệ thành công</span>
+            <div class="stat-value-row">
+              <span class="stat-value stat-value-success" id="stat-success-rate">98.5%</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Dashboard Grid — 2 columns -->
+      <div class="dash-main-grid">
+        <!-- Left Column -->
+        <div class="dash-col-left">
+          <!-- Hoạt động gần đây -->
+          <div class="dash-section-card">
+            <div class="dash-section-header">
+              <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Hoạt động gần đây
+              </h3>
+              <button class="dash-link-btn" onclick="App.navigateTo('templates')">Xem tất cả</button>
+            </div>
+            <div class="dash-activity-feed" id="dash-activity-feed">
+              <div class="dash-activity-item">
+                <div class="dash-activity-icon dash-activity-icon-indigo">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                </div>
+                <div class="dash-activity-content">
+                  <p>Đã tạo template mới: <strong>Báo cáo Tài sản Q3</strong></p>
+                  <span>Bởi Admin • 10 phút trước</span>
+                </div>
+              </div>
+              <div class="dash-activity-item">
+                <div class="dash-activity-icon dash-activity-icon-cyan">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </div>
+                <div class="dash-activity-content">
+                  <p>Xuất 45 tệp PDF từ template <strong>Hợp đồng vay vốn</strong></p>
+                  <span>Bởi Hệ thống • 45 phút trước</span>
+                </div>
+              </div>
+              <div class="dash-activity-item">
+                <div class="dash-activity-icon dash-activity-icon-purple">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </div>
+                <div class="dash-activity-content">
+                  <p>Cập nhật Master Data: <strong>Danh mục chi nhánh</strong></p>
+                  <span>Bởi User02 • 2 giờ trước</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Loại file được hỗ trợ -->
+          <div class="dash-section-card">
+            <div class="dash-section-header">
+              <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>
+                </svg>
+                Loại file được hỗ trợ
+              </h3>
+            </div>
+            <div class="dash-file-badges">
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-indigo"></span>thong_tin_vay</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-cyan"></span>tai_san</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-purple"></span>chu_tai_san</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-green"></span>tai_san_ctt</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-cyan"></span>thong_tin_chuyen_tien</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-indigo"></span>thu_phi_tnth</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-purple"></span>han_muc</span>
+              <span class="dash-file-badge"><span class="badge-dot badge-dot-green"></span>tai_tai_tro</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="dash-col-right">
+          <!-- Thao tác nhanh -->
+          <div class="dash-section-card">
+            <div class="dash-section-header">
+              <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+                Thao tác nhanh
+              </h3>
+            </div>
+            <div class="dash-quick-actions-stack">
+              <button class="dash-action-gradient dash-action-indigo" onclick="App.navigateTo('editor')">
+                <div>
+                  <span class="dash-action-title">Tạo Template mới</span>
+                  <span class="dash-action-subtitle">Xây dựng cấu trúc dữ liệu mapping</span>
+                </div>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+              <button class="dash-action-gradient dash-action-cyan" onclick="App.navigateTo('generate')">
+                <div>
+                  <span class="dash-action-title">Ghép dữ liệu & Xuất PDF</span>
+                  <span class="dash-action-subtitle">Xử lý hàng loạt tệp tin</span>
+                </div>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </button>
+              <button class="dash-action-gradient dash-action-slate" onclick="App.navigateTo('templates')">
+                <div>
+                  <span class="dash-action-title">Quản lý Templates</span>
+                  <span class="dash-action-subtitle">Chỉnh sửa & tối ưu hóa</span>
+                </div>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Thống kê sử dụng -->
+          <div class="dash-section-card">
+            <div class="dash-section-header">
+              <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2">
+                  <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+                  <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                Thống kê sử dụng
+              </h3>
+            </div>
+            <div class="dash-usage-stats">
+              <div class="dash-usage-row">
+                <div class="dash-usage-labels"><span>Hợp đồng Vay</span><span>84%</span></div>
+                <div class="dash-usage-bar"><div class="dash-usage-fill dash-fill-indigo" style="width: 84%"></div></div>
+              </div>
+              <div class="dash-usage-row">
+                <div class="dash-usage-labels"><span>Tài sản đảm bảo</span><span>56%</span></div>
+                <div class="dash-usage-bar"><div class="dash-usage-fill dash-fill-cyan" style="width: 56%"></div></div>
+              </div>
+              <div class="dash-usage-row">
+                <div class="dash-usage-labels"><span>Báo cáo nội bộ</span><span>22%</span></div>
+                <div class="dash-usage-bar"><div class="dash-usage-fill dash-fill-purple" style="width: 22%"></div></div>
+              </div>
+            </div>
+            <div class="dash-storage">
+              <div class="dash-storage-labels"><span>Dung lượng bộ nhớ</span><span>1.2 GB / 5 GB</span></div>
+              <div class="dash-storage-bar"><div class="dash-storage-fill" style="width: 24%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== TEMPLATES LIST PAGE ========== -->
+    <section id="page-templates" class="page">
+      <div class="page-header editorial">
+        <div>
+          <h2 class="page-title">Quản lý Template</h2>
+          <p class="page-subtitle">Repository của các biểu mẫu Excel mapping dữ liệu</p>
+        </div>
+        <button class="btn btn-primary" onclick="App.navigateTo('editor')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Tạo mới Template
+        </button>
+      </div>
+
+      <!-- Smart Filters Toolbar -->
+      <div class="template-filters-toolbar">
+        <div class="filter-group">
+          <button class="filter-chip active">Tất cả</button>
+          <button class="filter-chip">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Excel
+          </button>
+          <button class="filter-chip">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>
+            Word
+          </button>
+          <button class="filter-chip">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            PDF
+          </button>
+        </div>
+        <div class="filter-group">
+          <div class="status-indicator active"></div> <span>Active</span>
+          <div class="status-indicator draft"></div> <span>Draft</span>
+        </div>
+      </div>
+
+      <!-- List Header -->
+      <div class="templates-list-header">
+        <div class="col-name">TEMPLATE NAME</div>
+        <div class="col-type">TYPE</div>
+        <div class="col-status">STATUS</div>
+        <div class="col-date">LAST UPDATED</div>
+        <div class="col-actions"></div>
+      </div>
+
+      <div id="templates-list" class="templates-list-view">
+        <!-- Templates will be rendered here via JS -->
+      </div>
+      <div id="no-templates" class="empty-state" style="display:none;">
+        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <h3>Chưa có template nào</h3>
+        <p>Hãy tạo template đầu tiên để bắt đầu</p>
+        <button class="btn btn-primary" onclick="App.navigateTo('editor')">Tạo Template</button>
+      </div>
+    </section>
+
+    <!-- ========== TEMPLATE EDITOR PAGE ========== -->
+    <section id="page-editor" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title" id="editor-title">Tạo Template mới</h2>
+          <p class="page-subtitle">Thiết kế bảng dữ liệu Excel-style — kéo thả, gộp ô, chèn trường</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-outline" onclick="App.navigateTo('templates')">← Quay lại</button>
+          <button class="btn btn-primary" onclick="TemplateBuilder.save()" id="btn-save-template">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+            </svg>
+            Lưu Template
+          </button>
+        </div>
+      </div>
+
+      <div class="editor-layout">
+        <!-- Template Name -->
+        <div class="editor-name-bar">
+          <label for="template-name">Tên Template:</label>
+          <input type="text" id="template-name" placeholder="Nhập tên template..." class="input">
+        </div>
+
+        <!-- Spreadsheet Editor -->
+        <div class="spreadsheet-editor-wrap">
+          <!-- Formula Bar -->
+          <div class="ss-formula-bar-wrap">
+            <div class="ss-cell-ref-label" id="ss-cell-ref">A1</div>
+            <input type="text" class="ss-formula-input" id="ss-formula-bar" placeholder="Nội dung ô..." 
+              onchange="Spreadsheet.setCellValue(this.value)">
+          </div>
+
+          <!-- Spreadsheet Toolbar -->
+          <div class="ss-toolbar">
+            <button class="ss-tool-btn" id="ss-bold-btn" onclick="Spreadsheet.toggleBold()" title="In đậm (Ctrl+B)"><b>B</b></button>
+            <button class="ss-tool-btn" id="ss-italic-btn" onclick="Spreadsheet.toggleItalic()" title="In nghiêng (Ctrl+I)"><i>I</i></button>
+            <div class="tool-divider"></div>
+            <button class="ss-tool-btn ss-align-btn" data-align="left" onclick="Spreadsheet.setAlign('left')" title="Căn trái">⫷</button>
+            <button class="ss-tool-btn ss-align-btn" data-align="center" onclick="Spreadsheet.setAlign('center')" title="Căn giữa">☰</button>
+            <button class="ss-tool-btn ss-align-btn" data-align="right" onclick="Spreadsheet.setAlign('right')" title="Căn phải">⫸</button>
+            <div class="tool-divider"></div>
+            <select class="ss-tool-select" id="ss-font-size" onchange="Spreadsheet.setFontSize(this.value)" title="Cỡ chữ">
+              <option value="10">10px</option>
+              <option value="11">11px</option>
+              <option value="12">12px</option>
+              <option value="13" selected>13px</option>
+              <option value="14">14px</option>
+              <option value="16">16px</option>
+              <option value="18">18px</option>
+              <option value="20">20px</option>
+              <option value="24">24px</option>
+            </select>
+            <div class="tool-divider"></div>
+            <input type="color" class="ss-tool-color" id="ss-bg-color" value="#ffffff" onchange="Spreadsheet.setBgColor(this.value)" title="Màu nền">
+            <input type="color" class="ss-tool-color" id="ss-text-color" value="#1a1a2e" onchange="Spreadsheet.setTextColor(this.value)" title="Màu chữ">
+            <div class="tool-divider"></div>
+            <button class="ss-tool-btn accent" onclick="Spreadsheet.mergeCells()" title="Gộp ô (chọn nhiều ô bằng Shift+Click)">⊞</button>
+            <button class="ss-tool-btn" onclick="Spreadsheet.unmergeCells()" title="Tách ô">⊟</button>
+            <div class="tool-divider"></div>
+            <button class="ss-tool-btn accent" onclick="Spreadsheet.setCellAsPlaceholder()" title="Chèn trường dữ liệu vào ô">⧉ Field</button>
+            <div class="tool-divider"></div>
+            <button class="ss-tool-btn" onclick="Spreadsheet.insertRowBelow()" title="Thêm hàng">＋↓</button>
+            <button class="ss-tool-btn" onclick="Spreadsheet.insertColRight()" title="Thêm cột">＋→</button>
+            <div class="tool-divider"></div>
+            <button class="ss-tool-btn" onclick="Spreadsheet.undo()" title="Hoàn tác (Ctrl+Z)">↩</button>
+            <button class="ss-tool-btn" onclick="Spreadsheet.redo()" title="Làm lại (Ctrl+Y)">↪</button>
+          </div>
+
+          <!-- The Grid -->
+          <div id="spreadsheet-container" tabindex="0"></div>
+
+          <!-- Quick Actions -->
+          <div class="ss-quick-actions">
+            <button class="ss-add-row-btn" onclick="Spreadsheet.insertRowBelow()">
+              ＋ Thêm hàng mới
+            </button>
+            <button class="ss-add-col-btn" onclick="Spreadsheet.insertColRight()">
+              ＋ Thêm cột mới
+            </button>
+            <span class="ss-status" id="ss-status">Sẵn sàng</span>
+          </div>
+        </div>
+
+        <!-- Data Sources Upload Panel -->
+        <div class="data-sources-panel">
+          <div class="ds-panel-header" onclick="DataSources.togglePanel()">
+            <h4>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              Nguồn dữ liệu
+              <span class="ds-badge" id="ds-file-count">0</span>
+            </h4>
+            <span class="ds-toggle-icon" id="ds-toggle-icon">▼</span>
+          </div>
+          <div class="ds-panel-body" id="ds-panel-body">
+            <p class="ds-hint">Upload file Excel hoặc Word (.doc/.docx) để lấy danh sách trường dữ liệu cho template</p>
+            <div class="ds-upload-zone" id="ds-upload-zone"
+                 ondragover="event.preventDefault(); this.classList.add('dragover')"
+                 ondragleave="this.classList.remove('dragover')"
+                 ondrop="event.preventDefault(); this.classList.remove('dragover'); DataSources.handleDrop(event)">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <p>Kéo thả file Excel / Word vào đây</p>
+              <span>hoặc</span>
+              <label class="ds-browse-btn">
+                Chọn file
+                <input type="file" accept=".xlsx,.xls,.csv,.doc,.docx" multiple hidden
+                       onchange="DataSources.handleFiles(this.files)">
+              </label>
+            </div>
+            <div id="ds-files-list" class="ds-files-list"></div>
+          </div>
+        </div>
+
+        <!-- Placeholders Panel -->
+        <div class="placeholders-panel">
+          <h4>Các trường đã chèn</h4>
+          <div id="placeholders-list" class="placeholders-list">
+            <p class="text-muted">Chưa có trường dữ liệu nào</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== GENERATE PAGE ========== -->
+    <section id="page-generate" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Ghép dữ liệu & Xuất PDF</h2>
+          <p class="page-subtitle">Upload Excel, mapping dữ liệu và xuất PDF</p>
+        </div>
+      </div>
+
+      <!-- Step Indicator -->
+      <div class="steps-indicator">
+        <div class="step active" data-step="1">
+          <div class="step-number">1</div>
+          <span>Chọn Template</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" data-step="2">
+          <div class="step-number">2</div>
+          <span>Upload Excel</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" data-step="3">
+          <div class="step-number">3</div>
+          <span>Mapping</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" data-step="4">
+          <div class="step-number">4</div>
+          <span>Xuất PDF</span>
+        </div>
+      </div>
+
+      <!-- Step 1: Select Template -->
+      <div id="gen-step-1" class="gen-step active">
+        <div class="step-card">
+          <h3>Bước 1: Chọn Template</h3>
+          <p>Chọn template mà bạn muốn sử dụng để ghép dữ liệu</p>
+          <select id="select-template" class="input select-full">
+            <option value="">-- Chọn template --</option>
+          </select>
+          <div id="template-preview-mini" class="template-preview-mini" style="display:none;">
+            <h4>Xem trước template:</h4>
+            <div id="template-preview-content" class="preview-content"></div>
+          </div>
+          <div class="step-actions">
+            <button class="btn btn-primary" onclick="Generator.goToStep(2)" id="btn-step1-next" disabled>
+              Tiếp theo →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Upload Excel Files -->
+      <div id="gen-step-2" class="gen-step">
+        <div class="step-card">
+          <h3>Bước 2: Upload file Excel</h3>
+          <p>Upload các file Excel tương ứng với từng loại dữ liệu</p>
+
+          <!-- Multi-Sheet Import Zone -->
+          <div class="multi-sheet-import-zone" id="multi-sheet-zone">
+            <div class="multi-sheet-header">
+              <div class="multi-sheet-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h2"/>
+                </svg>
+              </div>
+              <div class="multi-sheet-text">
+                <h4>📑 Import từ 1 file nhiều sheet</h4>
+                <p>Upload 1 file Excel chứa nhiều sheet — mỗi sheet tương ứng 1 loại dữ liệu</p>
+              </div>
+            </div>
+            <div class="multi-sheet-upload-area" id="multi-sheet-drop"
+                 ondragover="event.preventDefault(); this.classList.add('dragover')"
+                 ondragleave="this.classList.remove('dragover')"
+                 ondrop="event.preventDefault(); this.classList.remove('dragover'); MultiSheetImport.handleDrop(event, 'excel')">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span>Kéo thả file hoặc</span>
+              <label class="multi-sheet-browse-btn">
+                Chọn file Excel
+                <input type="file" accept=".xlsx,.xls" hidden
+                       onchange="MultiSheetImport.handleFile(this.files[0], 'excel')">
+              </label>
+            </div>
+            <div class="multi-sheet-result" id="multi-sheet-result" style="display:none;"></div>
+          </div>
+
+          <div class="multi-sheet-divider">
+            <span>hoặc upload từng file riêng lẻ</span>
+          </div>
+
+          <div class="upload-grid" id="upload-grid">
+            <!-- Upload slots created by JS -->
+          </div>
+          
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="Generator.goToStep(1)">← Quay lại</button>
+            <button class="btn btn-primary" onclick="Generator.extractAllData()" id="btn-extract">
+              Trích xuất dữ liệu & Tiếp tục →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Mapping -->
+      <div id="gen-step-3" class="gen-step">
+        <div class="step-card">
+          <h3>Bước 3: Mapping dữ liệu</h3>
+          <p>Ghép các trường dữ liệu từ Excel vào các vị trí trong template</p>
+          
+          <div id="mapping-container" class="mapping-container">
+            <!-- Mapping rows created by JS -->
+          </div>
+
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="Generator.goToStep(2)">← Quay lại</button>
+            <button class="btn btn-primary" onclick="Generator.preview()">
+              Xem trước →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Preview & Export -->
+      <div id="gen-step-4" class="gen-step">
+        <div class="step-card">
+          <h3>Bước 4: Xem trước & Xuất PDF</h3>
+          <p>Kiểm tra kết quả và xuất file PDF</p>
+          
+          <div class="preview-wrapper">
+            <div id="pdf-preview" class="pdf-preview">
+              <!-- Preview content -->
+            </div>
+          </div>
+
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="Generator.goToStep(3)">← Quay lại</button>
+            <button class="btn btn-success" onclick="Generator.exportPDF()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Xuất PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== WORD TEMPLATES LIST PAGE ========== -->
+    <section id="page-word-templates" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Word Templates</h2>
+          <p class="page-subtitle">Quản lý các template Word đã tạo</p>
+        </div>
+        <button class="btn btn-primary" onclick="App.navigateTo('word-editor')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Tạo mới
+        </button>
+      </div>
+      <div id="word-templates-list" class="templates-grid"></div>
+      <div id="word-no-templates" class="empty-state" style="display:none;">
+        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <h3>Chưa có Word template nào</h3>
+        <p>Hãy tạo template Word đầu tiên</p>
+        <button class="btn btn-primary" onclick="App.navigateTo('word-editor')">Tạo Word Template</button>
+      </div>
+    </section>
+
+    <!-- ========== WORD TEMPLATE EDITOR PAGE ========== -->
+    <section id="page-word-editor" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title" id="word-editor-title">Tạo Template Word mới</h2>
+          <p class="page-subtitle">Soạn thảo văn bản Word — chèn trường dữ liệu từ file Excel</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-outline" onclick="App.navigateTo('word-templates')">← Quay lại</button>
+          <button class="btn btn-primary" onclick="WordEditor.save()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Lưu Template
+          </button>
+        </div>
+      </div>
+
+      <div class="word-editor-layout">
+        <!-- Template Name -->
+        <div class="editor-name-bar">
+          <label for="word-template-name">Tên Template:</label>
+          <input type="text" id="word-template-name" placeholder="Nhập tên template Word..." class="input">
+        </div>
+
+        <!-- Main editor area -->
+        <div class="word-editor-main">
+          <div class="word-editor-container">
+            <!-- Toolbar -->
+            <div class="we-toolbar">
+              <button class="we-tool-btn" onclick="WordEditor.toggleBold()" title="In đậm"><b>B</b></button>
+              <button class="we-tool-btn" onclick="WordEditor.toggleItalic()" title="In nghiêng"><i>I</i></button>
+              <button class="we-tool-btn" onclick="WordEditor.toggleUnderline()" title="Gạch chân"><u>U</u></button>
+              <button class="we-tool-btn" onclick="WordEditor.toggleStrike()" title="Gạch ngang"><s>S</s></button>
+              <div class="tool-divider"></div>
+              <select class="we-tool-select" onchange="WordEditor.setFontSize(this.value)" title="Cỡ chữ">
+                <option value="1">8pt</option><option value="2">10pt</option><option value="3" selected>12pt</option>
+                <option value="4">14pt</option><option value="5">18pt</option><option value="6">24pt</option><option value="7">36pt</option>
+              </select>
+              <input type="color" class="we-tool-color" value="#000000" onchange="WordEditor.setTextColor(this.value)" title="Màu chữ">
+              <input type="color" class="we-tool-color" value="#ffffff" onchange="WordEditor.setHighlight(this.value)" title="Tô nền">
+              <div class="tool-divider"></div>
+              <button class="we-tool-btn" onclick="WordEditor.setAlign('left')" title="Căn trái">⫷</button>
+              <button class="we-tool-btn" onclick="WordEditor.setAlign('center')" title="Căn giữa">☰</button>
+              <button class="we-tool-btn" onclick="WordEditor.setAlign('right')" title="Căn phải">⫸</button>
+              <button class="we-tool-btn" onclick="WordEditor.setAlign('justify')" title="Căn đều">☰</button>
+              <div class="tool-divider"></div>
+              <button class="we-tool-btn" onclick="WordEditor.insertList('ul')" title="Danh sách">• ≡</button>
+              <button class="we-tool-btn" onclick="WordEditor.insertList('ol')" title="Danh sách số">1. ≡</button>
+              <button class="we-tool-btn" onclick="WordEditor.indent()" title="Thụt vào">→|</button>
+              <button class="we-tool-btn" onclick="WordEditor.outdent()" title="Thụt ra">|←</button>
+              <div class="tool-divider"></div>
+              <button class="we-tool-btn accent" onclick="WordEditor.showTableDialog()" title="Chèn bảng">⊞ Bảng</button>
+              <button class="we-tool-btn accent" onclick="WordEditor.showPlaceholderModal()" title="Chèn trường dữ liệu">⧉ Field</button>
+              <div class="tool-divider"></div>
+              <button class="we-tool-btn" onclick="WordEditor.insertHR()" title="Đường kẻ ngang">―</button>
+              <button class="we-tool-btn" onclick="WordEditor.clearFormat()" title="Xóa định dạng">⌧</button>
+            </div>
+
+            <!-- Editor Area -->
+            <div id="word-editor-area" class="we-editor-area" contenteditable="true">
+              <p><br></p>
+            </div>
+          </div>
+
+          <!-- Right Panel: Data Sources & Placeholders -->
+          <div class="word-right-panel">
+            <!-- Data Sources Upload -->
+            <div class="word-ds-panel">
+              <h4>📂 Nguồn dữ liệu</h4>
+              <p class="ds-hint">Upload file Word (.doc/.docx) để tải nguyên mẫu vào editor, hoặc Excel để lấy trường dữ liệu</p>
+              <div class="ds-upload-zone" id="word-ds-upload-zone"
+                ondragover="event.preventDefault(); this.classList.add('dragover')"
+                ondragleave="this.classList.remove('dragover')"
+                ondrop="event.preventDefault(); this.classList.remove('dragover'); DataSources.handleDrop(event)">
+                <p>Kéo thả file Excel / Word hoặc</p>
+                <label class="ds-browse-btn">
+                  Chọn file
+                  <input type="file" accept=".xlsx,.xls,.csv,.doc,.docx" multiple hidden onchange="DataSources.handleFiles(this.files)">
+                </label>
+              </div>
+              <div id="word-ds-files-list" class="ds-files-list"></div>
+            </div>
+
+            <!-- Placeholders list -->
+            <div class="placeholders-panel">
+              <h4>⧉ Các trường đã chèn</h4>
+              <div id="word-placeholders-list" class="placeholders-list">
+                <p class="text-muted">Chưa có trường dữ liệu nào</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== WORD GENERATE PAGE ========== -->
+    <section id="page-word-generate" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Ghép dữ liệu & Xuất PDF</h2>
+          <p class="page-subtitle">Upload Excel, mapping dữ liệu và xuất file PDF</p>
+        </div>
+      </div>
+
+      <div class="steps-indicator w-steps-indicator">
+        <div class="step active" data-step="1"><div class="step-number">1</div><span>Chọn Template</span></div>
+        <div class="step-line"></div>
+        <div class="step" data-step="2"><div class="step-number">2</div><span>Upload Excel</span></div>
+        <div class="step-line"></div>
+        <div class="step" data-step="3"><div class="step-number">3</div><span>Mapping</span></div>
+        <div class="step-line"></div>
+        <div class="step" data-step="4"><div class="step-number">4</div><span>Xuất PDF</span></div>
+      </div>
+
+      <!-- Step 1 -->
+      <div id="wgen-step-1" class="wgen-step active">
+        <div class="step-card">
+          <h3>Bước 1: Chọn Template Word</h3>
+          <p>Chọn template Word mà bạn muốn sử dụng</p>
+          <select id="word-select-template" class="input select-full"><option value="">-- Chọn template --</option></select>
+          <div id="word-tpl-preview-mini" class="template-preview-mini" style="display:none;">
+            <h4>Xem trước template:</h4>
+            <div id="word-tpl-preview-content" class="preview-content"></div>
+          </div>
+          <div class="step-actions">
+            <button class="btn btn-primary" onclick="WordGenerator.goToStep(2)" id="btn-word-step1-next" disabled>Tiếp theo →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div id="wgen-step-2" class="wgen-step">
+        <div class="step-card">
+          <h3>Bước 2: Upload file Excel</h3>
+          <p>Upload các file Excel tương ứng với từng loại dữ liệu</p>
+
+          <!-- Multi-Sheet Import Zone (Word) -->
+          <div class="multi-sheet-import-zone" id="word-multi-sheet-zone">
+            <div class="multi-sheet-header">
+              <div class="multi-sheet-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h2"/>
+                </svg>
+              </div>
+              <div class="multi-sheet-text">
+                <h4>📑 Import từ 1 file nhiều sheet</h4>
+                <p>Upload 1 file Excel chứa nhiều sheet — mỗi sheet tương ứng 1 loại dữ liệu</p>
+              </div>
+            </div>
+            <div class="multi-sheet-upload-area" id="word-multi-sheet-drop"
+                 ondragover="event.preventDefault(); this.classList.add('dragover')"
+                 ondragleave="this.classList.remove('dragover')"
+                 ondrop="event.preventDefault(); this.classList.remove('dragover'); MultiSheetImport.handleDrop(event, 'word')">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span>Kéo thả file hoặc</span>
+              <label class="multi-sheet-browse-btn">
+                Chọn file Excel
+                <input type="file" accept=".xlsx,.xls" hidden
+                       onchange="MultiSheetImport.handleFile(this.files[0], 'word')">
+              </label>
+            </div>
+            <div class="multi-sheet-result" id="word-multi-sheet-result" style="display:none;"></div>
+          </div>
+
+          <div class="multi-sheet-divider">
+            <span>hoặc upload từng file riêng lẻ</span>
+          </div>
+
+          <div class="upload-grid" id="word-upload-grid"></div>
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="WordGenerator.goToStep(1)">← Quay lại</button>
+            <button class="btn btn-primary" onclick="WordGenerator.extractAllData()" id="btn-word-extract">Trích xuất & Tiếp tục →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div id="wgen-step-3" class="wgen-step">
+        <div class="step-card">
+          <h3>Bước 3: Mapping dữ liệu</h3>
+          <p>Ghép các trường dữ liệu từ Excel vào template Word</p>
+          <div id="word-mapping-container" class="mapping-container"></div>
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="WordGenerator.goToStep(2)">← Quay lại</button>
+            <button class="btn btn-primary" onclick="WordGenerator.preview()">Xem trước →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div id="wgen-step-4" class="wgen-step">
+        <div class="step-card">
+          <h3>Bước 4: Xem trước & Xuất PDF</h3>
+          <p>Kiểm tra kết quả và xuất file PDF</p>
+          <div class="preview-wrapper">
+            <div id="word-preview" class="pdf-preview"></div>
+          </div>
+          <div class="step-actions">
+            <button class="btn btn-outline" onclick="WordGenerator.goToStep(3)">← Quay lại</button>
+            <button class="btn btn-success" onclick="WordGenerator.exportPDF()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Xuất PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== MASTER DATA PAGE ========== -->
+    <div class="page" id="page-master-data">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Master Data</h2>
+          <p class="page-subtitle">Quản lý dữ liệu tổng thể & mối quan hệ giữa các loại dữ liệu</p>
+        </div>
+      </div>
+
+      <div class="md-page-layout">
+        <!-- Entity Sidebar -->
+        <div class="md-sidebar">
+          <div class="md-sidebar-header">
+            <span class="md-sidebar-title">Entities</span>
+            <div class="md-sidebar-actions">
+              <button class="btn btn-primary btn-sm" onclick="MasterData.showAddEntity()">＋ Thêm</button>
+              <button class="btn btn-outline btn-sm" onclick="MasterData.showAddConnection()">🔗 Liên kết</button>
+            </div>
+          </div>
+          <div class="md-entity-list" id="md-entity-list"></div>
+        </div>
+
+        <!-- Main Area -->
+        <div class="md-main">
+          <div class="md-toolbar">
+            <div class="md-view-switcher">
+              <button class="md-view-btn active" data-view="mindmap" onclick="MasterData.setView('mindmap')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <circle cx="5" cy="6" r="1.5"/><line x1="7" y1="7" x2="9" y2="9"/>
+                  <circle cx="19" cy="6" r="1.5"/><line x1="17" y1="7" x2="15" y2="9"/>
+                </svg>
+                Mindmap
+              </button>
+              <button class="md-view-btn" data-view="matrix" onclick="MasterData.setView('matrix')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                  <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                </svg>
+                Ma trận
+              </button>
+              <button class="md-view-btn" data-view="records" onclick="MasterData.setView('records')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+                  <line x1="8" y1="18" x2="21" y2="18"/>
+                  <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                </svg>
+                Bản ghi
+              </button>
+            </div>
+          </div>
+          <div class="md-view-panel" id="md-view-mindmap" style="display:block;position:relative;">
+            <div id="md-mindmap-canvas" style="width:100%;height:100%;"></div>
+          </div>
+          <div class="md-view-panel" id="md-view-matrix" style="display:none;"></div>
+          <div class="md-view-panel" id="md-view-records" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== ADDRESS PARSER PAGE ========== -->
+    <section id="page-address-parser" class="page">
+      <!-- Page Header with Breadcrumb -->
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Phân rã địa chỉ</h2>
+          <p class="page-subtitle">Xử lý và bóc tách dữ liệu địa chỉ tự động bằng AI</p>
+        </div>
+        <div class="ap-breadcrumb">
+          <span class="ap-bc-item">MAIN ENGINE</span>
+          <span class="ap-bc-sep">›</span>
+          <span class="ap-bc-item ap-bc-active">ADDRESS PARSER</span>
+        </div>
+      </div>
+
+      <!-- KPI Stats Row -->
+      <div class="ap-kpi-row">
+        <div class="ap-kpi-card">
+          <div class="ap-kpi-label">TỔNG ĐỊA CHỈ</div>
+          <div class="ap-kpi-body">
+            <span class="ap-kpi-value" id="ap-kpi-total">0</span>
+            <span class="ap-kpi-icon">📋</span>
+          </div>
+        </div>
+        <div class="ap-kpi-card">
+          <div class="ap-kpi-label">ĐÃ PHÂN RÃ</div>
+          <div class="ap-kpi-body">
+            <span class="ap-kpi-value" id="ap-kpi-parsed">0</span>
+            <span class="ap-kpi-icon ap-kpi-icon-success">✅</span>
+          </div>
+        </div>
+        <div class="ap-kpi-card ap-kpi-accent">
+          <div class="ap-kpi-label">TỶ LỆ CHÍNH XÁC</div>
+          <div class="ap-kpi-body">
+            <span class="ap-kpi-value ap-kpi-value-accent" id="ap-kpi-accuracy">0%</span>
+            <span class="ap-kpi-icon ap-kpi-icon-accent">📈</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload + Manual Input Side-by-Side -->
+      <div class="ap-input-grid">
+        <!-- Left: Upload Zone -->
+        <div class="ap-upload-card"
+             ondragover="event.preventDefault(); document.getElementById('ap-upload-zone').classList.add('dragover')"
+             ondragleave="document.getElementById('ap-upload-zone').classList.remove('dragover')"
+             ondrop="event.preventDefault(); document.getElementById('ap-upload-zone').classList.remove('dragover'); AddressParserUI.handleDrop(event)">
+          <div class="ap-upload-icon-wrap">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <h4 class="ap-upload-title">Tải lên danh sách</h4>
+          <p class="ap-upload-desc">Kéo và thả tệp Excel (.xlsx) hoặc CSV của bạn vào đây để bắt đầu xử lý hàng loạt.</p>
+          <div class="ap-upload-actions">
+            <label class="btn btn-outline ap-upload-btn">
+              Chọn tệp...
+              <input type="file" accept=".xlsx,.xls" style="display:none"
+                     onchange="AddressParserUI.handleFile(this.files[0])">
+            </label>
+            <button class="btn btn-outline" onclick="AddressParserUI.loadSampleData && AddressParserUI.loadSampleData()">Mẫu dữ liệu</button>
+          </div>
+          <!-- Visual drag-drop overlay (pointer-events: none, only visual) -->
+          <div class="ap-drop-overlay" id="ap-upload-zone"></div>
+        </div>
+
+        <!-- Right: Manual Input -->
+        <div class="ap-manual-card">
+          <h4 class="ap-manual-title">✏️ Nhập thủ công</h4>
+          <textarea class="ap-manual-input" id="ap-manual-input"
+                    placeholder="Nhập địa chỉ cần phân rã (ví dụ: 123 Lê Lợi, P. Bến Thành, Quận 1, TP. HCM)"
+                    rows="4"></textarea>
+          <button class="btn btn-accent ap-manual-btn" onclick="AddressParserUI.parseManual && AddressParserUI.parseManual()">
+            PHÂN RÃ NGAY
+          </button>
+        </div>
+      </div>
+
+      <!-- Column Selector (shown after file upload) -->
+      <div id="ap-column-selector"></div>
+
+      <!-- Results Section -->
+      <div id="ap-result-section"></div>
+    </section>
+
+  </main>
+
+  <!-- Modal: Insert Placeholder (Enhanced) -->
+  <div id="modal-placeholder" class="modal-overlay" style="display:none;">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3>📋 Chèn trường dữ liệu</h3>
+        <button class="modal-close" onclick="TemplateBuilder.closeModal('modal-placeholder')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Step 1: Select Source File -->
+        <div id="ph-step-source" class="ph-step">
+          <div class="ph-step-header">
+            <span class="ph-step-number">1</span>
+            <span class="ph-step-title">Chọn nguồn file Excel</span>
+            <span class="ph-step-hint">Chọn file chứa trường dữ liệu cần chèn</span>
+          </div>
+          <div id="ph-source-grid" class="ph-source-grid">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Step 2: Select Field from Headers -->
+        <div id="ph-step-fields" class="ph-step" style="display:none;">
+          <div class="ph-step-header">
+            <span class="ph-step-number">2</span>
+            <span class="ph-step-title">Chọn trường dữ liệu</span>
+            <span class="ph-step-hint" id="ph-selected-source-label"></span>
+          </div>
+
+          <!-- Search/filter -->
+          <div class="ph-search-bar">
+            <span class="ph-search-icon">🔍</span>
+            <input type="text" id="ph-field-search" class="input" placeholder="Tìm kiếm trường dữ liệu..."
+              oninput="TemplateBuilder.filterFields(this.value)">
+          </div>
+
+          <!-- Fields grid -->
+          <div id="ph-fields-grid" class="ph-fields-grid">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Custom field input -->
+          <div class="ph-custom-section">
+            <div class="ph-custom-divider">
+              <span>hoặc nhập tên trường tự do</span>
+            </div>
+            <div class="ph-custom-row">
+              <input type="text" id="ph-custom-name" class="input" placeholder="VD: Tên chỉ tiêu khác...">
+              <button class="btn btn-primary btn-sm" onclick="TemplateBuilder.insertCustomPlaceholder()">
+                ＋ Chèn
+              </button>
+            </div>
+          </div>
+
+          <button class="ph-back-btn" onclick="TemplateBuilder.showSourceStep()">
+            ← Chọn nguồn file khác
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="TemplateBuilder.closeModal('modal-placeholder')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Table Builder -->
+  <div id="modal-table" class="modal-overlay" style="display:none;">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3>🏗️ Tạo Bảng Template</h3>
+        <button class="modal-close" onclick="TemplateBuilder.closeModal('modal-table')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Step 1: Table Dimensions -->
+        <div class="tb-section">
+          <div class="tb-section-title">Kích thước bảng</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Số hàng:</label>
+              <input type="number" id="table-rows" class="input" value="3" min="1" max="30">
+            </div>
+            <div class="form-group">
+              <label>Số cột:</label>
+              <input type="number" id="table-cols" class="input" value="3" min="1" max="10">
+            </div>
+            <div class="form-group" style="justify-content:flex-end;">
+              <button class="btn btn-accent" onclick="TableBuilder.generateGrid()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+                Tạo lưới
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Interactive Grid -->
+        <div class="tb-section">
+          <div class="tb-section-title">
+            Cấu hình ô bảng
+            <span class="tb-hint">Nhấn vào ô để thiết lập: văn bản hoặc trường dữ liệu từ file Excel</span>
+          </div>
+          <div class="tb-legend">
+            <span class="tb-legend-item"><span class="tb-legend-dot text"></span> Văn bản</span>
+            <span class="tb-legend-item"><span class="tb-legend-dot header"></span> Tiêu đề</span>
+            <span class="tb-legend-item"><span class="tb-legend-dot placeholder"></span> Trường dữ liệu</span>
+          </div>
+          <div id="tb-grid-container" class="tb-grid-container">
+            <p class="text-muted" style="text-align:center;padding:30px;">Nhấn "Tạo lưới" để bắt đầu</p>
+          </div>
+        </div>
+
+        <!-- Cell Editor Panel (shown when clicking a cell) -->
+        <div id="tb-cell-editor" class="tb-cell-editor" style="display:none;">
+          <div class="tb-cell-editor-header">
+            <span>⚙️ Cấu hình ô <strong id="tb-cell-pos"></strong></span>
+            <button class="btn btn-sm btn-outline" onclick="TableBuilder.closeCellEditor()">Đóng</button>
+          </div>
+          <div class="tb-cell-editor-body">
+            <div class="form-group">
+              <label>Loại ô:</label>
+              <div class="tb-cell-type-btns">
+                <button class="tb-type-btn active" data-type="header" onclick="TableBuilder.setCellType('header')">
+                  <span class="tb-type-icon">Ⓗ</span> Tiêu đề
+                </button>
+                <button class="tb-type-btn" data-type="text" onclick="TableBuilder.setCellType('text')">
+                  <span class="tb-type-icon">Ⓣ</span> Văn bản
+                </button>
+                <button class="tb-type-btn" data-type="placeholder" onclick="TableBuilder.setCellType('placeholder')">
+                  <span class="tb-type-icon">⧉</span> Trường dữ liệu
+                </button>
+              </div>
+            </div>
+            <!-- Content for text/header -->
+            <div id="tb-text-input-group" class="form-group">
+              <label>Nội dung:</label>
+              <input type="text" id="tb-cell-text" class="input" placeholder="Nhập nội dung ô..." oninput="TableBuilder.updateCellContent()">
+            </div>
+            <!-- Content for placeholder -->
+            <div id="tb-placeholder-group" class="form-group" style="display:none;">
+              <label>Tên trường dữ liệu:</label>
+              <input type="text" id="tb-cell-placeholder-name" class="input" placeholder="VD: Tên khách hàng..." oninput="TableBuilder.updateCellContent()">
+              <label style="margin-top:8px;">Nguồn dữ liệu (File Excel):</label>
+              <select id="tb-cell-source-file" class="input" onchange="TableBuilder.updateCellContent()">
+                <option value="">-- Chọn file nguồn --</option>
+              </select>
+              <p class="hint">Chọn file Excel chứa dữ liệu cho trường này</p>
+            </div>
+          </div>
+          <div class="tb-cell-editor-footer">
+            <button class="btn btn-sm btn-primary" onclick="TableBuilder.applyCellConfig()">✓ Áp dụng</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="TemplateBuilder.closeModal('modal-table')">Hủy</button>
+        <button class="btn btn-primary" onclick="TableBuilder.insertConfiguredTable()" id="btn-insert-table">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg>
+          Chèn bảng vào Template
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spreadsheet Placeholder Modal -->
+  <div id="modal-ss-placeholder" class="ss-ph-modal" style="display:none;">
+    <div class="ss-ph-modal-body">
+      <div class="ss-ph-modal-header">
+        <h3>⧉ Chèn trường dữ liệu vào ô</h3>
+        <button class="ss-ph-close" onclick="Spreadsheet.closePhModal()">&times;</button>
+      </div>
+      <!-- Source Tabs: File nguồn vs Master Data -->
+      <div class="md-ph-tabs">
+        <button class="md-ph-tab active" id="ss-tab-file" onclick="MasterData._switchSsTab('file')">📄 File nguồn</button>
+        <button class="md-ph-tab" id="ss-tab-master" onclick="MasterData._switchSsTab('master')">📊 Master Data</button>
+      </div>
+      <div class="ss-ph-modal-content">
+        <!-- Step 1: Select source (File) -->
+        <div id="ss-ph-step-source">
+          <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">Chọn file nguồn chứa dữ liệu:</p>
+          <div class="ph-source-grid" id="ss-ph-source-grid">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+
+        <!-- Step 2: Select field (File) -->
+        <div id="ss-ph-step-fields" style="display:none;">
+          <button class="ss-ph-back-btn" onclick="Spreadsheet.showPhSourceStep()">← Chọn nguồn file khác</button>
+          <div class="ss-ph-source-label" id="ss-ph-source-label"></div>
+
+          <div class="ss-ph-search-wrap">
+            <input type="text" class="ss-ph-search-input" id="ss-ph-field-search" 
+              placeholder="🔍 Tìm kiếm trường dữ liệu..." oninput="Spreadsheet.filterPhFields(this.value)">
+          </div>
+
+          <div class="ph-fields-grid" id="ss-ph-fields-grid">
+            <!-- Filled by JS -->
+          </div>
+
+          <div class="ss-ph-custom-wrap">
+            <input type="text" class="ss-ph-custom-input" id="ss-ph-custom-name" placeholder="Nhập tên trường tự do...">
+            <button class="ss-ph-custom-btn" onclick="Spreadsheet.insertPhCustom()">＋ Chèn</button>
+          </div>
+        </div>
+
+        <!-- Master Data: Entity selection -->
+        <div id="ss-ph-step-masterdata" style="display:none;">
+          <div id="ss-md-step-entities">
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">Chọn Entity từ Master Data:</p>
+            <div class="ph-source-grid" id="ss-md-entity-grid"></div>
+          </div>
+          <div id="ss-md-step-fields" style="display:none;">
+            <button class="ss-ph-back-btn" onclick="MasterData.showSsMdEntitiesStep()">← Chọn Entity khác</button>
+            <div class="ss-ph-source-label" id="ss-md-entity-label"></div>
+            <div class="ss-ph-search-wrap">
+              <input type="text" class="ss-ph-search-input" placeholder="🔍 Tìm kiếm trường..." oninput="MasterData.filterSsMdFields(this.value)">
+            </div>
+            <div class="ph-fields-grid" id="ss-md-fields-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Word Placeholder -->
+  <div id="modal-word-placeholder" class="modal-overlay" style="display:none;">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3>⧉ Chèn trường dữ liệu (Word)</h3>
+        <button class="modal-close" onclick="WordEditor.closePlaceholderModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Source Tabs -->
+        <div class="md-ph-tabs">
+          <button class="md-ph-tab active" id="word-tab-file" onclick="MasterData._switchWordTab('file')">📄 File nguồn</button>
+          <button class="md-ph-tab" id="word-tab-master" onclick="MasterData._switchWordTab('master')">📊 Master Data</button>
+        </div>
+
+        <!-- File source step -->
+        <div id="word-ph-step-source">
+          <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">Chọn file nguồn chứa dữ liệu:</p>
+          <div class="ph-source-grid" id="word-ph-source-grid"></div>
+        </div>
+
+        <!-- File fields step -->
+        <div id="word-ph-step-fields" style="display:none;">
+          <button class="ph-back-btn" onclick="WordEditor.showPhSourceStep()">← Chọn nguồn file khác</button>
+          <div class="ss-ph-source-label" id="word-ph-source-label" style="margin:10px 0;font-weight:600;"></div>
+          <div class="ph-search-bar">
+            <span class="ph-search-icon">🔍</span>
+            <input type="text" id="word-ph-field-search" class="input" placeholder="Tìm kiếm trường dữ liệu..." oninput="WordEditor.filterPhFields(this.value)" style="padding-left:40px;">
+          </div>
+          <div class="ph-fields-grid" id="word-ph-fields-grid"></div>
+          <div class="ph-custom-section">
+            <div class="ph-custom-divider"><span>hoặc nhập tên trường tự do</span></div>
+            <div class="ph-custom-row">
+              <input type="text" id="word-ph-custom-name" class="input" placeholder="VD: Tên chỉ tiêu khác...">
+              <button class="btn btn-primary btn-sm" onclick="WordEditor.insertPhCustom()">＋ Chèn</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Master Data step -->
+        <div id="word-ph-step-masterdata" style="display:none;">
+          <div id="word-md-step-entities">
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">Chọn Entity từ Master Data:</p>
+            <div class="ph-source-grid" id="word-md-entity-grid"></div>
+          </div>
+          <div id="word-md-step-fields" style="display:none;">
+            <button class="ph-back-btn" onclick="MasterData.showWordMdEntitiesStep()">← Chọn Entity khác</button>
+            <div class="ss-ph-source-label" id="word-md-entity-label" style="margin:10px 0;font-weight:600;"></div>
+            <div class="ph-search-bar">
+              <span class="ph-search-icon">🔍</span>
+              <input type="text" class="input" placeholder="Tìm kiếm trường..." oninput="MasterData.filterWordMdFields(this.value)" style="padding-left:40px;">
+            </div>
+            <div class="ph-fields-grid" id="word-md-fields-grid"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="WordEditor.closePlaceholderModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Word Table Insert -->
+  <div id="modal-word-table" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>⊞ Chèn bảng vào Word Template</h3>
+        <button class="modal-close" onclick="WordEditor.closeTableDialog()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Số hàng:</label>
+            <input type="number" id="word-table-rows" class="input" value="3" min="1" max="30">
+          </div>
+          <div class="form-group">
+            <label>Số cột:</label>
+            <input type="number" id="word-table-cols" class="input" value="3" min="1" max="10">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="WordEditor.closeTableDialog()">Hủy</button>
+        <button class="btn btn-primary" onclick="WordEditor.insertTable()">Chèn bảng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+
+  <!-- Entity Modal -->
+  <div class="md-modal-overlay" id="modal-entity">
+    <div class="md-modal">
+      <div class="md-modal-header">
+        <h3 id="entity-modal-title">Thêm Entity mới</h3>
+        <button class="md-modal-close" onclick="MasterData.closeEntityModal()">✕</button>
+      </div>
+      <div class="md-modal-body">
+        <input type="hidden" id="entity-modal-id" value="">
+
+        <div class="md-form-group">
+          <label class="md-form-label">Tên Entity</label>
+          <input type="text" class="input" id="entity-name-input" placeholder="VD: Khách hàng, Tài sản, Khoản vay...">
+        </div>
+
+        <div class="md-form-group">
+          <label class="md-form-label">Màu sắc</label>
+          <input type="hidden" id="entity-color-input" value="#6366f1">
+          <div class="md-color-grid" id="entity-color-grid">
+            <div class="md-color-swatch selected" style="background:#6366f1;" onclick="MasterData._selectColor(this,'#6366f1')"></div>
+            <div class="md-color-swatch" style="background:#8b5cf6;" onclick="MasterData._selectColor(this,'#8b5cf6')"></div>
+            <div class="md-color-swatch" style="background:#ec4899;" onclick="MasterData._selectColor(this,'#ec4899')"></div>
+            <div class="md-color-swatch" style="background:#ef4444;" onclick="MasterData._selectColor(this,'#ef4444')"></div>
+            <div class="md-color-swatch" style="background:#f59e0b;" onclick="MasterData._selectColor(this,'#f59e0b')"></div>
+            <div class="md-color-swatch" style="background:#10b981;" onclick="MasterData._selectColor(this,'#10b981')"></div>
+            <div class="md-color-swatch" style="background:#06b6d4;" onclick="MasterData._selectColor(this,'#06b6d4')"></div>
+            <div class="md-color-swatch" style="background:#3b82f6;" onclick="MasterData._selectColor(this,'#3b82f6')"></div>
+          </div>
+        </div>
+
+        <div class="md-form-group">
+          <div class="md-fields-header">
+            <h4>Danh sách trường dữ liệu</h4>
+            <button class="btn btn-outline btn-sm" onclick="MasterData.addFieldRow()">＋ Thêm trường</button>
+          </div>
+          <div id="entity-fields-editor">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+      <div class="md-modal-footer">
+        <button class="btn btn-outline" onclick="MasterData.closeEntityModal()">Hủy</button>
+        <button class="btn btn-primary" onclick="MasterData.saveEntity()">💾 Lưu Entity</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connection Modal -->
+  <div class="md-modal-overlay" id="modal-connection">
+    <div class="md-modal" style="max-width:480px;">
+      <div class="md-modal-header">
+        <h3>🔗 Tạo liên kết giữa Entity</h3>
+        <button class="md-modal-close" onclick="MasterData.closeConnectionModal()">✕</button>
+      </div>
+      <div class="md-modal-body">
+        <div class="md-form-group">
+          <label class="md-form-label">Entity nguồn</label>
+          <select class="input" id="conn-from-entity" onchange="MasterData.onConnEntityChange('from')">
+            <option value="">-- Chọn entity --</option>
+          </select>
+        </div>
+        <div class="md-form-group">
+          <label class="md-form-label">Trường liên kết (nguồn)</label>
+          <select class="input" id="conn-from-field">
+            <option value="">-- Chọn trường --</option>
+          </select>
+        </div>
+        <div style="text-align:center;padding:8px 0;color:var(--text-muted);font-size:1.2rem;">⟷</div>
+        <div class="md-form-group">
+          <label class="md-form-label">Entity đích</label>
+          <select class="input" id="conn-to-entity" onchange="MasterData.onConnEntityChange('to')">
+            <option value="">-- Chọn entity --</option>
+          </select>
+        </div>
+        <div class="md-form-group">
+          <label class="md-form-label">Trường liên kết (đích)</label>
+          <select class="input" id="conn-to-field">
+            <option value="">-- Chọn trường --</option>
+          </select>
+        </div>
+      </div>
+      <div class="md-modal-footer">
+        <button class="btn btn-outline" onclick="MasterData.closeConnectionModal()">Hủy</button>
+        <button class="btn btn-primary" onclick="MasterData.saveConnection()">🔗 Tạo liên kết</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Hidden PDF render area -->
+  <div id="pdf-render-area" style="position:absolute;left:-9999px;top:-9999px;"></div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
+  <script src="js/spreadsheet.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/master-data.js"></script>
+  <script src="js/word-template.js"></script>
+  <script src="data/master-wards-2025.js"></script>
+  <script src="js/address-data.js"></script>
+  <script src="js/address-parser.js"></script>
+</body>
+</html>
