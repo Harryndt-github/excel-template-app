@@ -151,14 +151,16 @@ const MasterData = {
     // Hide all panels
     document.querySelectorAll('.md-view-panel').forEach(p => p.style.display = 'none');
     const panel = document.getElementById(`md-view-${mode}`);
-    if (panel) panel.style.display = (mode === 'config') ? 'flex' : 'block';
+    const flexModes = ['config', 'ratecenter'];
+    if (panel) panel.style.display = flexModes.includes(mode) ? 'flex' : 'block';
 
-    // Sidebar: hide for config (it has its own entity panel), show for mindmap
+    // Sidebar: only show for mindmap
     const sidebar = document.querySelector('.md-sidebar');
-    if (sidebar) sidebar.style.display = (mode === 'config') ? 'none' : '';
+    if (sidebar) sidebar.style.display = (mode === 'mindmap') ? '' : 'none';
 
-    if (mode === 'mindmap') { this.renderMindmap(); this.renderEntityList(); }
-    if (mode === 'config')  this.cfgRenderEntityList();
+    if (mode === 'mindmap')    { this.renderMindmap(); this.renderEntityList(); }
+    if (mode === 'config')     this.cfgRenderEntityList();
+    if (mode === 'ratecenter') RateCenter.render();
   },
 
   // ── Entity List (sidebar on master data page) ──

@@ -991,6 +991,12 @@
                 </svg>
                 Xem sơ đồ
               </button>
+              <button class="md-view-btn" data-view="ratecenter" onclick="MasterData.setView('ratecenter')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                Lãi suất
+              </button>
             </div>
           </div>
           <div class="md-view-panel" id="md-view-mindmap" style="display:block;position:relative;">
@@ -1029,6 +1035,39 @@
                 </div>
                 <p class="md-cfg-hint" id="md-cfg-data-hint">← Chọn Entity và cấu hình cột trước</p>
                 <div id="md-cfg-data-area"></div>
+              </div>
+            </div>
+          </div>
+          <div class="md-view-panel" id="md-view-ratecenter" style="display:none;overflow:hidden;height:100%;">
+            <div class="rc-layout">
+              <!-- RC Panel 1: Projects -->
+              <div class="rc-panel rc-projects-panel">
+                <div class="rc-panel-hd">
+                  <span class="rc-panel-title"><span class="md-cfg-num">1</span> Dự án</span>
+                  <button class="md-cfg-add-btn" onclick="RateCenter.addProject()">+ Thêm</button>
+                </div>
+                <div id="rc-project-list" class="rc-list"></div>
+              </div>
+              <!-- RC Panel 2: Packages -->
+              <div class="rc-panel rc-packages-panel">
+                <div class="rc-panel-hd">
+                  <span class="rc-panel-title"><span class="md-cfg-num">2</span><span id="rc-pkg-panel-title">Gói tín dụng</span></span>
+                  <button class="md-cfg-add-btn" id="rc-add-pkg-btn" onclick="RateCenter.addPackage()" style="display:none;">+ Gói</button>
+                </div>
+                <p class="md-cfg-hint" id="rc-pkg-hint">← Chọn dự án</p>
+                <div id="rc-package-list" class="rc-list"></div>
+              </div>
+              <!-- RC Panel 3: Package Detail -->
+              <div class="rc-panel rc-detail-panel">
+                <div class="rc-panel-hd">
+                  <span class="rc-panel-title"><span class="md-cfg-num">3</span><span id="rc-detail-title">Chi tiết gói vay</span></span>
+                  <div id="rc-detail-actions" style="display:none;gap:6px;">
+                    <button class="md-cfg-add-btn" onclick="RateCenter.addTier()">+ Mức lãi</button>
+                    <button class="md-cfg-add-btn" onclick="RateCenter.addCondition()" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.3);color:#10b981;">+ Điều kiện</button>
+                  </div>
+                </div>
+                <p class="md-cfg-hint" id="rc-detail-hint">← Chọn gói tín dụng</p>
+                <div id="rc-detail-area" style="flex:1;overflow-y:auto;"></div>
               </div>
             </div>
           </div>
@@ -1535,6 +1574,7 @@
   <script src="js/spreadsheet.js"></script>
   <script src="js/app.js"></script>
   <script src="js/master-data.js"></script>
+  <script src="js/rate-center.js"></script>
   <script src="js/word-template.js"></script>
   <script src="data/master-wards-2025.js"></script>
   <script src="js/address-data.js"></script>

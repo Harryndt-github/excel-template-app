@@ -1368,3 +1368,184 @@
 .md-page-layout .md-sidebar[style*="display:none"] {
   display: none !important;
 }
+
+/* ═══════════════════════════════════════════
+   RATE CENTER — Trung tâm lãi suất
+   ═══════════════════════════════════════════ */
+
+#md-view-ratecenter { flex: 1; overflow: hidden; height: 100%; }
+
+.rc-layout {
+  display: flex; height: 100%; overflow: hidden; flex: 1;
+}
+
+.rc-panel {
+  display: flex; flex-direction: column; overflow: hidden;
+  border-right: 1px solid rgba(99,102,241,0.08);
+}
+.rc-projects-panel { width: 220px; min-width: 180px; flex-shrink: 0; background: rgba(20,20,40,0.95); }
+.rc-packages-panel { width: 260px; min-width: 200px; flex-shrink: 0; background: rgba(24,24,46,0.9); }
+.rc-detail-panel   { flex: 1; min-width: 0; background: rgba(18,18,38,0.85); border-right: none; }
+
+.rc-panel-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid rgba(99,102,241,0.07);
+  background: rgba(99,102,241,0.03); flex-shrink: 0;
+}
+.rc-panel-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.79rem; font-weight: 700; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+.rc-list { flex: 1; overflow-y: auto; padding: 8px; }
+
+/* Project / Package items */
+.rc-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 11px; border-radius: var(--radius-md);
+  cursor: pointer; transition: var(--transition);
+  margin-bottom: 3px; border: 1px solid transparent;
+}
+.rc-item:hover { background: rgba(99,102,241,0.07); border-color: rgba(99,102,241,0.1); }
+.rc-item.active { background: rgba(99,102,241,0.14); border-color: rgba(99,102,241,0.25); }
+.rc-item-icon {
+  width: 30px; height: 30px; border-radius: 8px; display: flex;
+  align-items: center; justify-content: center; font-size: 0.85rem;
+  flex-shrink: 0; font-weight: 700; color: white;
+}
+.rc-item-info { flex: 1; min-width: 0; }
+.rc-item-name {
+  display: block; font-size: 0.82rem; font-weight: 600;
+  color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rc-item-meta { display: block; font-size: 0.69rem; color: var(--text-muted); margin-top: 2px; }
+.rc-item-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
+.rc-item:hover .rc-item-actions { opacity: 1; }
+.rc-act-btn {
+  width: 22px; height: 22px; border: none; background: transparent;
+  color: var(--text-muted); cursor: pointer; border-radius: var(--radius-sm);
+  font-size: 0.75rem; display: flex; align-items: center; justify-content: center; transition: var(--transition);
+}
+.rc-act-btn:hover { background: rgba(99,102,241,0.14); color: var(--accent); }
+.rc-act-btn.del:hover { background: rgba(239,68,68,0.12); color: #ef4444; }
+
+/* Package badge (color dot) */
+.rc-pkg-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* ── Detail Panel ── */
+#rc-detail-area { padding: 0; }
+
+.rc-detail-section {
+  padding: 14px 18px; border-bottom: 1px solid rgba(99,102,241,0.07);
+}
+.rc-detail-section-title {
+  font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 6px;
+}
+
+/* Basic fields grid */
+.rc-fields-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.rc-field-item { display: flex; flex-direction: column; gap: 4px; }
+.rc-field-label {
+  font-size: 0.72rem; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.rc-field-input {
+  padding: 7px 10px; border: 1px solid rgba(99,102,241,0.15);
+  border-radius: var(--radius-sm); background: rgba(30,30,55,0.8);
+  color: var(--text-primary); font-family: inherit; font-size: 0.82rem; outline: none; transition: var(--transition);
+}
+.rc-field-input:focus { border-color: var(--accent); background: rgba(99,102,241,0.07); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+
+/* Rate tiers table */
+.rc-tiers-table {
+  width: 100%; border-collapse: collapse; font-size: 0.8rem;
+}
+.rc-tiers-table th {
+  padding: 7px 10px; text-align: left; font-size: 0.69rem;
+  text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted);
+  border-bottom: 1px solid rgba(99,102,241,0.1); font-weight: 600;
+  background: rgba(99,102,241,0.04);
+}
+.rc-tiers-table td { padding: 0; border-bottom: 1px solid rgba(30,30,58,0.15); }
+.rc-tiers-table tr:last-child td { border-bottom: none; }
+.rc-tiers-table tr:hover td { background: rgba(99,102,241,0.03); }
+.rc-tier-input {
+  width: 100%; padding: 7px 9px; border: 1px solid transparent;
+  background: transparent; color: var(--text-primary); font-family: inherit;
+  font-size: 0.8rem; outline: none; transition: var(--transition);
+}
+.rc-tier-input:focus { background: rgba(99,102,241,0.06); border-color: var(--accent); }
+.rc-tier-del {
+  padding: 0 8px; border: none; background: transparent; color: var(--text-muted);
+  cursor: pointer; font-size: 0.8rem; height: 100%; transition: var(--transition);
+  opacity: 0;
+}
+.rc-tiers-table tr:hover .rc-tier-del { opacity: 1; }
+.rc-tier-del:hover { color: #ef4444; }
+.rc-type-badge {
+  display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 0.68rem; font-weight: 600;
+}
+.rc-type-fixed    { background: rgba(99,102,241,0.12); color: var(--accent); }
+.rc-type-floating { background: rgba(16,185,129,0.12); color: #10b981; }
+
+/* Conditions list */
+.rc-conditions-list { display: flex; flex-direction: column; gap: 6px; }
+.rc-condition-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: var(--radius-md);
+  background: rgba(30,30,52,0.5); border: 1px solid rgba(99,102,241,0.08);
+  transition: var(--transition);
+}
+.rc-condition-row:hover { border-color: rgba(99,102,241,0.18); }
+.rc-cond-key {
+  flex: 1; min-width: 0; padding: 4px 6px; border: 1px solid transparent;
+  border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary);
+  font-family: inherit; font-size: 0.78rem; font-weight: 600; outline: none; transition: var(--transition);
+}
+.rc-cond-key:focus { border-color: rgba(99,102,241,0.3); background: rgba(99,102,241,0.05); }
+.rc-cond-sep { color: var(--text-muted); font-size: 0.8rem; flex-shrink: 0; }
+.rc-cond-val {
+  flex: 1.5; min-width: 0; padding: 4px 6px; border: 1px solid transparent;
+  border-radius: var(--radius-sm); background: transparent; color: var(--text-primary);
+  font-family: inherit; font-size: 0.82rem; outline: none; transition: var(--transition);
+}
+.rc-cond-val:focus { border-color: rgba(99,102,241,0.3); background: rgba(99,102,241,0.05); }
+.rc-cond-del {
+  width: 20px; height: 20px; border: none; background: transparent; color: var(--text-muted);
+  cursor: pointer; border-radius: var(--radius-sm); font-size: 0.75rem;
+  display: flex; align-items: center; justify-content: center; transition: var(--transition); flex-shrink: 0; opacity: 0;
+}
+.rc-condition-row:hover .rc-cond-del { opacity: 1; }
+.rc-cond-del:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
+
+/* Entity declarations in detail */
+.rc-entity-section { padding: 14px 18px; }
+.rc-entity-cols-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 8px;
+}
+.rc-entity-col-card {
+  padding: 8px 12px; border-radius: var(--radius-md);
+  background: rgba(30,30,52,0.6); border: 1px solid rgba(99,102,241,0.1);
+  display: flex; align-items: center; gap: 8px; transition: var(--transition);
+}
+.rc-entity-col-card:hover { border-color: rgba(99,102,241,0.25); }
+.rc-entity-col-icon {
+  width: 22px; height: 22px; border-radius: 5px; background: rgba(99,102,241,0.1);
+  color: var(--accent); font-size: 0.62rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.rc-entity-col-name { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+.rc-entity-col-val { font-size: 0.8rem; color: var(--text-primary); margin-left: auto; font-weight: 500; }
+
+/* Empty state */
+.rc-empty {
+  padding: 32px 16px; text-align: center; color: var(--text-muted); font-size: 0.78rem; line-height: 1.5;
+}
+.rc-empty-icon { font-size: 2rem; display: block; margin-bottom: 8px; opacity: 0.4; }
