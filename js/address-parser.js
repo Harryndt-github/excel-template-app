@@ -663,6 +663,225 @@ const AddressParser = {
   },
 
   // =============================================
+  // INVERTED LOOKUP TABLE: Build once, reuse
+  // Maps normKey(name) → { ward?, district?, province, type }
+  // =============================================
+  _adminLookup: null,
+
+  _buildAdminLookup() {
+    if (this._adminLookup) return;
+    this._buildDictionaries();
+    VietnamAddressData._buildOldAdminData();
+
+    const lookup = new Map();
+
+    const norm = (s) => {
+      if (!s) return '';
+      return this._removeDiacritics(s).toLowerCase().replace(/\s+/g, ' ').trim();
+    };
+
+    // Helper: add entry, keeping highest-confidence if key exists
+    const add = (key, entry) => {
+      if (!key || key.length < 2) return;
+      if (!lookup.has(key)) lookup.set(key, entry);
+    };
+
+    // ── 1. PROVINCES ──────────────────────────────────────
+    // Use _provinceAliases which already contains all aliases
+    for (const [alias, canonical] of this._provinceAliases) {
+      const k = alias.replace(/\s+/g, ' ').trim();
+      if (k.length >= 2) {
+        add(k, { type: 'province', province: canonical });
+      }
+    }
+
+    // ── 2. DISTRICTS from _oldAdminData (added FIRST so they take priority over same-name wards)
+    for (const [provName, provData] of Object.entries(VietnamAddressData._oldAdminData)) {
+      for (const [distName, distData] of Object.entries(provData.districts)) {
+        const distBase = distName.replace(/^(Quận|Huyện|Thị xã)\s+/i, '');
+        add(norm(distBase), { type: 'district', district: distName, province: provName });
+        add(norm(distName), { type: 'district', district: distName, province: provName });
+        for (const alias of (distData.aliases || [])) {
+          add(norm(alias), { type: 'district', district: distName, province: provName });
+        }
+      }
+    }
+
+    // ── 3. WARDS from _oldAdminData (được thêm sau district — key đã tồn tại sẽ không đè)
+    for (const [provName, provData] of Object.entries(VietnamAddressData._oldAdminData)) {
+      for (const [distName, distData] of Object.entries(provData.districts)) {
+        for (const wardFull of (distData.wards || [])) {
+          const wardBase = wardFull.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
+          add(norm(wardBase), { type: 'ward', ward: wardFull, district: distName, province: provName });
+          add(norm(wardFull), { type: 'ward', ward: wardFull, district: distName, province: provName });
+        }
+      }
+    }
+
+    // ── 3. WARDS from MASTER_WARDS_2025 (3,321 wards) ────
+    if (typeof MASTER_WARDS_2025 !== 'undefined') {
+      for (const [masterProv, wards] of Object.entries(MASTER_WARDS_2025)) {
+        for (const wardFull of wards) {
+          const wardBase = wardFull.replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
+          const kBase = norm(wardBase);
+          const kFull = norm(wardFull);
+          // Only add if not already in lookup (oldAdminData has more detail)
+          if (kBase && !lookup.has(kBase)) {
+            lookup.set(kBase, { type: 'ward', ward: wardFull, district: null, province: masterProv });
+          }
+          if (kFull && !lookup.has(kFull)) {
+            lookup.set(kFull, { type: 'ward', ward: wardFull, district: null, province: masterProv });
+          }
+        }
+      }
+    }
+
+    this._adminLookup = lookup;
+  },
+
+  // =============================================
+  // SMART SEGMENTATION v2: Right-to-Left Suffix Scanner
+  // Dùng inverted lookup table, không dùng sliding window phức tạp
+  //
+  // Thuật toán:
+  //   1. Tách địa chỉ thành mảng từ (words)
+  //   2. Từ cuối cùng, cộng dồn từng từ sang trái → kiểm tra bảng tra cứu
+  //   3. Greedy longest match: ưu tiên chuỗi dài nhất khớp
+  //   4. Thứ tự nhận diện: PROVINCE → WARD → DISTRICT (từ phải sang trái)
+  //   5. Phần còn lại bên trái = số nhà & đường
+  //
+  // Ví dụ: "C5 119 Tran Duy Hung Yen Hoa Ha Noi"
+  //   → suffix "Noi"        → không khớp
+  //   → suffix "Ha Noi"     → PROVINCE "Hà Nội" ✓ (provinceStart=7)
+  //   → suffix "Hoa"        → không khớp (trong context sau khi bỏ province)
+  //   → suffix "Yen Hoa"    → WARD "Phường Yên Hòa" ✓ (wardStart=5)
+  //   → street = words[0..5) = "C5 119 Tran Duy Hung"
+  // =============================================
+  _smartSegmentNoComma(text) {
+    this._buildAdminLookup();
+
+    const words = text.trim().split(/\s+/);
+    if (words.length < 3) return null;
+
+    const norm = (s) => this._removeDiacritics(s).toLowerCase().replace(/\s+/g, ' ').trim();
+
+    let province = '';
+    let provinceStart = -1;
+    let ward = '';
+    let wardStart = -1;
+    let district = '';
+    let districtStart = -1;
+
+    // ── PASS 1: Tìm PROVINCE từ cuối chuỗi ─────────────────
+    // Quét suffix từ DÀI → ngắn (4→1 từ), lấy match dài nhất trước
+    // Ưu tiên dài để "Ho Chi Minh" (3 từ) thắng "Minh" (1 từ)
+    for (let winSize = 4; winSize >= 1; winSize--) {
+      const start = words.length - winSize;
+      if (start < 0) continue;
+      const candidate = norm(words.slice(start).join(' '));
+      const entry = this._adminLookup.get(candidate);
+      if (entry && entry.type === 'province') {
+        province = entry.province;
+        provinceStart = start;
+        break; // Lấy match DÀI nhất trước
+      }
+    }
+
+    // Nếu chưa tìm được tỉnh, thử với alias ngắn hơn (1 từ)
+    // Đây là safety net cho các tỉnh tên 1 từ như "Huế", "Hà Giang"
+    const rightBound = provinceStart >= 0 ? provinceStart : words.length;
+
+    // ── PASS 2: Tìm WARD từ phần còn lại sau tỉnh ────────────
+    // Thử suffix 1→4 từ từ rightBound, lấy match DÀI nhất
+    const provNorm = province ? norm(province) : '';
+    const _provMatch = (entryProv) => {
+      if (!provNorm || !entryProv) return true; // không biết tỉnh → chấp nhận mọi
+      const ep = norm(entryProv);
+      return ep.includes(provNorm) || provNorm.includes(ep);
+    };
+
+    let bestWardMatch = null;
+    let bestWardLen = 0;
+    for (let winSize = 1; winSize <= Math.min(4, rightBound); winSize++) {
+      const start = rightBound - winSize;
+      if (start < 0) break;
+      const candidate = norm(words.slice(start, rightBound).join(' '));
+      const entry = this._adminLookup.get(candidate);
+      if (entry && entry.type === 'ward' && _provMatch(entry.province)) {
+        if (winSize > bestWardLen) {
+          bestWardMatch = { ...entry, start };
+          bestWardLen = winSize;
+        }
+      }
+    }
+    if (bestWardMatch) {
+      ward = bestWardMatch.ward;
+      wardStart = bestWardMatch.start;
+      if (!province && bestWardMatch.province) province = bestWardMatch.province;
+      if (!district && bestWardMatch.district) district = bestWardMatch.district;
+    }
+
+    // ── PASS 3: Tìm DISTRICT ─────────────────────────────────
+    // Trong cấu trúc địa chỉ Việt Nam: [street] [ward] [district] [province]
+    // District có thể nằm:
+    //   A) Giữa ward và province: "Ben Nghe | Quan 1 | Ho Chi Minh"
+    //   B) Trước ward (bên trái): hiếm gặp hơn
+    // ⇒ Tìm trong [wardEnd..provinceStart) trước, rồi [0..wardStart)
+    if (!district) {
+      const wardEnd = wardStart >= 0 ? wardStart + bestWardLen : -1;
+
+      // Phương án A: giữa ward và province
+      const afterWardBound = { from: wardEnd >= 0 ? wardEnd : rightBound, to: rightBound };
+      // Phương án B: bên trái ward
+      const beforeWardBound = { from: 0, to: wardStart >= 0 ? wardStart : rightBound };
+
+      const searchRegions = wardEnd >= 0
+        ? [afterWardBound, beforeWardBound]   // A trước, B sau
+        : [beforeWardBound];                   // không có ward → chỉ bên trái
+
+      outer:
+      for (const region of searchRegions) {
+        const regionLen = region.to - region.from;
+        if (regionLen <= 0) continue;
+        for (let winSize = Math.min(4, regionLen); winSize >= 1; winSize--) {
+          // Thử các vị trí trong region (bắt đầu từ phải)
+          for (let start = region.to - winSize; start >= region.from; start--) {
+            const candidate = norm(words.slice(start, start + winSize).join(' '));
+            const entry = this._adminLookup.get(candidate);
+            if (entry && entry.type === 'district' && _provMatch(entry.province)) {
+              district = entry.district;
+              districtStart = start;
+              if (!province && entry.province) province = entry.province;
+              break outer;
+            }
+          }
+        }
+      }
+    }
+
+    // ── Không tìm được gì → trả về null để normal parsing xử lý ─
+    if (!province && !ward && !district) return null;
+    // Nếu chỉ có tỉnh → normal parsing đã làm được, không cần override
+    if (!ward && !district) return null;
+
+    // ── Xác định phần đường ─────────────────────────────────
+    const streetEnd = Math.min(
+      districtStart  >= 0 ? districtStart  : Infinity,
+      wardStart      >= 0 ? wardStart      : Infinity,
+      provinceStart  >= 0 ? provinceStart  : Infinity
+    );
+    const streetSegment = words.slice(0, streetEnd === Infinity ? words.length : streetEnd).join(' ').trim();
+
+    const segments = [];
+    if (streetSegment) segments.push(streetSegment);
+    if (ward)          segments.push(`__WARD__:${ward}`);
+    if (district)      segments.push(`__DISTRICT__:${district}`);
+    if (province)      segments.push(province);
+
+    return { segments, province, ward, district, street: streetSegment };
+  },
+
+  // =============================================
   // MAIN PARSING ENGINE — v3.0
   // =============================================
   parseAddress(rawAddress) {
@@ -685,6 +904,14 @@ const AddressParser = {
       .split(/[,;|\uFF0C\u3001\u2022]+|[\s]+[–—][\s]+/)
       .map(s => s.trim())
       .filter(s => s.length > 0);
+
+    // Step 2.5: Nếu chỉ có DUY NHẤT 1 segment (địa chỉ không có dấu phân cách)
+    // → Thử phân tích thông minh từ phải sang trái theo database
+    // Ví dụ: "C5 119 Tran Duy Hung Yen Hoa Ha Noi"
+    let noCommaResult = null;
+    if (rawSegments.length === 1) {
+      noCommaResult = this._smartSegmentNoComma(rawSegments[0]);
+    }
 
     // Step 3: Filter out noise segments
     const filteredSegments = rawSegments.filter(s => !this._isNoise(s));
@@ -738,14 +965,26 @@ const AddressParser = {
       }
     }
 
-    let province = '';
-    let ward = '';
-    let district = '';
+    // Nếu phân tích no-comma thành công, seed kết quả từ đó
+    let province = noCommaResult ? (noCommaResult.province || '') : '';
+    let ward     = noCommaResult ? (noCommaResult.ward     || '') : '';
+    let district = noCommaResult ? (noCommaResult.district || '') : '';
     let streetParts = [];
     let provinceIdx = -1;
     let wardIdx = -1;
     let districtIdx = -1;
     let warnings = [];
+
+    // Nếu no-comma đã tách được: đưa phần đường vào streetParts và bỏ qua các bước scan segment
+    if (noCommaResult) {
+      const streetSeg = noCommaResult.segments.find(s => !s.startsWith('__') && !this._detectProvince(s));
+      if (streetSeg) streetParts.push(streetSeg);
+      warnings.push({
+        type: 'no_comma_segmented',
+        message: `Địa chỉ không có dấu phân cách — tự động nhận diện: đường="${streetSeg || ''}", phường/xã="${ward}", quận/huyện="${district}", tỉnh/TP="${province}"`,
+        severity: 'info'
+      });
+    }
 
     // Track noise removal
     if (allRemovedNoise.length > 0) {
@@ -756,65 +995,68 @@ const AddressParser = {
       });
     }
 
-    // Step 5: First pass — handle pre-tagged segments
-    for (let i = 0; i < segments.length; i++) {
-      const seg = segments[i];
-      if (seg.startsWith('__WARD__:') && !ward) {
-        ward = seg.substring('__WARD__:'.length);
-        wardIdx = i;
-      } else if (seg.startsWith('__DISTRICT__:') && !district) {
-        district = seg.substring('__DISTRICT__:'.length);
-        districtIdx = i;
-      }
-    }
-
-    // Step 6: Scan remaining segments RIGHT to LEFT
-    for (let i = segments.length - 1; i >= 0; i--) {
-      if (i === wardIdx || i === districtIdx) continue;
-      const seg = segments[i];
-      if (seg.startsWith('__WARD__:') || seg.startsWith('__DISTRICT__:')) continue;
-
-      // Try to detect province
-      if (!province) {
-        const detected = this._detectProvince(seg);
-        if (detected) {
-          province = detected;
-          provinceIdx = i;
-          continue;
-        }
-      }
-
-      // Try to detect district (entire segment)
-      if (!district) {
-        const detected = this._detectDistrict(seg);
-        if (detected && !detected.remainder) {
-          district = detected.district;
-          districtIdx = i;
-          if (!province) {
-            const lookup = VietnamAddressData.lookupDistrictInOldData(district);
-            if (lookup) province = lookup.province;
-          }
-          continue;
-        }
-      }
-
-      // Try to detect ward (entire segment)
-      if (!ward) {
-        const detected = this._detectWard(seg);
-        if (detected && !detected.remainder) {
-          ward = detected.ward;
+    // Step 5–7: Chỉ chạy scan segment khi KHÔNG dùng no-comma segmentation
+    if (!noCommaResult) {
+      // Step 5: First pass — handle pre-tagged segments
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        if (seg.startsWith('__WARD__:') && !ward) {
+          ward = seg.substring('__WARD__:'.length);
           wardIdx = i;
-          continue;
+        } else if (seg.startsWith('__DISTRICT__:') && !district) {
+          district = seg.substring('__DISTRICT__:'.length);
+          districtIdx = i;
         }
       }
-    }
 
-    // Step 7: Collect remaining as street
-    for (let i = 0; i < segments.length; i++) {
-      if (i === provinceIdx || i === wardIdx || i === districtIdx) continue;
-      const seg = segments[i];
-      if (seg.startsWith('__WARD__:') || seg.startsWith('__DISTRICT__:')) continue;
-      if (seg.trim()) streetParts.push(seg.trim());
+      // Step 6: Scan remaining segments RIGHT to LEFT
+      for (let i = segments.length - 1; i >= 0; i--) {
+        if (i === wardIdx || i === districtIdx) continue;
+        const seg = segments[i];
+        if (seg.startsWith('__WARD__:') || seg.startsWith('__DISTRICT__:')) continue;
+
+        // Try to detect province
+        if (!province) {
+          const detected = this._detectProvince(seg);
+          if (detected) {
+            province = detected;
+            provinceIdx = i;
+            continue;
+          }
+        }
+
+        // Try to detect district (entire segment)
+        if (!district) {
+          const detected = this._detectDistrict(seg);
+          if (detected && !detected.remainder) {
+            district = detected.district;
+            districtIdx = i;
+            if (!province) {
+              const lookup = VietnamAddressData.lookupDistrictInOldData(district);
+              if (lookup) province = lookup.province;
+            }
+            continue;
+          }
+        }
+
+        // Try to detect ward (entire segment)
+        if (!ward) {
+          const detected = this._detectWard(seg);
+          if (detected && !detected.remainder) {
+            ward = detected.ward;
+            wardIdx = i;
+            continue;
+          }
+        }
+      }
+
+      // Step 7: Collect remaining as street
+      for (let i = 0; i < segments.length; i++) {
+        if (i === provinceIdx || i === wardIdx || i === districtIdx) continue;
+        const seg = segments[i];
+        if (seg.startsWith('__WARD__:') || seg.startsWith('__DISTRICT__:')) continue;
+        if (seg.trim()) streetParts.push(seg.trim());
+      }
     }
 
     // Step 8: If still no province, fuzzy match
