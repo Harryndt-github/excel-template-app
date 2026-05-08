@@ -1,6 +1,6 @@
 /* ============================================================
    RateCenter — Trung tâm lãi suất
-   Quản lý: Dự án → Gói tín dụng → Mức lãi suất + Điều kiện
+   Quản lý: Dự án → Chính sách bán hàng → Mức lãi suất + Điều kiện
    ============================================================ */
 
 // ── State ────────────────────────────────────────────────────
@@ -14,8 +14,15 @@ const RateCenterState = {
 function _rcId() { return 'rc_' + Math.random().toString(36).slice(2, 9); }
 function _rcEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-// ── Default columns for a new loan package entity ─────────────
+// ── Default columns for a new sales policy ────────────────────
 const RC_DEFAULT_FIELDS = [
+  { id:'f_project_code', label:'Mã dự án',                        unit:'',      type:'text' },
+  { id:'f_policy_code',  label:'Mã chính sách',                   unit:'',      type:'text' },
+  { id:'f_policy_name',  label:'Chính sách bán hàng',             unit:'',      type:'text' },
+  { id:'f_effective_from', label:'Thời gian áp dụng từ',          unit:'',      type:'date' },
+  { id:'f_effective_to', label:'Thời gian áp dụng đến',           unit:'',      type:'date' },
+  { id:'f_legal_note',   label:'Điều kiện đi kèm',                unit:'',      type:'text' },
+  { id:'f_policy_note',  label:'Ghi chú chính sách',              unit:'',      type:'text' },
   { id:'f_min_term',    label:'Thời gian vay tối thiểu',           unit:'tháng', type:'number' },
   { id:'f_fixed_per',   label:'Thời gian cố định lãi suất ưu đãi', unit:'tháng', type:'number' },
   { id:'f_fixed_rate',  label:'Lãi suất cố định',                  unit:'%/năm', type:'percent' },
@@ -55,9 +62,36 @@ const RateCenter = {
   // ── Main render entry ────────────────────────────────────────
   render() {
     this.load();
+    this._ensureDataShape();
     this.renderProjects();
     this.renderPackages(RateCenterState.selectedProject);
     this.renderDetail(RateCenterState.selectedProject, RateCenterState.selectedPackage);
+  },
+
+  _ensureDataShape() {
+    let changed = false;
+    (RateCenterState.projects || []).forEach(project => {
+      if (!project.packages) {
+        project.packages = [];
+        changed = true;
+      }
+      project.packages.forEach(pkg => {
+        if (!pkg.fields) {
+          pkg.fields = [];
+          changed = true;
+        }
+        RC_DEFAULT_FIELDS.forEach(def => {
+          if (!pkg.fields.find(field => field.id === def.id)) {
+            pkg.fields.push({ ...def, value: '' });
+            changed = true;
+          }
+        });
+        if (!pkg.tiers) { pkg.tiers = []; changed = true; }
+        if (!pkg.conditions) { pkg.conditions = []; changed = true; }
+        if (!pkg.customFields) { pkg.customFields = []; changed = true; }
+      });
+    });
+    if (changed) this.save();
   },
 
   // ── Panel 1: Projects ────────────────────────────────────────
@@ -76,7 +110,7 @@ const RateCenter = {
         <div class="rc-item-icon" style="background:${p.color};">${p.icon||'🏢'}</div>
         <div class="rc-item-info">
           <span class="rc-item-name">${_rcEsc(p.name)}</span>
-          <span class="rc-item-meta">${pkgCount} gói tín dụng</span>
+          <span class="rc-item-meta">${pkgCount} chính sách lãi suất</span>
         </div>
         <div class="rc-item-actions">
           <button class="rc-act-btn" onclick="event.stopPropagation();RateCenter.editProject('${p.id}')" title="Sửa">✎</button>
@@ -118,7 +152,7 @@ const RateCenter = {
   },
 
   deleteProject(id) {
-    if (!confirm('Xóa dự án này và toàn bộ gói tín dụng?')) return;
+    if (!confirm('Xóa dự án này và toàn bộ chính sách lãi suất?')) return;
     RateCenterState.projects = RateCenterState.projects.filter(p => p.id !== id);
     if (RateCenterState.selectedProject === id) {
       RateCenterState.selectedProject = null;
@@ -138,19 +172,19 @@ const RateCenter = {
 
     const proj = RateCenterState.projects.find(p => p.id === projectId);
     if (!proj) {
-      if (titleEl) titleEl.textContent = 'Gói tín dụng';
+      if (titleEl) titleEl.textContent = 'Chính sách';
       if (hintEl)  hintEl.textContent  = '← Chọn dự án';
       if (addBtn)  addBtn.style.display = 'none';
       listEl.innerHTML = '';
       return;
     }
     if (titleEl) titleEl.textContent = proj.name;
-    if (hintEl)  hintEl.textContent  = `Các gói vay của ${proj.name}`;
+    if (hintEl)  hintEl.textContent  = `Các chính sách của ${proj.name}`;
     if (addBtn)  addBtn.style.display = '';
 
     const pkgs = proj.packages || [];
     if (!pkgs.length) {
-      listEl.innerHTML = `<div class="rc-empty"><span class="rc-empty-icon">📦</span>Chưa có gói vay.<br>Nhấn <b>+ Gói</b> để tạo.</div>`;
+      listEl.innerHTML = `<div class="rc-empty"><span class="rc-empty-icon">📦</span>Chưa có chính sách nào.<br>Nhấn <b>+ Chính sách</b> để tạo.</div>`;
       return;
     }
     listEl.innerHTML = pkgs.map(pkg => {
@@ -183,7 +217,7 @@ const RateCenter = {
   addPackage() {
     const proj = RateCenterState.projects.find(p => p.id === RateCenterState.selectedProject);
     if (!proj) return;
-    const name = prompt('Tên gói tín dụng:', '');
+    const name = prompt('Tên chính sách bán hàng / gói lãi suất:', '');
     if (!name || !name.trim()) return;
     const colors = ['#6366f1','#8b5cf6','#10b981','#f59e0b','#ec4899','#06b6d4'];
     const pkg = {
@@ -204,9 +238,11 @@ const RateCenter = {
     };
     if (!proj.packages) proj.packages = [];
     proj.packages.push(pkg);
+    const policyNameField = pkg.fields.find(field => field.id === 'f_policy_name');
+    if (policyNameField) policyNameField.value = pkg.name;
     this.save();
     this.selectPackage(proj.id, pkg.id);
-    if (typeof App !== 'undefined') App.toast('Đã thêm gói tín dụng', 'success');
+    if (typeof App !== 'undefined') App.toast('Đã thêm chính sách lãi suất', 'success');
   },
 
   editPackage(projectId, pkgId) {
@@ -214,16 +250,18 @@ const RateCenter = {
     if (!proj) return;
     const pkg = (proj.packages||[]).find(k => k.id === pkgId);
     if (!pkg) return;
-    const name = prompt('Tên gói tín dụng:', pkg.name);
+    const name = prompt('Tên chính sách bán hàng / gói lãi suất:', pkg.name);
     if (!name || !name.trim()) return;
     pkg.name = name.trim();
+    const policyNameField = (pkg.fields || []).find(field => field.id === 'f_policy_name');
+    if (policyNameField) policyNameField.value = pkg.name;
     this.save();
     this.renderPackages(projectId);
     this.renderDetail(projectId, pkgId);
   },
 
   deletePackage(projectId, pkgId) {
-    if (!confirm('Xóa gói tín dụng này?')) return;
+    if (!confirm('Xóa chính sách lãi suất này?')) return;
     const proj = RateCenterState.projects.find(p => p.id === projectId);
     if (!proj) return;
     proj.packages = (proj.packages||[]).filter(k => k.id !== pkgId);
@@ -245,10 +283,10 @@ const RateCenter = {
     const pkg  = proj && (proj.packages||[]).find(k => k.id === pkgId);
 
     if (!pkg) {
-      if (titleEl)   titleEl.textContent = 'Chi tiết gói vay';
-      if (hintEl)    hintEl.textContent  = '← Chọn gói tín dụng';
+      if (titleEl)   titleEl.textContent = 'Chi tiết chính sách';
+      if (hintEl)    hintEl.textContent  = '← Chọn chính sách';
       if (actionsEl) actionsEl.style.display = 'none';
-      areaEl.innerHTML = `<div class="rc-empty" style="margin:40px auto;"><span class="rc-empty-icon">💰</span><b>Chọn một gói tín dụng</b> từ danh sách bên trái để xem và chỉnh sửa chi tiết lãi suất và điều kiện.</div>`;
+      areaEl.innerHTML = `<div class="rc-empty" style="margin:40px auto;"><span class="rc-empty-icon">💰</span><b>Chọn một chính sách</b> từ danh sách bên trái để xem và chỉnh sửa chi tiết lãi suất, thời gian áp dụng và điều kiện.</div>`;
       return;
     }
 
@@ -256,13 +294,12 @@ const RateCenter = {
     if (hintEl)    hintEl.textContent  = '';
     if (actionsEl) actionsEl.style.display = 'flex';
 
-    const iconMap = {number:'#',percent:'%',text:'Aa'};
     // ── Section 1: Basic fields (entity columns)
     const fields = pkg.fields || RC_DEFAULT_FIELDS.map(f => ({...f, value:''}));
     const fieldsHtml = fields.map(f => `
       <div class="rc-field-item">
         <label class="rc-field-label">${_rcEsc(f.label)} <small style="color:var(--text-muted);font-weight:400;">(${f.unit||''})</small></label>
-        <input class="rc-field-input" type="${f.type==='percent'||f.type==='number'?'number':'text'}"
+        <input class="rc-field-input" type="${f.type==='percent'||f.type==='number'?'number':(f.type==='date'?'date':'text')}"
           step="0.01" value="${_rcEsc(f.value||'')}" placeholder="Nhập..."
           onchange="RateCenter.setFieldVal('${projectId}','${pkgId}','${f.id}',this.value)">
       </div>`).join('');
@@ -319,7 +356,7 @@ const RateCenter = {
       <!-- Section 1: Entity Columns -->
       <div class="rc-detail-section">
         <div class="rc-detail-section-title">
-          📋 Thông số gói vay
+          📋 Thông số chính sách
           <button onclick="RateCenter.addCustomField('${projectId}','${pkgId}')"
             style="margin-left:auto;padding:3px 10px;border-radius:6px;border:1px dashed rgba(99,102,241,0.3);
             background:transparent;color:var(--accent);font-size:0.72rem;cursor:pointer;font-family:inherit;">
@@ -376,6 +413,10 @@ const RateCenter = {
     if (!pkg.fields) pkg.fields = RC_DEFAULT_FIELDS.map(f => ({...f, value:''}));
     const f = pkg.fields.find(x => x.id === fieldId);
     if (f) f.value = value;
+    if (fieldId === 'f_policy_name' && String(value || '').trim()) {
+      pkg.name = String(value).trim();
+      this.renderDetail(projectId, pkgId);
+    }
     this.save();
     this.renderPackages(projectId);
   },
@@ -431,7 +472,7 @@ const RateCenter = {
   addTier() {
     const { selectedProject: pId, selectedPackage: pkgId } = RateCenterState;
     const pkg = this._getPkg(pId, pkgId);
-    if (!pkg) { if (typeof App!=='undefined') App.toast('Chọn gói tín dụng trước','warning'); return; }
+    if (!pkg) { if (typeof App!=='undefined') App.toast('Chọn chính sách trước','warning'); return; }
     if (!pkg.tiers) pkg.tiers = [];
     pkg.tiers.push({ id: _rcId(), period: '', rate: '', type: 'fixed', margin: '', note: '' });
     this.save();
@@ -460,7 +501,7 @@ const RateCenter = {
   addCondition() {
     const { selectedProject: pId, selectedPackage: pkgId } = RateCenterState;
     const pkg = this._getPkg(pId, pkgId);
-    if (!pkg) { if (typeof App!=='undefined') App.toast('Chọn gói tín dụng trước','warning'); return; }
+    if (!pkg) { if (typeof App!=='undefined') App.toast('Chọn chính sách trước','warning'); return; }
     if (!pkg.conditions) pkg.conditions = [];
     pkg.conditions.push({ id: _rcId(), key: '', value: '' });
     this.save();
@@ -473,6 +514,125 @@ const RateCenter = {
     pkg.conditions = (pkg.conditions||[]).filter(c => c.id !== condId);
     this.save();
     this.renderDetail(projectId, pkgId);
+  },
+
+  getProjects() {
+    this.load();
+    this._ensureDataShape();
+    return RateCenterState.projects || [];
+  },
+
+  getProjectPolicies(projectId) {
+    const project = this.getProjects().find(item => item.id === projectId);
+    return project ? (project.packages || []) : [];
+  },
+
+  getTemplateFields() {
+    const fields = [
+      'Dự án',
+      'Mã dự án',
+      'Chính sách bán hàng',
+      'Mã chính sách',
+      'Thời gian áp dụng từ',
+      'Thời gian áp dụng đến',
+      'Trạng thái áp dụng',
+      'Điều kiện đi kèm',
+      'Ghi chú chính sách',
+      'Tóm tắt biểu lãi suất',
+      'Tóm tắt điều kiện'
+    ];
+
+    RC_DEFAULT_FIELDS.forEach(field => {
+      if (!fields.includes(field.label)) fields.push(field.label);
+    });
+
+    this.getProjects().forEach(project => {
+      (project.packages || []).forEach(pkg => {
+        (pkg.customFields || []).forEach(field => {
+          if (field.label && !fields.includes(field.label)) fields.push(field.label);
+        });
+        (pkg.conditions || []).forEach(condition => {
+          if (condition.key && !fields.includes(condition.key)) fields.push(condition.key);
+        });
+        (pkg.tiers || []).forEach((tier, index) => {
+          const ordinal = index + 1;
+          ['Giai đoạn', 'Loại lãi suất', 'Lãi suất', 'Biên độ', 'Ghi chú'].forEach(prefix => {
+            const label = `${prefix} ${ordinal}`;
+            if (!fields.includes(label)) fields.push(label);
+          });
+        });
+      });
+    });
+
+    return fields;
+  },
+
+  getTemplateData(projectId, pkgId) {
+    const project = this.getProjects().find(item => item.id === projectId);
+    if (!project) return {};
+    const pkg = (project.packages || []).find(item => item.id === pkgId);
+    if (!pkg) return {};
+
+    const data = {
+      'Dự án': project.name || '',
+      'Mã dự án': '',
+      'Chính sách bán hàng': pkg.name || '',
+      'Mã chính sách': '',
+      'Thời gian áp dụng từ': '',
+      'Thời gian áp dụng đến': '',
+      'Trạng thái áp dụng': '',
+      'Điều kiện đi kèm': '',
+      'Ghi chú chính sách': '',
+      'Tóm tắt biểu lãi suất': '',
+      'Tóm tắt điều kiện': ''
+    };
+
+    (pkg.fields || []).forEach(field => {
+      data[field.label] = field.value || '';
+    });
+
+    data['Mã dự án'] = data['Mã dự án'] || '';
+    data['Mã chính sách'] = data['Mã chính sách'] || '';
+    data['Chính sách bán hàng'] = data['Chính sách bán hàng'] || pkg.name || '';
+    data['Thời gian áp dụng từ'] = data['Thời gian áp dụng từ'] || '';
+    data['Thời gian áp dụng đến'] = data['Thời gian áp dụng đến'] || '';
+    data['Điều kiện đi kèm'] = data['Điều kiện đi kèm'] || '';
+    data['Ghi chú chính sách'] = data['Ghi chú chính sách'] || '';
+
+    const now = new Date();
+    const from = data['Thời gian áp dụng từ'] ? new Date(data['Thời gian áp dụng từ']) : null;
+    const to = data['Thời gian áp dụng đến'] ? new Date(data['Thời gian áp dụng đến']) : null;
+    let status = 'Không xác định';
+    if (from instanceof Date && !Number.isNaN(from.getTime()) && now < from) status = 'Sắp áp dụng';
+    if (to instanceof Date && !Number.isNaN(to.getTime()) && now > to) status = 'Hết hiệu lực';
+    if ((!from || Number.isNaN(from.getTime()) || now >= from) && (!to || Number.isNaN(to.getTime()) || now <= to)) status = 'Đang áp dụng';
+    data['Trạng thái áp dụng'] = status;
+
+    const tierSummary = [];
+    (pkg.tiers || []).forEach((tier, index) => {
+      const ordinal = index + 1;
+      data[`Giai đoạn ${ordinal}`] = tier.period || '';
+      data[`Loại lãi suất ${ordinal}`] = tier.type === 'floating' ? 'Thả nổi' : 'Cố định';
+      data[`Lãi suất ${ordinal}`] = tier.rate || '';
+      data[`Biên độ ${ordinal}`] = tier.margin || '';
+      data[`Ghi chú ${ordinal}`] = tier.note || '';
+      tierSummary.push([tier.period, tier.type === 'floating' ? `LSCB + ${tier.margin || ''}` : tier.rate, tier.note].filter(Boolean).join(' | '));
+    });
+    data['Tóm tắt biểu lãi suất'] = tierSummary.join(' ; ');
+
+    const conditionSummary = [];
+    (pkg.conditions || []).forEach(condition => {
+      if (!condition.key) return;
+      data[condition.key] = condition.value || '';
+      conditionSummary.push(`${condition.key}: ${condition.value || ''}`);
+    });
+    data['Tóm tắt điều kiện'] = conditionSummary.join(' ; ');
+
+    (pkg.customFields || []).forEach(field => {
+      if (field.label) data[field.label] = field.value || '';
+    });
+
+    return data;
   },
 };
 

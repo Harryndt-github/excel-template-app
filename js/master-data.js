@@ -1267,7 +1267,8 @@ const MasterData = {
     if (!container) return;
 
     const entities = MasterDataState.entities;
-    if (entities.length === 0) {
+    const hasRateCenter = typeof RateCenter !== 'undefined' && typeof RateCenter.getTemplateFields === 'function';
+    if (entities.length === 0 && !hasRateCenter) {
       container.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--text-muted);">
         <p style="font-size:2rem;margin-bottom:8px;">📊</p>
         <p>Chưa có Master Data.</p>
@@ -1276,20 +1277,47 @@ const MasterData = {
       return;
     }
 
-    container.innerHTML = entities.map(ent => {
+    const cards = entities.map(ent => {
       const recCount = (MasterDataState.records[ent.id] || []).length;
       return `<div class="ph-source-card md-ph-entity-card" onclick="${callbackPrefix}('${ent.id}')" style="border-left:3px solid ${ent.color};">
         <span class="ph-source-icon" style="color:${ent.color};">⬢</span>
         <span class="ph-source-label">${_mdEsc(ent.name)}</span>
         <span class="ph-source-count">${ent.fields.length} trường • ${recCount} bản ghi</span>
       </div>`;
-    }).join('');
+    });
+
+    if (hasRateCenter) {
+      const rateFields = RateCenter.getTemplateFields();
+      cards.unshift(`<div class="ph-source-card md-ph-entity-card" onclick="${callbackPrefix}('__ratecenter__')" style="border-left:3px solid #10b981;">
+        <span class="ph-source-icon" style="color:#10b981;">%</span>
+        <span class="ph-source-label">Master Data lãi suất</span>
+        <span class="ph-source-count">${rateFields.length} trường động theo dự án/chính sách</span>
+      </div>`);
+    }
+
+    container.innerHTML = cards.join('');
   },
 
   // ── Render fields of a selected entity for insertion ──
   renderMasterDataFields(entityId, containerId, callbackPrefix, filter) {
     const container = document.getElementById(containerId);
     if (!container) return;
+
+    if (entityId === '__ratecenter__') {
+      const rateFields = typeof RateCenter !== 'undefined' && typeof RateCenter.getTemplateFields === 'function'
+        ? RateCenter.getTemplateFields()
+        : [];
+      const fields = filter
+        ? rateFields.filter(name => name.toLowerCase().includes(filter.toLowerCase()))
+        : rateFields;
+      container.innerHTML = fields.map(name => `
+        <div class="ph-field-chip md-ph-field-chip" onclick="${callbackPrefix}('Master Data lãi suất', '${_mdEsc(name)}')" style="border-left:3px solid #10b981;">
+          <span class="ph-field-icon" style="color:#10b981;">%</span>
+          <span class="ph-field-name">${_mdEsc(name)}</span>
+        </div>
+      `).join('');
+      return;
+    }
 
     const entity = MasterDataState.entities.find(e => e.id === entityId);
     if (!entity) return;
@@ -1322,10 +1350,11 @@ const MasterData = {
 
   selectSsMdEntity(entityId) {
     this._ssSelectedEntity = entityId;
-    const entity = MasterDataState.entities.find(e => e.id === entityId);
+    const isRateCenter = entityId === '__ratecenter__';
+    const entity = isRateCenter ? { name: 'Master Data lãi suất', color: '#10b981' } : MasterDataState.entities.find(e => e.id === entityId);
     if (!entity) return;
 
-    document.getElementById('ss-md-entity-label').textContent = `⬢ ${entity.name}`;
+    document.getElementById('ss-md-entity-label').textContent = isRateCenter ? '％ Master Data lãi suất' : `⬢ ${entity.name}`;
     document.getElementById('ss-md-entity-label').style.color = entity.color;
     document.getElementById('ss-md-step-entities').style.display = 'none';
     document.getElementById('ss-md-step-fields').style.display = '';
@@ -1361,10 +1390,11 @@ const MasterData = {
 
   selectWordMdEntity(entityId) {
     this._wordSelectedEntity = entityId;
-    const entity = MasterDataState.entities.find(e => e.id === entityId);
+    const isRateCenter = entityId === '__ratecenter__';
+    const entity = isRateCenter ? { name: 'Master Data lãi suất', color: '#10b981' } : MasterDataState.entities.find(e => e.id === entityId);
     if (!entity) return;
 
-    document.getElementById('word-md-entity-label').textContent = `⬢ ${entity.name}`;
+    document.getElementById('word-md-entity-label').textContent = isRateCenter ? '％ Master Data lãi suất' : `⬢ ${entity.name}`;
     document.getElementById('word-md-entity-label').style.color = entity.color;
     document.getElementById('word-md-step-entities').style.display = 'none';
     document.getElementById('word-md-step-fields').style.display = '';

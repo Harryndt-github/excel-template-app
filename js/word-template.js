@@ -393,6 +393,9 @@ const WordEditor = {
    WORD GENERATOR — Merge Data & Export .doc
    ───────────────────────────────────────────── */
 const WordGenerator = {
+  _selectedRateProjectId: '',
+  _selectedRatePolicyId: '',
+
   initStep1() {
     const select = document.getElementById('word-select-template');
     if (!select) return;
@@ -596,19 +599,45 @@ const WordGenerator = {
       document.getElementById('word-mapping-container').innerHTML = '<div class="empty-state"><h3>Template không có trường dữ liệu</h3></div>';
       return;
     }
-    let options = '<option value="">-- Không mapping --</option>';
-    Object.keys(WordState.extractedData).forEach(ft => {
-      const cfg = FILE_TYPES[ft]; const data = WordState.extractedData[ft];
-      const keys = Object.keys(data);
-      if (keys.length > 0) {
-        options += `<optgroup label="${cfg.label}">`;
-        keys.forEach(k => { options += `<option value="${ft}::${k}" title="${String(data[k]).substring(0,50)}">[${cfg.label}] ${k}</option>`; });
-        options += '</optgroup>';
-      }
-    });
+    this._syncRateSelection();
+    const currentMappings = this._collectCurrentMappings(tpl.placeholders);
+    const options = this._buildMappingOptions();
+    const projects = (typeof RateCenter !== 'undefined' && typeof RateCenter.getProjects === 'function')
+      ? RateCenter.getProjects()
+      : [];
+    const policies = this._selectedRateProjectId
+      ? ((typeof RateCenter !== 'undefined' && typeof RateCenter.getProjectPolicies === 'function')
+        ? RateCenter.getProjectPolicies(this._selectedRateProjectId)
+        : [])
+      : [];
     document.getElementById('word-mapping-container').innerHTML = `
+      <div class="rate-filter-panel" style="margin-bottom:18px;padding:16px 18px;border:1px solid rgba(99,102,241,0.14);border-radius:14px;background:rgba(99,102,241,0.04);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <div>
+            <h4 style="margin:0 0 4px;font-size:0.95rem;color:var(--text-primary);">Nguồn Master Data lãi suất</h4>
+            <p style="margin:0;font-size:0.82rem;color:var(--text-muted);">Chọn dự án và chính sách để các placeholder Word lấy đúng bộ lãi suất và điều kiện áp dụng.</p>
+          </div>
+          <span style="padding:6px 10px;border-radius:999px;background:rgba(99,102,241,0.1);color:var(--accent);font-size:0.75rem;font-weight:600;">Master Data</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+          <div>
+            <label style="display:block;margin-bottom:6px;font-size:0.8rem;font-weight:600;color:var(--text-secondary);">Dự án bất động sản</label>
+            <select class="mapping-select" id="word-rate-project-select" onchange="WordGenerator.onRateProjectChange(this.value)">
+              <option value="">-- Chọn dự án --</option>
+              ${projects.map(project => `<option value="${project.id}" ${project.id === this._selectedRateProjectId ? 'selected' : ''}>${_wEsc(project.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:6px;font-size:0.8rem;font-weight:600;color:var(--text-secondary);">Chính sách áp dụng</label>
+            <select class="mapping-select" id="word-rate-policy-select" onchange="WordGenerator.onRatePolicyChange(this.value)">
+              <option value="">-- Chọn chính sách --</option>
+              ${policies.map(policy => `<option value="${policy.id}" ${policy.id === this._selectedRatePolicyId ? 'selected' : ''}>${_wEsc(policy.name)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>
       <table class="mapping-table"><thead><tr>
-        <th style="width:30%">Trường Template</th><th style="width:40%">Dữ liệu Excel</th><th style="width:30%">Giá trị</th>
+        <th style="width:30%">Trường Template</th><th style="width:40%">Dữ liệu Excel / Master Data</th><th style="width:30%">Giá trị</th>
       </tr></thead><tbody>
       ${tpl.placeholders.map(ph => `<tr>
         <td class="mapping-placeholder-name">{{${_wEsc(ph)}}}</td>
@@ -616,12 +645,103 @@ const WordGenerator = {
         <td class="mapping-value-preview" id="wprev-${_wSanId(ph)}">—</td>
       </tr>`).join('')}
       </tbody></table>`;
+    tpl.placeholders.forEach(ph => {
+      const selectEl = document.getElementById(`wmap-${_wSanId(ph)}`);
+      const currentValue = currentMappings[ph];
+      const hasCurrentValue = selectEl && Array.from(selectEl.options).some(option => option.value === currentValue);
+      if (selectEl && currentValue && hasCurrentValue) {
+        selectEl.value = currentValue;
+        this.onMappingChange(ph, currentValue);
+      }
+    });
     this.autoMap(tpl.placeholders);
   },
 
-  autoMap(placeholders) {
+  _collectCurrentMappings(placeholders) {
+    const mappings = {};
     placeholders.forEach(ph => {
-      const phL = ph.toLowerCase().trim();
+      const selectEl = document.getElementById(`wmap-${_wSanId(ph)}`);
+      if (selectEl && selectEl.value) mappings[ph] = selectEl.value;
+    });
+    return mappings;
+  },
+
+  _syncRateSelection() {
+    if (typeof RateCenter === 'undefined' || typeof RateCenter.getProjects !== 'function') {
+      this._selectedRateProjectId = '';
+      this._selectedRatePolicyId = '';
+      return;
+    }
+    const projects = RateCenter.getProjects();
+    if (!projects.find(project => project.id === this._selectedRateProjectId)) {
+      this._selectedRateProjectId = projects[0] ? projects[0].id : '';
+    }
+    const policies = this._selectedRateProjectId ? RateCenter.getProjectPolicies(this._selectedRateProjectId) : [];
+    if (!policies.find(policy => policy.id === this._selectedRatePolicyId)) {
+      this._selectedRatePolicyId = policies[0] ? policies[0].id : '';
+    }
+  },
+
+  _getRateTemplateData() {
+    if (typeof RateCenter === 'undefined' || typeof RateCenter.getTemplateData !== 'function') return {};
+    if (!this._selectedRateProjectId || !this._selectedRatePolicyId) return {};
+    return RateCenter.getTemplateData(this._selectedRateProjectId, this._selectedRatePolicyId);
+  },
+
+  _buildMappingOptions() {
+    let options = '<option value="">-- Không mapping --</option>';
+    Object.keys(WordState.extractedData).forEach(ft => {
+      const cfg = FILE_TYPES[ft];
+      const data = WordState.extractedData[ft];
+      const keys = Object.keys(data);
+      if (keys.length > 0) {
+        options += `<optgroup label="${cfg.label}">`;
+        keys.forEach(k => { options += `<option value="${ft}::${k}" title="${String(data[k]).substring(0,50)}">[${cfg.label}] ${k}</option>`; });
+        options += '</optgroup>';
+      }
+    });
+    const rateData = this._getRateTemplateData();
+    const rateKeys = Object.keys(rateData);
+    if (rateKeys.length > 0) {
+      options += '<optgroup label="Master Data lãi suất">';
+      rateKeys.forEach(key => {
+        options += `<option value="ratecenter::${key}" title="${String(rateData[key] || '').substring(0,50)}">[Lãi suất] ${_wEsc(key)}</option>`;
+      });
+      options += '</optgroup>';
+    }
+    return options;
+  },
+
+  onRateProjectChange(projectId) {
+    this._selectedRateProjectId = projectId;
+    const policies = (typeof RateCenter !== 'undefined' && typeof RateCenter.getProjectPolicies === 'function')
+      ? RateCenter.getProjectPolicies(projectId)
+      : [];
+    this._selectedRatePolicyId = policies[0] ? policies[0].id : '';
+    this.buildMappingUI();
+  },
+
+  onRatePolicyChange(policyId) {
+    this._selectedRatePolicyId = policyId;
+    this.buildMappingUI();
+  },
+
+  _resolveMappingValue(mappingValue) {
+    if (!mappingValue) return undefined;
+    const [source, ...rest] = mappingValue.split('::');
+    const field = rest.join('::');
+    if (source === 'ratecenter') {
+      const data = this._getRateTemplateData();
+      return data[field];
+    }
+    const data = WordState.extractedData[source];
+    return data ? data[field] : undefined;
+  },
+
+  autoMap(placeholders) {
+    const rateData = this._getRateTemplateData();
+    placeholders.forEach(ph => {
+      const phL = ph.toLowerCase().trim().replace(/^\[[^\]]+\]\s*/, '');
       let best = null, bestS = 0;
       Object.keys(WordState.extractedData).forEach(ft => {
         Object.keys(WordState.extractedData[ft]).forEach(k => {
@@ -637,22 +757,33 @@ const WordGenerator = {
           if (s > bestS) { bestS = s; best = `${ft}::${k}`; }
         });
       });
+      Object.keys(rateData).forEach(k => {
+        const kL = k.toLowerCase().trim();
+        let s = 0;
+        if (kL === phL) s = 100;
+        else if (kL.includes(phL) || phL.includes(kL)) s = 70;
+        else {
+          const pw = phL.split(/\s+/), kw = kL.split(/\s+/);
+          const ov = pw.filter(w => kw.some(x => x.includes(w) || w.includes(x)));
+          if (ov.length > 0) s = (ov.length / Math.max(pw.length, kw.length)) * 60;
+        }
+        if (s > bestS) { bestS = s; best = `ratecenter::${k}`; }
+      });
       if (best && bestS >= 50) {
         const sel = document.getElementById(`wmap-${_wSanId(ph)}`);
-        if (sel) { sel.value = best; this.onMappingChange(ph, best); }
+        if (sel && !sel.value) { sel.value = best; this.onMappingChange(ph, best); }
       }
     });
   },
 
   onMappingChange(ph, value) {
     const el = document.getElementById(`wprev-${_wSanId(ph)}`);
-    if (!value) { el.textContent = '—'; return; }
-    const [ft, field] = value.split('::');
-    const data = WordState.extractedData[ft];
-    if (data && data[field] !== undefined) {
-      el.textContent = String(data[field]).substring(0, 80) || '(trống)';
-      el.title = String(data[field]);
-    } else { el.textContent = '—'; }
+    if (!value) { el.textContent = '—'; el.title = ''; return; }
+    const resolvedValue = this._resolveMappingValue(value);
+    if (resolvedValue !== undefined) {
+      el.textContent = String(resolvedValue).substring(0, 80) || '(trống)';
+      el.title = String(resolvedValue);
+    } else { el.textContent = '—'; el.title = ''; }
   },
 
   preview() {
@@ -663,9 +794,8 @@ const WordGenerator = {
       tpl.placeholders.forEach(ph => {
         const sel = document.getElementById(`wmap-${_wSanId(ph)}`);
         if (sel && sel.value) {
-          const [ft, field] = sel.value.split('::');
-          const data = WordState.extractedData[ft];
-          if (data && data[field] !== undefined) replacements[ph] = String(data[field]);
+          const resolvedValue = this._resolveMappingValue(sel.value);
+          if (resolvedValue !== undefined) replacements[ph] = String(resolvedValue);
         }
       });
     }

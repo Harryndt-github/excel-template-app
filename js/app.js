@@ -2244,6 +2244,9 @@ const MultiSheetImport = {
 // GENERATOR - Generate Documents
 // ============================================
 const Generator = {
+  _selectedRateProjectId: '',
+  _selectedRatePolicyId: '',
+
   // Track extra columns acceptance per file type
   _acceptedExtraCols: {},
 
@@ -2499,30 +2502,50 @@ const Generator = {
       return;
     }
 
-    // Build options from extracted data
-    let options = '<option value="">-- Không mapping --</option>';
-    Object.keys(AppState.extractedData).forEach(fileType => {
-      const config = FILE_TYPES[fileType];
-      const data = AppState.extractedData[fileType];
-      const keys = Object.keys(data);
-      if (keys.length > 0) {
-        options += `<optgroup label="${config.label}">`;
-        keys.forEach(key => {
-          const value = data[key];
-          const displayValue = String(value).substring(0, 50);
-          options += `<option value="${fileType}::${key}" title="${displayValue}">[${config.label}] ${key}</option>`;
-        });
-        options += '</optgroup>';
-      }
-    });
+    this._syncRateSelection();
+    const currentMappings = this._collectCurrentMappings(tpl.placeholders);
+    const options = this._buildMappingOptions();
+    const projects = (typeof RateCenter !== 'undefined' && typeof RateCenter.getProjects === 'function')
+      ? RateCenter.getProjects()
+      : [];
+    const policies = this._selectedRateProjectId
+      ? ((typeof RateCenter !== 'undefined' && typeof RateCenter.getProjectPolicies === 'function')
+        ? RateCenter.getProjectPolicies(this._selectedRateProjectId)
+        : [])
+      : [];
 
     const container = document.getElementById('mapping-container');
     container.innerHTML = `
+      <div class="rate-filter-panel" style="margin-bottom:18px;padding:16px 18px;border:1px solid rgba(99,102,241,0.14);border-radius:14px;background:rgba(99,102,241,0.04);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <div>
+            <h4 style="margin:0 0 4px;font-size:0.95rem;color:var(--text-primary);">Nguồn Master Data lãi suất</h4>
+            <p style="margin:0;font-size:0.82rem;color:var(--text-muted);">Chọn dự án và chính sách để các placeholder lãi suất tự filter đúng theo setup đã cấu hình.</p>
+          </div>
+          <span style="padding:6px 10px;border-radius:999px;background:rgba(99,102,241,0.1);color:var(--accent);font-size:0.75rem;font-weight:600;">Master Data</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+          <div>
+            <label style="display:block;margin-bottom:6px;font-size:0.8rem;font-weight:600;color:var(--text-secondary);">Dự án bất động sản</label>
+            <select class="mapping-select" id="rate-project-select" onchange="Generator.onRateProjectChange(this.value)">
+              <option value="">-- Chọn dự án --</option>
+              ${projects.map(project => `<option value="${project.id}" ${project.id === this._selectedRateProjectId ? 'selected' : ''}>${TemplateBuilder.escapeHtml(project.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:6px;font-size:0.8rem;font-weight:600;color:var(--text-secondary);">Chính sách áp dụng</label>
+            <select class="mapping-select" id="rate-policy-select" onchange="Generator.onRatePolicyChange(this.value)">
+              <option value="">-- Chọn chính sách --</option>
+              ${policies.map(policy => `<option value="${policy.id}" ${policy.id === this._selectedRatePolicyId ? 'selected' : ''}>${TemplateBuilder.escapeHtml(policy.name)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>
       <table class="mapping-table">
         <thead>
           <tr>
             <th style="width:30%">Trường trong Template</th>
-            <th style="width:40%">Dữ liệu từ Excel</th>
+            <th style="width:40%">Dữ liệu từ Excel / Master Data</th>
             <th style="width:30%">Giá trị hiện tại</th>
           </tr>
         </thead>
@@ -2543,13 +2566,112 @@ const Generator = {
       </table>
     `;
 
+    tpl.placeholders.forEach(ph => {
+      const selectEl = document.getElementById(`map-${this.sanitizeId(ph)}`);
+      const currentValue = currentMappings[ph];
+      const hasCurrentValue = selectEl && Array.from(selectEl.options).some(option => option.value === currentValue);
+      if (selectEl && currentValue && hasCurrentValue) {
+        selectEl.value = currentValue;
+        this.onMappingChange(ph, currentValue);
+      }
+    });
+
     // Auto-map: try to match placeholder names with field names
     this.autoMap(tpl.placeholders);
   },
 
-  autoMap(placeholders) {
+  _collectCurrentMappings(placeholders) {
+    const mappings = {};
     placeholders.forEach(ph => {
-      const phLower = ph.toLowerCase().trim();
+      const selectEl = document.getElementById(`map-${this.sanitizeId(ph)}`);
+      if (selectEl && selectEl.value) mappings[ph] = selectEl.value;
+    });
+    return mappings;
+  },
+
+  _syncRateSelection() {
+    if (typeof RateCenter === 'undefined' || typeof RateCenter.getProjects !== 'function') {
+      this._selectedRateProjectId = '';
+      this._selectedRatePolicyId = '';
+      return;
+    }
+    const projects = RateCenter.getProjects();
+    if (!projects.find(project => project.id === this._selectedRateProjectId)) {
+      this._selectedRateProjectId = projects[0] ? projects[0].id : '';
+    }
+    const policies = this._selectedRateProjectId ? RateCenter.getProjectPolicies(this._selectedRateProjectId) : [];
+    if (!policies.find(policy => policy.id === this._selectedRatePolicyId)) {
+      this._selectedRatePolicyId = policies[0] ? policies[0].id : '';
+    }
+  },
+
+  _getRateTemplateData() {
+    if (typeof RateCenter === 'undefined' || typeof RateCenter.getTemplateData !== 'function') return {};
+    if (!this._selectedRateProjectId || !this._selectedRatePolicyId) return {};
+    return RateCenter.getTemplateData(this._selectedRateProjectId, this._selectedRatePolicyId);
+  },
+
+  _buildMappingOptions() {
+    let options = '<option value="">-- Không mapping --</option>';
+    Object.keys(AppState.extractedData).forEach(fileType => {
+      const config = FILE_TYPES[fileType];
+      const data = AppState.extractedData[fileType];
+      const keys = Object.keys(data);
+      if (keys.length > 0) {
+        options += `<optgroup label="${config.label}">`;
+        keys.forEach(key => {
+          const value = data[key];
+          const displayValue = String(value).substring(0, 50);
+          options += `<option value="${fileType}::${key}" title="${displayValue}">[${config.label}] ${key}</option>`;
+        });
+        options += '</optgroup>';
+      }
+    });
+
+    const rateData = this._getRateTemplateData();
+    const rateKeys = Object.keys(rateData);
+    if (rateKeys.length > 0) {
+      options += '<optgroup label="Master Data lãi suất">';
+      rateKeys.forEach(key => {
+        const value = rateData[key];
+        const displayValue = String(value || '').substring(0, 50);
+        options += `<option value="ratecenter::${key}" title="${displayValue}">[Lãi suất] ${key}</option>`;
+      });
+      options += '</optgroup>';
+    }
+    return options;
+  },
+
+  onRateProjectChange(projectId) {
+    this._selectedRateProjectId = projectId;
+    const policies = (typeof RateCenter !== 'undefined' && typeof RateCenter.getProjectPolicies === 'function')
+      ? RateCenter.getProjectPolicies(projectId)
+      : [];
+    this._selectedRatePolicyId = policies[0] ? policies[0].id : '';
+    this.buildMappingUI();
+  },
+
+  onRatePolicyChange(policyId) {
+    this._selectedRatePolicyId = policyId;
+    this.buildMappingUI();
+  },
+
+  _resolveMappingValue(mappingValue) {
+    if (!mappingValue) return undefined;
+    const [source, ...rest] = mappingValue.split('::');
+    const field = rest.join('::');
+    if (source === 'ratecenter') {
+      const data = this._getRateTemplateData();
+      return data[field];
+    }
+    const data = AppState.extractedData[source];
+    return data ? data[field] : undefined;
+  },
+
+  autoMap(placeholders) {
+    const rateData = this._getRateTemplateData();
+    placeholders.forEach(ph => {
+      const phLower = ph.toLowerCase().trim().replace(/^\[[^\]]+\]\s*/, '');
       let bestMatch = null;
       let bestScore = 0;
 
@@ -2584,9 +2706,27 @@ const Generator = {
         });
       });
 
+      Object.keys(rateData).forEach(key => {
+        const keyLower = key.toLowerCase().trim();
+        let score = 0;
+        if (keyLower === phLower) score = 100;
+        else if (keyLower.includes(phLower) || phLower.includes(keyLower)) score = 70;
+        else {
+          const phWords = phLower.split(/\s+/);
+          const keyWords = keyLower.split(/\s+/);
+          const overlap = phWords.filter(w => keyWords.some(kw => kw.includes(w) || w.includes(kw)));
+          if (overlap.length > 0) score = (overlap.length / Math.max(phWords.length, keyWords.length)) * 60;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = `ratecenter::${key}`;
+        }
+      });
+
       if (bestMatch && bestScore >= 50) {
         const selectEl = document.getElementById(`map-${this.sanitizeId(ph)}`);
-        if (selectEl) {
+        if (selectEl && !selectEl.value) {
           selectEl.value = bestMatch;
           this.onMappingChange(ph, bestMatch);
         }
@@ -2598,16 +2738,17 @@ const Generator = {
     const previewEl = document.getElementById(`preview-${this.sanitizeId(placeholder)}`);
     if (!value) {
       previewEl.textContent = '—';
+      previewEl.title = '';
       return;
     }
 
-    const [fileType, field] = value.split('::');
-    const data = AppState.extractedData[fileType];
-    if (data && data[field] !== undefined) {
-      previewEl.textContent = String(data[field]).substring(0, 80) || '(trống)';
-      previewEl.title = String(data[field]);
+    const resolvedValue = this._resolveMappingValue(value);
+    if (resolvedValue !== undefined) {
+      previewEl.textContent = String(resolvedValue).substring(0, 80) || '(trống)';
+      previewEl.title = String(resolvedValue);
     } else {
       previewEl.textContent = '—';
+      previewEl.title = '';
     }
   },
 
@@ -2625,10 +2766,9 @@ const Generator = {
       tpl.placeholders.forEach(ph => {
         const selectEl = document.getElementById(`map-${this.sanitizeId(ph)}`);
         if (selectEl && selectEl.value) {
-          const [fileType, field] = selectEl.value.split('::');
-          const data = AppState.extractedData[fileType];
-          if (data && data[field] !== undefined) {
-            replacements[ph] = String(data[field]);
+          const resolvedValue = this._resolveMappingValue(selectEl.value);
+          if (resolvedValue !== undefined) {
+            replacements[ph] = String(resolvedValue);
           }
         }
       });
