@@ -1163,6 +1163,26 @@
 
   </main>
 
+  <!-- Modal: Rate Center Quick Name Input (replaces prompt()) -->
+  <div id="rc-name-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+    <div style="background:var(--surface,#1e1e2e);border:1px solid rgba(99,102,241,0.25);border-radius:16px;padding:28px 32px;min-width:360px;max-width:480px;box-shadow:0 24px 60px rgba(0,0,0,0.5);">
+      <h3 id="rc-name-modal-title" style="margin:0 0 16px;font-size:1rem;font-weight:700;color:var(--text-primary,#e2e8f0);">Nhập tên</h3>
+      <input id="rc-name-modal-input" type="text" placeholder="Nhập tên..."
+        style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid rgba(99,102,241,0.3);background:rgba(255,255,255,0.05);color:var(--text-primary,#e2e8f0);font-size:0.95rem;font-family:inherit;outline:none;margin-bottom:18px;"
+        onkeydown="if(event.key==='Enter')document.getElementById('rc-name-modal-ok').click();if(event.key==='Escape')RateCenter._closeNameModal(null)">
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="RateCenter._closeNameModal(null)"
+          style="padding:8px 18px;border-radius:8px;border:1px solid rgba(99,102,241,0.2);background:transparent;color:var(--text-muted,#94a3b8);cursor:pointer;font-family:inherit;font-size:0.88rem;">
+          Hủy
+        </button>
+        <button id="rc-name-modal-ok" onclick="RateCenter._closeNameModal(document.getElementById('rc-name-modal-input').value)"
+          style="padding:8px 20px;border-radius:8px;border:none;background:var(--accent,#6366f1);color:#fff;cursor:pointer;font-family:inherit;font-size:0.88rem;font-weight:600;">
+          Xác nhận
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Insert Placeholder (Enhanced) -->
   <div id="modal-placeholder" class="modal-overlay" style="display:none;">
     <div class="modal modal-wide">

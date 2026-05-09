@@ -2246,6 +2246,15 @@ const MultiSheetImport = {
 const Generator = {
   _selectedRateProjectId: '',
   _selectedRatePolicyId: '',
+  _runtimeConditions: {
+    htlsMonths: '',
+    disbursementDate: '',
+    loanType: 'HTLS',
+    hasSupplementGrace: false,
+    projectGroup: '',
+    currentMonth: 1,
+  },
+  _runtimeDerivedData: {},
 
   // Track extra columns acceptance per file type
   _acceptedExtraCols: {},
@@ -2541,6 +2550,60 @@ const Generator = {
           </div>
         </div>
       </div>
+
+      <!-- Runtime Rule Conditions -->
+      <div style="margin-bottom:18px;border:1px solid rgba(16,185,129,0.2);border-radius:14px;background:rgba(16,185,129,0.03);">
+        <div style="padding:12px 18px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;"
+             onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.rc-expand-icon').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'">
+          <span style="font-size:0.9rem;font-weight:700;color:#10b981;">⚙️ Điều kiện tính Rule Lãi suất</span>
+          <span style="font-size:0.75rem;color:var(--text-muted);">Nhập để Rule Engine tự tính bucket, ân hạn, phí TNTH</span>
+          <span class="rc-expand-icon" style="margin-left:auto;color:#10b981;font-size:0.8rem;">▶</span>
+        </div>
+        <div style="display:none;padding:0 18px 16px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px;">
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Thời gian HTLS/CĐLS (tháng)</label>
+              <input type="number" min="0" class="mapping-select" id="rc-runtime-htls"
+                placeholder="VD: 24"
+                value="${this._runtimeConditions.htlsMonths||''}"
+                oninput="Generator._runtimeConditions.htlsMonths=this.value">
+            </div>
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Tháng hiện tại trong khoản vay</label>
+              <input type="number" min="1" class="mapping-select" id="rc-runtime-month"
+                placeholder="VD: 1"
+                value="${this._runtimeConditions.currentMonth||1}"
+                oninput="Generator._runtimeConditions.currentMonth=Number(this.value)">
+            </div>
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Loại khoản vay</label>
+              <select class="mapping-select" id="rc-runtime-loantype"
+                onchange="Generator._runtimeConditions.loanType=this.value">
+                <option value="HTLS" ${this._runtimeConditions.loanType==='HTLS'?'selected':''}>Có HTLS từ CĐT</option>
+                <option value="standard" ${this._runtimeConditions.loanType==='standard'?'selected':''}>Không có HTLS</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Nhóm dự án (A/B/...)</label>
+              <input type="text" class="mapping-select" id="rc-runtime-group"
+                placeholder="VD: A, B, hoặc để trống"
+                value="${this._runtimeConditions.projectGroup||''}"
+                oninput="Generator._runtimeConditions.projectGroup=this.value">
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding-top:20px;">
+              <input type="checkbox" id="rc-runtime-supp"
+                ${this._runtimeConditions.hasSupplementGrace?'checked':''}
+                onchange="Generator._runtimeConditions.hasSupplementGrace=this.checked">
+              <label for="rc-runtime-supp" style="font-size:0.82rem;color:var(--text-secondary);cursor:pointer;">Có ân hạn gốc bổ sung</label>
+            </div>
+          </div>
+          <button onclick="Generator.applyRuleEngine()" style="padding:8px 18px;border-radius:8px;border:none;background:#10b981;color:#fff;font-weight:700;cursor:pointer;font-size:0.85rem;font-family:inherit;">
+            ▶ Chạy Rule Engine → Cập nhật mapping
+          </button>
+          <div id="rc-runtime-result" style="margin-top:10px;font-size:0.8rem;color:var(--text-muted);"></div>
+        </div>
+      </div>
+
       <table class="mapping-table">
         <thead>
           <tr>
@@ -2639,6 +2702,19 @@ const Generator = {
       });
       options += '</optgroup>';
     }
+
+    // Rule engine derived fields
+    const derived = this._runtimeDerivedData || {};
+    const derivedKeys = Object.keys(derived);
+    if (derivedKeys.length > 0) {
+      options += '<optgroup label="⚙️ Rule Engine (tính tự động)">';
+      derivedKeys.forEach(key => {
+        const value = derived[key];
+        const displayValue = String(value || '').substring(0, 50);
+        options += `<option value="derived::${key}" title="${displayValue}">[Rule] ${key} = ${displayValue}</option>`;
+      });
+      options += '</optgroup>';
+    }
     return options;
   },
 
@@ -2656,6 +2732,46 @@ const Generator = {
     this.buildMappingUI();
   },
 
+  applyRuleEngine() {
+    if (typeof RateCenter === 'undefined' || typeof RateRuleEngine === 'undefined') {
+      if (typeof App !== 'undefined') App.toast('Rule Engine chưa sẵn sàng', 'warning');
+      return;
+    }
+    if (!this._selectedRateProjectId || !this._selectedRatePolicyId) {
+      if (typeof App !== 'undefined') App.toast('Chọn dự án và chính sách trước', 'warning');
+      return;
+    }
+    const projects = RateCenter.getProjects();
+    const proj = projects.find(p => p.id === this._selectedRateProjectId);
+    const pkg  = proj && (proj.packages||[]).find(k => k.id === this._selectedRatePolicyId);
+    if (!pkg) { if (typeof App !== 'undefined') App.toast('Không tìm thấy chính sách', 'error'); return; }
+
+    const input = {
+      htlsMonths:         Number(this._runtimeConditions.htlsMonths) || 0,
+      currentMonth:       Number(this._runtimeConditions.currentMonth) || 1,
+      hasHTLS:            this._runtimeConditions.loanType === 'HTLS',
+      hasSupplementGrace: this._runtimeConditions.hasSupplementGrace,
+      projectGroup:       this._runtimeConditions.projectGroup || '',
+      loanType:           this._runtimeConditions.loanType,
+    };
+
+    const derived = RateRuleEngine.evaluate(pkg, proj, input);
+    this._runtimeDerivedData = derived;
+
+    // Show result summary
+    const resultEl = document.getElementById('rc-runtime-result');
+    if (resultEl) {
+      const items = Object.entries(derived).map(([k,v]) =>
+        `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:#059669;font-size:0.75rem;"><b>${k}:</b> ${v}</span>`
+      ).join('');
+      resultEl.innerHTML = '<b style="color:#10b981">✅ Kết quả rule:</b><br>' + items;
+    }
+
+    // Rebuild mapping options to include derived fields
+    this.buildMappingUI();
+    if (typeof App !== 'undefined') App.toast('Rule Engine đã chạy, mapping được cập nhật', 'success');
+  },
+
   _resolveMappingValue(mappingValue) {
     if (!mappingValue) return undefined;
     const [source, ...rest] = mappingValue.split('::');
@@ -2663,6 +2779,9 @@ const Generator = {
     if (source === 'ratecenter') {
       const data = this._getRateTemplateData();
       return data[field];
+    }
+    if (source === 'derived') {
+      return (this._runtimeDerivedData || {})[field];
     }
     const data = AppState.extractedData[source];
     return data ? data[field] : undefined;
