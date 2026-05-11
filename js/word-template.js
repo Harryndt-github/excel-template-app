@@ -395,6 +395,16 @@ const WordEditor = {
 const WordGenerator = {
   _selectedRateProjectId: '',
   _selectedRatePolicyId: '',
+  // [P2-2] Rule Engine runtime
+  _runtimeConditions: {
+    htlsMonths: '', currentMonth: 1, loanType: 'HTLS',
+    hasSupplementGrace: false, projectGroup: '',
+    contractFields: {
+      'Xếp hạng khách hàng': '', 'Hạng khách hàng': '',
+      'Nhóm nợ': '', 'Loại tài sản đảm bảo': '', 'Mục đích vay': '',
+    },
+  },
+  _runtimeDerivedData: {},
 
   initStep1() {
     const select = document.getElementById('word-select-template');
@@ -636,6 +646,68 @@ const WordGenerator = {
           </div>
         </div>
       </div>
+      <!-- [P2-2] Rule Engine Panel -->
+      <div style="margin-bottom:18px;border:1px solid rgba(16,185,129,0.2);border-radius:14px;background:rgba(16,185,129,0.03);">
+        <div style="padding:12px 18px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;"
+             onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.wre-exp').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'">
+          <span style="font-size:0.9rem;font-weight:700;color:#10b981;">⚙️ Rule Engine — Tính lãi suất động</span>
+          <span style="font-size:0.75rem;color:var(--text-muted);">Nhập điều kiện để tự động tính bucket, ân hạn, phí TNTH, lãi suất bổ sung</span>
+          <span class="wre-exp" style="margin-left:auto;color:#10b981;font-size:0.8rem;">▶</span>
+        </div>
+        <div style="display:none;padding:0 18px 16px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:12px;">
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Thời gian HTLS/CĐLS (tháng)</label>
+              <input type="number" min="0" class="mapping-select" placeholder="VD: 24"
+                value="${this._runtimeConditions.htlsMonths||''}"
+                oninput="WordGenerator._runtimeConditions.htlsMonths=this.value">
+            </div>
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Tháng hiện tại trong khoản vay</label>
+              <input type="number" min="1" class="mapping-select" placeholder="VD: 1"
+                value="${this._runtimeConditions.currentMonth||1}"
+                oninput="WordGenerator._runtimeConditions.currentMonth=Number(this.value)">
+            </div>
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Loại khoản vay</label>
+              <select class="mapping-select" onchange="WordGenerator._runtimeConditions.loanType=this.value">
+                <option value="HTLS" ${this._runtimeConditions.loanType==='HTLS'?'selected':''}>Có HTLS từ CĐT</option>
+                <option value="standard" ${this._runtimeConditions.loanType==='standard'?'selected':''}>Không có HTLS</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Nhóm dự án (A/B/...)</label>
+              <input type="text" class="mapping-select" placeholder="VD: A, B, hoặc để trống"
+                value="${this._runtimeConditions.projectGroup||''}"
+                oninput="WordGenerator._runtimeConditions.projectGroup=this.value">
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
+              <input type="checkbox" id="wre-supp-grace"
+                ${this._runtimeConditions.hasSupplementGrace?'checked':''}
+                onchange="WordGenerator._runtimeConditions.hasSupplementGrace=this.checked">
+              <label for="wre-supp-grace" style="font-size:0.82rem;color:var(--text-secondary);cursor:pointer;">Có ân hạn gốc bổ sung</label>
+            </div>
+          </div>
+          <!-- Contract fields for adjustment rules -->
+          <div style="padding:10px 14px;border-radius:10px;border:1px solid rgba(245,158,11,0.25);background:rgba(245,158,11,0.04);margin-bottom:12px;">
+            <div style="font-size:0.75rem;font-weight:700;color:#f59e0b;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.04em;">⚡ Điều kiện hợp đồng (cho Lãi suất bổ sung)</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+              ${Object.keys(this._runtimeConditions.contractFields||{}).map(field => `
+              <div>
+                <label style="display:block;margin-bottom:3px;font-size:0.75rem;font-weight:600;color:var(--text-secondary);">${field}</label>
+                <input type="text" class="mapping-select" placeholder="Để trống = không áp dụng"
+                  value="${this._runtimeConditions.contractFields[field]||''}"
+                  oninput="WordGenerator._runtimeConditions.contractFields['${field}']=this.value">
+              </div>`).join('')}
+            </div>
+          </div>
+          <button onclick="WordGenerator.applyRuleEngine()" style="padding:8px 18px;border-radius:8px;border:none;background:#10b981;color:#fff;font-weight:700;cursor:pointer;font-size:0.85rem;font-family:inherit;">
+            ▶ Chạy Rule Engine → Cập nhật mapping
+          </button>
+          <div id="wre-runtime-result" style="margin-top:10px;font-size:0.8rem;color:var(--text-muted);"></div>
+        </div>
+      </div>
+
       <table class="mapping-table"><thead><tr>
         <th style="width:30%">Trường Template</th><th style="width:40%">Dữ liệu Excel / Master Data</th><th style="width:30%">Giá trị</th>
       </tr></thead><tbody>
@@ -709,6 +781,31 @@ const WordGenerator = {
       });
       options += '</optgroup>';
     }
+    // [P2-2] Master Data entity records
+    if (typeof MasterData !== 'undefined' && typeof MasterData.getMappingData === 'function') {
+      const mdData = MasterData.getMappingData();
+      const mdKeys = Object.keys(mdData);
+      if (mdKeys.length > 0) {
+        options += '<optgroup label="📋 Master Data">';
+        mdKeys.forEach(key => {
+          const val = mdData[key];
+          options += `<option value="masterdata::${key}" title="${String(val||'').substring(0,50)}">[MD] ${_wEsc(key)}</option>`;
+        });
+        options += '</optgroup>';
+      }
+    }
+    // [P2-2] Rule Engine derived fields
+    const derived = this._runtimeDerivedData || {};
+    const derivedKeys = Object.keys(derived).filter(k => !k.startsWith('_'));
+    if (derivedKeys.length > 0) {
+      options += '<optgroup label="⚙️ Rule Engine (tính tự động)">';
+      derivedKeys.forEach(key => {
+        const val = derived[key];
+        const disp = String(val || '').substring(0, 50);
+        options += `<option value="derived::${key}" title="${disp}">[Rule] ${_wEsc(key)} = ${disp}</option>`;
+      });
+      options += '</optgroup>';
+    }
     return options;
   },
 
@@ -734,8 +831,85 @@ const WordGenerator = {
       const data = this._getRateTemplateData();
       return data[field];
     }
+    if (source === 'masterdata') {
+      if (typeof MasterData !== 'undefined' && typeof MasterData.getMappingData === 'function') {
+        return MasterData.getMappingData()[field];
+      }
+      return undefined;
+    }
+    if (source === 'derived') {
+      return (this._runtimeDerivedData || {})[field];
+    }
     const data = WordState.extractedData[source];
     return data ? data[field] : undefined;
+  },
+
+  // [P2-2] Build contract data for adjustments
+  _buildContractData() {
+    const data = {};
+    const loanData = WordState.extractedData['thong_tin_vay'] || {};
+    Object.assign(data, loanData);
+    if (typeof MasterData !== 'undefined' && typeof MasterData.getMappingData === 'function') {
+      const mdData = MasterData.getMappingData();
+      Object.entries(mdData).forEach(([key, val]) => {
+        const plainKey = key.replace(/^\[[^\]]+\]\s*/, '');
+        if (val !== undefined && val !== '') { data[plainKey] = val; data[key] = val; }
+      });
+    }
+    const manual = this._runtimeConditions.contractFields || {};
+    Object.entries(manual).forEach(([k, v]) => {
+      if (v !== undefined && String(v).trim() !== '') data[k] = v;
+    });
+    return data;
+  },
+
+  // [P2-2] Apply Rule Engine for Word template
+  applyRuleEngine() {
+    if (typeof RateCenter === 'undefined' || typeof RateRuleEngine === 'undefined') {
+      if (typeof App !== 'undefined') App.toast('Rule Engine chưa sẵn sàng', 'warning');
+      return;
+    }
+    if (!this._selectedRateProjectId || !this._selectedRatePolicyId) {
+      if (typeof App !== 'undefined') App.toast('Chọn dự án và chính sách trước', 'warning');
+      return;
+    }
+    const proj = RateCenter.getProjects().find(p => p.id === this._selectedRateProjectId);
+    const pkg  = proj && (proj.packages||[]).find(k => k.id === this._selectedRatePolicyId);
+    if (!pkg) { if (typeof App !== 'undefined') App.toast('Không tìm thấy chính sách', 'error'); return; }
+
+    const input = {
+      htlsMonths:         Number(this._runtimeConditions.htlsMonths) || 0,
+      currentMonth:       Number(this._runtimeConditions.currentMonth) || 1,
+      hasHTLS:            this._runtimeConditions.loanType === 'HTLS',
+      hasSupplementGrace: this._runtimeConditions.hasSupplementGrace,
+      projectGroup:       this._runtimeConditions.projectGroup || '',
+      loanType:           this._runtimeConditions.loanType,
+    };
+    const derived = RateRuleEngine.evaluate(pkg, proj, input);
+
+    const contractData = this._buildContractData();
+    if (typeof RateRuleEngine.evaluateAdjustments === 'function') {
+      const adjResult = RateRuleEngine.evaluateAdjustments(pkg, contractData);
+      if (adjResult.totalDelta !== 0) {
+        derived['Lãi suất điều chỉnh bổ sung'] = adjResult.totalDelta + '%/năm';
+        const base = parseFloat(derived['Lãi suất hiệu lực'] || derived['Lãi suất bucket'] || 0);
+        derived['Lãi suất hiệu lực (có ĐC)'] = isNaN(base)
+          ? adjResult.totalDelta + '%/năm'
+          : (base + adjResult.totalDelta).toFixed(2) + '%/năm';
+        derived['Rules điều chỉnh khớp'] = adjResult.matched.map(m => `${m.name} (+${m.delta}%)`).join(', ');
+      }
+    }
+    this._runtimeDerivedData = derived;
+
+    const resultEl = document.getElementById('wre-runtime-result');
+    if (resultEl) {
+      const items = Object.entries(derived).filter(([k]) => !k.startsWith('_')).map(([k,v]) =>
+        `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:#059669;font-size:0.75rem;"><b>${k}:</b> ${v}</span>`
+      ).join('');
+      resultEl.innerHTML = '<b style="color:#10b981">✅ Kết quả rule:</b><br>' + items;
+    }
+    this.buildMappingUI();
+    if (typeof App !== 'undefined') App.toast('Rule Engine đã chạy, mapping được cập nhật', 'success');
   },
 
   autoMap(placeholders) {
