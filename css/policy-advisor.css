@@ -68,3 +68,33 @@
   .pa-grid-2{grid-template-columns:1fr}
   .pg-fee-row{flex-direction:column}
 }
+
+/* ── PolicyRanker — Top-5 Cards ── */
+.pg-rank-card {
+  border: 1px solid rgba(99,102,241,0.15);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: rgba(255,255,255,0.03);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.pg-rank-card:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+.pg-rank-card-gold { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.04); }
+.pg-rank-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.pg-rank-medal { font-size:1.6rem; flex-shrink:0; }
+.pg-rank-names { flex:1; min-width:0; }
+.pg-rank-policy { font-weight:700; font-size:0.9rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pg-rank-project { font-size:0.75rem; color:var(--text-muted); }
+.pg-rank-score { text-align:right; flex-shrink:0; }
+.pg-rank-score-val { font-size:1.6rem; font-weight:800; color:#6366f1; }
+.pg-rank-score-unit { font-size:0.7rem; color:var(--text-muted); }
+.pg-rank-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:6px; margin-bottom:12px; }
+.pg-rank-metric { padding:6px 10px; border-radius:8px; background:rgba(255,255,255,0.04); }
+.pg-rank-metric-label { display:block; font-size:0.68rem; color:var(--text-muted); margin-bottom:2px; }
+.pg-rank-metric-val { font-size:0.82rem; font-weight:700; color:var(--text-primary); }
+.pg-score-breakdown { border-top:1px solid rgba(99,102,241,0.08); padding-top:10px; display:flex; flex-direction:column; gap:5px; }
+.pg-score-bar-row { display:flex; align-items:center; gap:8px; }
+.pg-score-bar-label { font-size:0.68rem; color:var(--text-muted); width:46px; flex-shrink:0; }
+.pg-score-bar-track { flex:1; height:5px; border-radius:99px; background:rgba(255,255,255,0.07); overflow:hidden; }
+.pg-score-bar-fill { height:100%; border-radius:99px; transition:width 0.4s ease; }
+.pg-score-bar-pts { font-size:0.68rem; font-weight:700; width:28px; text-align:right; flex-shrink:0; }

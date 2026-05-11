@@ -2253,6 +2253,14 @@ const Generator = {
     hasSupplementGrace: false,
     projectGroup: '',
     currentMonth: 1,
+    // [P1-2] Contract fields for evaluateAdjustments
+    contractFields: {
+      'Xếp hạng khách hàng': '',
+      'Hạng khách hàng': '',
+      'Nhóm nợ': '',
+      'Loại tài sản đảm bảo': '',
+      'Mục đích vay': '',
+    },
   },
   _runtimeDerivedData: {},
 
@@ -2597,7 +2605,26 @@ const Generator = {
               <label for="rc-runtime-supp" style="font-size:0.82rem;color:var(--text-secondary);cursor:pointer;">Có ân hạn gốc bổ sung</label>
             </div>
           </div>
-          <button onclick="Generator.applyRuleEngine()" style="padding:8px 18px;border-radius:8px;border:none;background:#10b981;color:#fff;font-weight:700;cursor:pointer;font-size:0.85rem;font-family:inherit;">
+          <!-- [P1-2] Contract fields for evaluateAdjustments -->
+          <div style="margin-top:14px;padding:10px 14px;border-radius:10px;border:1px solid rgba(245,158,11,0.25);background:rgba(245,158,11,0.04);">
+            <div style="font-size:0.75rem;font-weight:700;color:#f59e0b;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.04em;">
+              ⚡ Điều kiện hợp đồng (cho Lãi suất bổ sung)
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;">
+              ${Object.keys(this._runtimeConditions.contractFields||{}).map(field => `
+              <div>
+                <label style="display:block;margin-bottom:3px;font-size:0.75rem;font-weight:600;color:var(--text-secondary);">${field}</label>
+                <input type="text" class="mapping-select" placeholder="Để trống = không áp dụng"
+                  value="${this._runtimeConditions.contractFields['${field}']||''}"
+                  oninput="Generator._runtimeConditions.contractFields['${field}']=this.value">
+              </div>`).join('')}
+            </div>
+            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:8px;">
+              💡 Nếu có data từ Excel "Thông tin vay" đã upload, hệ thống tự động lấy — không cần nhập lại.
+            </div>
+          </div>
+
+          <button onclick="Generator.applyRuleEngine()" style="margin-top:12px;padding:8px 18px;border-radius:8px;border:none;background:#10b981;color:#fff;font-weight:700;cursor:pointer;font-size:0.85rem;font-family:inherit;">
             ▶ Chạy Rule Engine → Cập nhật mapping
           </button>
           <div id="rc-runtime-result" style="margin-top:10px;font-size:0.8rem;color:var(--text-muted);"></div>
@@ -2703,6 +2730,21 @@ const Generator = {
       options += '</optgroup>';
     }
 
+    // [P1-3] Master Data entity records
+    if (typeof MasterData !== 'undefined' && typeof MasterData.getMappingData === 'function') {
+      const mdData = MasterData.getMappingData();
+      const mdKeys = Object.keys(mdData);
+      if (mdKeys.length > 0) {
+        options += '<optgroup label="📋 Master Data">';
+        mdKeys.forEach(key => {
+          const value = mdData[key];
+          const displayValue = String(value || '').substring(0, 50);
+          options += `<option value="masterdata::${key}" title="${displayValue}">[MD] ${key}${value ? ' = ' + displayValue : ''}</option>`;
+        });
+        options += '</optgroup>';
+      }
+    }
+
     // Rule engine derived fields
     const derived = this._runtimeDerivedData || {};
     const derivedKeys = Object.keys(derived);
@@ -2732,6 +2774,33 @@ const Generator = {
     this.buildMappingUI();
   },
 
+  /**
+   * [P1-2] Xây dựng contract data dict để truyền vào evaluateAdjustments.
+   * Ưu tiên: (1) extracted Excel data, (2) Master Data, (3) fields nhập tay trong UI
+   */
+  _buildContractData() {
+    const data = {};
+    // (1) Từ extracted data (thông tin vay)
+    const loanData = AppState.extractedData['thong_tin_vay'] || {};
+    Object.assign(data, loanData);
+    // (2) Từ Master Data entities
+    if (typeof MasterData !== 'undefined' && typeof MasterData.getMappingData === 'function') {
+      const mdData = MasterData.getMappingData();
+      Object.entries(mdData).forEach(([key, val]) => {
+        // Strip entity prefix "[EntityName] "
+        const plainKey = key.replace(/^\[[^\]]+\]\s*/, '');
+        if (val !== undefined && val !== '') data[plainKey] = val;
+        data[key] = val; // also keep full key
+      });
+    }
+    // (3) Từ fields nhập tay trong Rule Engine panel
+    const manual = this._runtimeConditions.contractFields || {};
+    Object.entries(manual).forEach(([k, v]) => {
+      if (v !== undefined && String(v).trim() !== '') data[k] = v;
+    });
+    return data;
+  },
+
   applyRuleEngine() {
     if (typeof RateCenter === 'undefined' || typeof RateRuleEngine === 'undefined') {
       if (typeof App !== 'undefined') App.toast('Rule Engine chưa sẵn sàng', 'warning');
@@ -2756,6 +2825,25 @@ const Generator = {
     };
 
     const derived = RateRuleEngine.evaluate(pkg, proj, input);
+
+    // [P1-2] Nối evaluateAdjustments — thu thập contract fields từ UI + extracted data
+    const contractData = this._buildContractData();
+    if (typeof RateRuleEngine.evaluateAdjustments === 'function') {
+      const adjResult = RateRuleEngine.evaluateAdjustments(pkg, contractData);
+      if (adjResult.totalDelta !== 0) {
+        derived['Lãi suất điều chỉnh bổ sung'] = adjResult.totalDelta + '%/năm';
+        derived['Lãi suất hiệu lực (có ĐC)'] = (() => {
+          const base = parseFloat(derived['Lãi suất hiệu lực'] || derived['Lãi suất bucket'] || 0);
+          return isNaN(base) ? adjResult.totalDelta + '%/năm' : (base + adjResult.totalDelta).toFixed(2) + '%/năm';
+        })();
+        derived['Rules điều chỉnh khớp'] = adjResult.matched.map(m =>
+          `${m.name} (+${m.delta}%)`
+        ).join(', ');
+      }
+      derived['_adjMatched'] = adjResult.matched.length;
+      derived['_contractData'] = contractData;
+    }
+
     this._runtimeDerivedData = derived;
 
     // Show result summary
@@ -2782,6 +2870,13 @@ const Generator = {
     }
     if (source === 'derived') {
       return (this._runtimeDerivedData || {})[field];
+    }
+    // [P1-3] Master Data entity records
+    if (source === 'masterdata') {
+      if (typeof MasterData !== 'undefined' && typeof MasterData.getMappingData === 'function') {
+        return MasterData.getMappingData()[field];
+      }
+      return undefined;
     }
     const data = AppState.extractedData[source];
     return data ? data[field] : undefined;

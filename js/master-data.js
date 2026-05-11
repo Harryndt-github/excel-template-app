@@ -1691,5 +1691,70 @@ Object.assign(MasterData, {
     this.cfgRenderData(entityId);
     this.cfgRenderEntityList();
     App.toast('Đã xóa bản ghi', 'info');
-  }
+  },
+
+  /**
+   * [P1-3] Trả về field-value từ bản ghi đang chọn của mọi entity.
+   * Dùng làm nguồn mapping trong template generation.
+   * Format: { "[TênEntity] TênField": value }
+   */
+  getMappingData() {
+    const result = {};
+    MasterDataState.entities.forEach(ent => {
+      const recs = MasterDataState.records[ent.id] || [];
+      const selIdx = (MasterDataState.selectedEntity === ent.id && MasterDataState.selectedRecord != null)
+        ? MasterDataState.selectedRecord : 0;
+      const rec = recs[selIdx];
+      if (!rec) return;
+      (ent.fields || []).forEach(f => {
+        const key = `[${ent.name}] ${f.name || f.label || f.id}`;
+        result[key] = rec[f.id] !== undefined ? rec[f.id] : '';
+      });
+    });
+    return result;
+  },
+
+  /**
+   * [P2-1] Auto-fill trường con khi thay đổi trường có linkedEntity.
+   */
+  _triggerAutoFill(entityId, recIdx, changedFieldId, value) {
+    const ent = MasterDataState.entities.find(e => e.id === entityId);
+    if (!ent) return;
+    const changedCol = (ent.fields || []).find(c => c.id === changedFieldId);
+    if (!changedCol || !changedCol.linkedEntity || !changedCol.lookupField) return;
+    const linkedEnt = MasterDataState.entities.find(e => e.id === changedCol.linkedEntity);
+    if (!linkedEnt) return;
+    const linkedRecs = MasterDataState.records[linkedEnt.id] || [];
+    const matchedRec = linkedRecs.find(r =>
+      String(r[changedCol.lookupField] || '').trim().toLowerCase() === String(value).trim().toLowerCase()
+    );
+    if (!matchedRec) return;
+    const rec = MasterDataState.records[entityId][recIdx];
+    if (!rec) return;
+    let filled = 0;
+    (ent.fields || []).forEach(col => {
+      if (col.linkedEntity === changedCol.linkedEntity && col.mappedFromField) {
+        if (matchedRec[col.mappedFromField] !== undefined) {
+          rec[col.id] = matchedRec[col.mappedFromField];
+          filled++;
+        }
+      }
+    });
+    if (filled > 0) {
+      this.saveState();
+      this.cfgRenderData(entityId);
+      if (typeof App !== 'undefined') App.toast(`Auto-fill ${filled} trường từ "${linkedEnt.name}"`, 'success');
+    }
+  },
+
+  cfgSetVal(entityId, recIdx, fieldId, value) {
+    if (!MasterDataState.records[entityId]) MasterDataState.records[entityId] = [];
+    const rec = MasterDataState.records[entityId][recIdx];
+    if (rec) {
+      rec[fieldId] = value;
+      this.saveState();
+      // [P2-1] trigger auto-fill nếu field có linkedEntity
+      this._triggerAutoFill(entityId, recIdx, fieldId, value);
+    }
+  },
 });
