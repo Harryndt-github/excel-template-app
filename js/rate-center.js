@@ -30,12 +30,12 @@ const RC_DEFAULT_FIELDS = [
 ];
 
 const RC_DEFAULT_RATE_BUCKETS = [
-  { id:'rb_6',  maxMonths: 6,  rate:'', margin:'', label:'≤ 6 tháng' },
-  { id:'rb_12', maxMonths: 12, rate:'', margin:'', label:'≤ 12 tháng' },
-  { id:'rb_18', maxMonths: 18, rate:'', margin:'', label:'≤ 18 tháng' },
-  { id:'rb_24', maxMonths: 24, rate:'', margin:'', label:'≤ 24 tháng' },
-  { id:'rb_30', maxMonths: 30, rate:'', margin:'', label:'≤ 30 tháng' },
-  { id:'rb_36', maxMonths: 36, rate:'', margin:'', label:'≤ 36 tháng' },
+  { id:'rb_6',  maxMonths: 6,  rate:'', margin:'', label:'≤ 6 tháng',  note:'', applyUntilDate:'', standardRate:'' },
+  { id:'rb_12', maxMonths: 12, rate:'', margin:'', label:'≤ 12 tháng', note:'', applyUntilDate:'', standardRate:'' },
+  { id:'rb_18', maxMonths: 18, rate:'', margin:'', label:'≤ 18 tháng', note:'', applyUntilDate:'', standardRate:'' },
+  { id:'rb_24', maxMonths: 24, rate:'', margin:'', label:'≤ 24 tháng', note:'', applyUntilDate:'', standardRate:'' },
+  { id:'rb_30', maxMonths: 30, rate:'', margin:'', label:'≤ 30 tháng', note:'', applyUntilDate:'', standardRate:'' },
+  { id:'rb_36', maxMonths: 36, rate:'', margin:'', label:'≤ 36 tháng', note:'', applyUntilDate:'', standardRate:'' },
 ];
 
 const RC_DEFAULT_FEE_RULES = [
@@ -63,9 +63,59 @@ const RateRuleEngine = {
   selectBucket(rateBuckets, htlsMonths) {
     if (!rateBuckets || !rateBuckets.length) return null;
     const months = Math.ceil(Number(htlsMonths) || 0);
-    const sorted = [...rateBuckets].sort((a, b) => a.maxMonths - b.maxMonths);
+    const sorted = this.normalizeBuckets(rateBuckets);
     const bucket = sorted.find(b => months <= b.maxMonths);
     return bucket || sorted[sorted.length - 1];
+  },
+
+  normalizeBuckets(rateBuckets) {
+    return (rateBuckets || [])
+      .map(bucket => ({
+        ...bucket,
+        maxMonths: Number(bucket.maxMonths) || 0,
+        label: bucket.label || `≤ ${Number(bucket.maxMonths) || 0} tháng`
+      }))
+      .filter(bucket => bucket.maxMonths > 0)
+      .sort((a, b) => a.maxMonths - b.maxMonths);
+  },
+
+  resolveEffectiveBucket(rateBuckets, selectedBucket, evalDate) {
+    if (!selectedBucket) return null;
+    const sorted = this.normalizeBuckets(rateBuckets);
+    const selectedMonths = Number(selectedBucket.maxMonths) || 0;
+    const source = sorted.find(bucket =>
+      bucket.maxMonths >= selectedMonths &&
+      (bucket.rate !== undefined && String(bucket.rate).trim() !== '')
+    );
+    const base = {
+      ...selectedBucket,
+      rate: source ? source.rate : selectedBucket.rate,
+      margin: source && String(selectedBucket.margin || '').trim() === '' ? source.margin : selectedBucket.margin,
+      effectiveSourceLabel: source ? source.label : selectedBucket.label,
+      inherited: !!source && source.id !== selectedBucket.id,
+      standardRate: source ? (source.standardRate || '') : (selectedBucket.standardRate || ''),
+      applyUntilDate: source ? (source.applyUntilDate || '') : (selectedBucket.applyUntilDate || ''),
+    };
+    // Kiểm tra ngày hết ưu đãi
+    const checkDate = evalDate || new Date();
+    if (base.applyUntilDate) {
+      const until = new Date(base.applyUntilDate);
+      if (!isNaN(until.getTime()) && checkDate > until) {
+        base.preferentialExpired = true;
+        base.effectiveRate = base.standardRate || base.rate;
+        base.expiryNote = `Ưu đãi đã hết hạn ${base.applyUntilDate} → áp dụng lãi chuẩn`;
+      } else {
+        base.preferentialExpired = false;
+        base.effectiveRate = base.rate;
+        const daysLeft = base.applyUntilDate ? Math.ceil((new Date(base.applyUntilDate) - checkDate) / 86400000) : null;
+        base.expiryNote = daysLeft !== null ? `Còn ${daysLeft} ngày ưu đãi (đến ${base.applyUntilDate})` : '';
+      }
+    } else {
+      base.preferentialExpired = false;
+      base.effectiveRate = base.rate;
+      base.expiryNote = '';
+    }
+    return base;
   },
 
   /**
@@ -153,7 +203,8 @@ const RateRuleEngine = {
     const htlsMonths = Number(input.htlsMonths) || 0;
 
     // 1. Bucket lãi suất
-    const bucket = this.selectBucket(pkg.rateBuckets, htlsMonths);
+    const selectedBucket = this.selectBucket(pkg.rateBuckets, htlsMonths);
+    const bucket = this.resolveEffectiveBucket(pkg.rateBuckets, selectedBucket);
 
     // 2. Phí TNTH
     const feeRule = this.calcFee(pkg.feeRules, { currentMonth: input.currentMonth, htlsMonths });
@@ -173,6 +224,8 @@ const RateRuleEngine = {
       'Bucket HTLS':        bucket ? bucket.label : '',
       'Lãi suất áp dụng':  bucket ? bucket.rate  : '',
       'Biên độ':            bucket ? bucket.margin : '',
+      'Nguồn bucket lãi suất': bucket ? bucket.effectiveSourceLabel : '',
+      'Kế thừa bucket lớn hơn': bucket && bucket.inherited ? 'Có' : 'Không',
       'Phí TNTH hiện hành':feeRule ? feeRule.fee  : '',
       'Giai đoạn TNTH':    feeRule ? feeRule.label : '',
       'Ân hạn gốc tối đa': grace,
@@ -181,6 +234,45 @@ const RateRuleEngine = {
     };
 
     return derived;
+  },
+
+  /**
+   * Đánh giá điều chỉnh lãi suất bổ sung dựa trên dữ liệu hợp đồng
+   * @param {Object} pkg      - Chính sách (package) cần đánh giá
+   * @param {Object} record   - Dữ liệu hợp đồng / khách hàng (key: label, value: string)
+   * @returns {{ totalDelta, matched: [{name, delta, conditions}] }}
+   */
+  evaluateAdjustments(pkg, record = {}) {
+    const rules = pkg.rateAdjustments || [];
+    const matched = [];
+    let totalDelta = 0;
+
+    rules.forEach(rule => {
+      if (!rule.conditions || !rule.conditions.length) return;
+      const allMet = rule.conditions.every(cond => {
+        const actual = String(record[cond.field] || '').trim().toLowerCase();
+        const expected = String(cond.value || '').trim().toLowerCase();
+        switch (cond.operator) {
+          case 'equals':      return actual === expected;
+          case 'not_equals':  return actual !== expected;
+          case 'contains':    return actual.includes(expected);
+          case 'starts_with': return actual.startsWith(expected);
+          case 'gt':          return parseFloat(actual) > parseFloat(expected);
+          case 'gte':         return parseFloat(actual) >= parseFloat(expected);
+          case 'lt':          return parseFloat(actual) < parseFloat(expected);
+          case 'lte':         return parseFloat(actual) <= parseFloat(expected);
+          case 'in_list':     return expected.split(',').map(s => s.trim()).includes(actual);
+          default:            return false;
+        }
+      });
+      if (allMet) {
+        const delta = parseFloat(rule.rateDelta) || 0;
+        totalDelta += delta;
+        matched.push({ name: rule.name, delta, conditions: rule.conditions, note: rule.note || '' });
+      }
+    });
+
+    return { totalDelta: +totalDelta.toFixed(4), matched };
   },
 };
 
@@ -226,8 +318,18 @@ const RateCenter = {
           }
         });
         if (!pkg.rateBuckets) { pkg.rateBuckets = RC_DEFAULT_RATE_BUCKETS.map(b => ({...b, id:_rcId()})); changed = true; }
+        (pkg.rateBuckets || []).forEach(bucket => {
+          const months = Number(bucket.maxMonths) || 0;
+          const label = `≤ ${months} tháng`;
+          if (!bucket.label || bucket.label !== label) { bucket.label = label; changed = true; }
+          if (bucket.note === undefined) { bucket.note = ''; changed = true; }
+          if (bucket.applyUntilDate === undefined) { bucket.applyUntilDate = ''; changed = true; }
+          if (bucket.standardRate === undefined) { bucket.standardRate = ''; changed = true; }
+        });
+        pkg.rateBuckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
         if (!pkg.feeRules)    { pkg.feeRules    = RC_DEFAULT_FEE_RULES.map(r => ({...r, id:_rcId()})); changed = true; }
         if (!pkg.graceRules)  { pkg.graceRules  = { ...RC_DEFAULT_GRACE_RULES }; changed = true; }
+        if (!pkg.rateAdjustments) { pkg.rateAdjustments = []; changed = true; }
         if (!pkg.projectExceptions)     { pkg.projectExceptions = []; changed = true; }
         if (!pkg.eligibilityConditions) { pkg.eligibilityConditions = []; changed = true; }
         if (!pkg.tiers)       { pkg.tiers = []; changed = true; }
@@ -470,6 +572,7 @@ const RateCenter = {
       { key:'buckets',    icon:'📈', label:'Bảng lãi suất' },
       { key:'grace',      icon:'⏳', label:'Ân hạn gốc' },
       { key:'fees',       icon:'💼', label:'Phí TNTH' },
+      { key:'adjustments',icon:'⚡', label:'Điều chỉnh lãi suất' },
       { key:'exceptions', icon:'🚫', label:'Ngoại lệ' },
     ];
 
@@ -478,11 +581,12 @@ const RateCenter = {
     ).join('')}</div>`;
 
     let contentHtml = '';
-    if (tab === 'info')       contentHtml = this._renderTabInfo(projectId, pkgId, pkg);
-    if (tab === 'buckets')    contentHtml = this._renderTabBuckets(projectId, pkgId, pkg);
-    if (tab === 'grace')      contentHtml = this._renderTabGrace(projectId, pkgId, pkg);
-    if (tab === 'fees')       contentHtml = this._renderTabFees(projectId, pkgId, pkg);
-    if (tab === 'exceptions') contentHtml = this._renderTabExceptions(projectId, pkgId, pkg);
+    if (tab === 'info')        contentHtml = this._renderTabInfo(projectId, pkgId, pkg);
+    if (tab === 'buckets')     contentHtml = this._renderTabBuckets(projectId, pkgId, pkg);
+    if (tab === 'grace')       contentHtml = this._renderTabGrace(projectId, pkgId, pkg);
+    if (tab === 'fees')        contentHtml = this._renderTabFees(projectId, pkgId, pkg);
+    if (tab === 'adjustments') contentHtml = this._renderTabAdjustments(projectId, pkgId, pkg);
+    if (tab === 'exceptions')  contentHtml = this._renderTabExceptions(projectId, pkgId, pkg);
 
     areaEl.innerHTML = tabsHtml + contentHtml;
 
@@ -514,32 +618,105 @@ const RateCenter = {
       <div class="rc-fields-grid">${fieldsHtml}</div></div>`;
   },
 
-  // Tab 2: Rate Buckets
+  // Tab 2: Bảng lãi suất (Rate Buckets)
   _renderTabBuckets(projectId, pkgId, pkg) {
-    const buckets = pkg.rateBuckets || RC_DEFAULT_RATE_BUCKETS;
-    const rows = buckets.map(b => `
+    const buckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets || RC_DEFAULT_RATE_BUCKETS);
+    const now = new Date();
+    const rows = buckets.map(b => {
+      const effective = RateRuleEngine.resolveEffectiveBucket(buckets, b) || b;
+      const prefRate = (effective.rate !== undefined && String(effective.rate).trim() !== '') ? effective.rate : '—';
+      // Trạng thái ưu đãi theo ngày
+      let statusBadge = '';
+      let effectiveDisplay = prefRate;
+      if (effective.applyUntilDate) {
+        const until = new Date(effective.applyUntilDate);
+        const valid = !isNaN(until.getTime());
+        const expired = valid && now > until;
+        const daysLeft = valid ? Math.ceil((until - now) / 86400000) : null;
+        if (expired) {
+          statusBadge = `<span class="rc-expire-badge rc-expire-done">⚠ Hết ưu đãi</span>`;
+          effectiveDisplay = effective.standardRate || prefRate;
+        } else {
+          statusBadge = (daysLeft !== null && daysLeft <= 90)
+            ? `<span class="rc-expire-badge rc-expire-warn">⏳ Còn ${daysLeft} ngày</span>`
+            : `<span class="rc-expire-badge rc-expire-ok">✅ Đang ưu đãi</span>`;
+        }
+      }
+      const inheritedLabel = effective.inherited
+        ? `<span class="rc-inherited-badge">Kế thừa ${_rcEsc(effective.effectiveSourceLabel)}</span>`
+        : '<span class="rc-own-badge">Nhập trực tiếp</span>';
+      return `
       <tr>
-        <td><span class="rc-bucket-label">${_rcEsc(b.label)}</span></td>
-        <td><input class="rc-tier-input" type="number" step="0.01" value="${_rcEsc(b.rate||'')}" placeholder="VD: 8.5"
+        <td>
+          <div class="rc-bucket-month-cell">
+            <span class="rc-bucket-prefix">≤</span>
+            <input class="rc-tier-input rc-bucket-month-input" type="number" min="1" step="1" value="${_rcEsc(b.maxMonths||'')}"
+              onchange="RateCenter.setBucketVal('${projectId}','${pkgId}','${b.id}','maxMonths',this.value)">
+            <span class="rc-bucket-suffix">tháng</span>
+          </div>
+        </td>
+        <td><input class="rc-tier-input" type="number" step="0.01" value="${_rcEsc(b.rate||'')}" placeholder="VD: 0"
           onchange="RateCenter.setBucketVal('${projectId}','${pkgId}','${b.id}','rate',this.value)"> %/năm</td>
         <td><input class="rc-tier-input" type="number" step="0.01" value="${_rcEsc(b.margin||'')}" placeholder="VD: 3.5"
           onchange="RateCenter.setBucketVal('${projectId}','${pkgId}','${b.id}','margin',this.value)"> %</td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:6px 8px;">
+            <input class="rc-tier-input" type="date" value="${_rcEsc(b.applyUntilDate||'')}"
+              style="padding:4px 6px;font-size:0.75rem;"
+              title="Ngày hết ưu đãi (để trống = không giới hạn theo ngày)"
+              onchange="RateCenter.setBucketVal('${projectId}','${pkgId}','${b.id}','applyUntilDate',this.value)">
+            ${statusBadge}
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:4px;padding:0 8px;">
+            <input class="rc-tier-input" type="number" step="0.01" value="${_rcEsc(b.standardRate||'')}" placeholder="—"
+              style="max-width:70px;"
+              title="Lãi suất tiêu chuẩn áp dụng sau ngày hết ưu đãi"
+              onchange="RateCenter.setBucketVal('${projectId}','${pkgId}','${b.id}','standardRate',this.value)">
+            <span style="font-size:0.7rem;color:var(--text-muted);">%/năm</span>
+          </div>
+        </td>
+        <td>
+          <div class="rc-effective-rate">
+            <strong>${_rcEsc(effectiveDisplay)}</strong><span>%/năm</span>${inheritedLabel}
+          </div>
+        </td>
         <td><input class="rc-tier-input" value="${_rcEsc(b.note||'')}" placeholder="Ghi chú..."
           onchange="RateCenter.setBucketVal('${projectId}','${pkgId}','${b.id}','note',this.value)"></td>
-      </tr>`).join('');
+        <td><button class="rc-tier-del" onclick="RateCenter.deleteBucket('${projectId}','${pkgId}','${b.id}')" title="Xóa bucket">✕</button></td>
+      </tr>`;
+    }).join('');
+
     return `<div class="rc-detail-section">
       <div class="rc-detail-section-title">📈 Bảng lãi suất theo bucket HTLS/CĐLS
-        <span style="margin-left:auto;font-size:0.68rem;color:var(--text-muted);font-weight:400;text-transform:none;">
+        <button onclick="RateCenter.addBucket('${projectId}','${pkgId}')"
+          style="margin-left:auto;padding:3px 10px;border-radius:6px;border:1px dashed rgba(99,102,241,0.3);
+          background:transparent;color:var(--accent);font-size:0.72rem;cursor:pointer;font-family:inherit;">
+          + Thêm bucket
+        </button>
+        <span style="margin-left:8px;font-size:0.68rem;color:var(--text-muted);font-weight:400;text-transform:none;">
           Rule: chọn bucket nhỏ nhất có maxMonths ≥ thời gian CĐLS đã làm tròn
         </span>
       </div>
       <div class="rc-bucket-info">
-        ℹ️ Hệ thống tự chọn bucket phù hợp khi chạy rule. Lãi suất thả nổi = LSCB + Biên độ.
+        ℹ️ Mỗi bucket là mức áp dụng đến tối đa N tháng. <b>Hết ưu đãi ngày</b>: nếu để trống = không giới hạn ngày; nếu có ngày → sau ngày đó hệ thống tự dùng <b>Lãi chuẩn sau ưu đãi</b>.
       </div>
+      <div style="overflow-x:auto;">
       <table class="rc-tiers-table">
-        <thead><tr><th>Bucket (≤ N tháng)</th><th>Lãi suất cố định</th><th>Biên độ (thả nổi)</th><th>Ghi chú</th></tr></thead>
+        <thead><tr>
+          <th>Áp dụng đến</th>
+          <th>Lãi suất ưu đãi</th>
+          <th>Biên độ</th>
+          <th>Hết ưu đãi ngày</th>
+          <th>Lãi chuẩn sau ưu đãi</th>
+          <th>Lãi suất hiệu lực</th>
+          <th>Ghi chú</th>
+          <th></th>
+        </tr></thead>
         <tbody>${rows}</tbody>
-      </table></div>`;
+      </table>
+      </div></div>`;
   },
 
   // Tab 3: Ân hạn gốc
@@ -623,6 +800,174 @@ const RateCenter = {
     </div>`;
   },
 
+  // Tab ⚡: Điều chỉnh lãi suất bổ sung (Rate Adjustment Rules)
+  _renderTabAdjustments(projectId, pkgId, pkg) {
+    const rules = pkg.rateAdjustments || [];
+    // Lấy danh sách tên cột từ Master Data entities làm gợi ý
+    const mdEntities = (typeof MasterDataState !== 'undefined' && MasterDataState.entities) ? MasterDataState.entities : [];
+    const allFieldLabels = [];
+    mdEntities.forEach(ent => (ent.columns||[]).forEach(col => {
+      if (col.name && !allFieldLabels.includes(col.name)) allFieldLabels.push(col.name);
+    }));
+    // Thêm một số gợi ý mặc định
+    ['Xếp hạng khách hàng','Hạng khách hàng','Loại hình vay','Mục đích vay',
+     'Nhóm nợ','Tình trạng pháp lý tài sản','Loại tài sản đảm bảo'].forEach(f => {
+      if (!allFieldLabels.includes(f)) allFieldLabels.push(f);
+    });
+    const fieldOpts = allFieldLabels.map(f => `<option value="${_rcEsc(f)}">${_rcEsc(f)}</option>`).join('');
+    const opOpts = [
+      ['equals','= Bằng'],['not_equals','≠ Khác'],['contains','⊃ Chứa'],
+      ['starts_with','→ Bắt đầu bằng'],['gt','> Lớn hơn'],['gte','≥ Lớn hơn hoặc bằng'],
+      ['lt','< Nhỏ hơn'],['lte','≤ Nhỏ hơn hoặc bằng'],['in_list','∈ Trong danh sách'],
+    ].map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+
+    const rulesHtml = rules.map((rule, ri) => {
+      const condsHtml = (rule.conditions||[]).map((cond, ci) => `
+        <div class="rc-adj-cond-row">
+          <select class="rc-tier-input rc-adj-select" style="max-width:180px;"
+            onchange="RateCenter.setAdjVal('${projectId}','${pkgId}','${rule.id}','cond_field_${ci}',this.value)"
+            title="Trường dữ liệu hợp đồng">
+            <option value="">-- Chọn trường --</option>
+            ${allFieldLabels.map(f => `<option value="${_rcEsc(f)}"${cond.field===f?' selected':''}>${_rcEsc(f)}</option>`).join('')}
+          </select>
+          <select class="rc-tier-input rc-adj-select" style="max-width:150px;"
+            onchange="RateCenter.setAdjVal('${projectId}','${pkgId}','${rule.id}','cond_op_${ci}',this.value)"
+            title="Toán tử so sánh">
+            ${[['equals','= Bằng'],['not_equals','≠ Khác'],['contains','⊃ Chứa'],
+               ['starts_with','→ Bắt đầu bằng'],['gt','> Lớn hơn'],['gte','≥ ≥'],
+               ['lt','< Nhỏ hơn'],['lte','≤ ≤'],['in_list','∈ Trong DS (dấu phẩy)'],
+              ].map(([v,l]) => `<option value="${v}"${cond.operator===v?' selected':''}>${l}</option>`).join('')}
+          </select>
+          <input class="rc-tier-input" style="max-width:160px;" value="${_rcEsc(cond.value||'')}"
+            placeholder="Giá trị so sánh" title="Giá trị cần khớp"
+            onchange="RateCenter.setAdjVal('${projectId}','${pkgId}','${rule.id}','cond_val_${ci}',this.value)">
+          <button class="rc-tier-del" style="opacity:1;" title="Xóa điều kiện"
+            onclick="RateCenter.deleteAdjCondition('${projectId}','${pkgId}','${rule.id}',${ci})">✕</button>
+        </div>`).join('');
+
+      const sign = parseFloat(rule.rateDelta||0) >= 0 ? '+' : '';
+      return `
+      <div class="rc-adj-rule-card">
+        <div class="rc-adj-rule-header">
+          <span class="rc-adj-badge">⚡ Rule ${ri+1}</span>
+          <input class="rc-tier-input rc-adj-name" value="${_rcEsc(rule.name||'')}" placeholder="Tên rule (VD: KH xếp hạng C)"
+            onchange="RateCenter.setAdjVal('${projectId}','${pkgId}','${rule.id}','name',this.value)">
+          <div class="rc-adj-delta-wrap">
+            <span style="font-size:0.72rem;color:var(--text-muted);">Cộng thêm:</span>
+            <input class="rc-tier-input" type="number" step="0.01" style="max-width:80px;font-weight:700;color:#f59e0b;"
+              value="${_rcEsc(rule.rateDelta||'')}" placeholder="VD: 0.5"
+              title="Biên lãi suất bổ sung (%/năm). Dương = tăng, âm = giảm"
+              onchange="RateCenter.setAdjVal('${projectId}','${pkgId}','${rule.id}','rateDelta',this.value)">
+            <span style="font-size:0.82rem;color:#f59e0b;font-weight:700;">%/năm</span>
+          </div>
+          <button class="rc-act-btn del" title="Xóa rule"
+            onclick="RateCenter.deleteAdjustment('${projectId}','${pkgId}','${rule.id}')">✕</button>
+        </div>
+        <div class="rc-adj-conds-wrap">
+          <div class="rc-adj-conds-label">Khi TẤT CẢ điều kiện sau đây khớp:</div>
+          <div class="rc-adj-conds-list" id="rc-adj-conds-${rule.id}">
+            ${condsHtml || '<div style="color:var(--text-muted);font-size:0.75rem;padding:4px 0;">← Chưa có điều kiện nào</div>'}
+          </div>
+          <button class="rc-adj-add-cond-btn"
+            onclick="RateCenter.addAdjCondition('${projectId}','${pkgId}','${rule.id}')">
+            + Thêm điều kiện
+          </button>
+        </div>
+        <div class="rc-adj-note-row">
+          <input class="rc-tier-input" value="${_rcEsc(rule.note||'')}" placeholder="Ghi chú rule..."
+            onchange="RateCenter.setAdjVal('${projectId}','${pkgId}','${rule.id}','note',this.value)">
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="rc-detail-section">
+      <div class="rc-detail-section-title">⚡ Điều chỉnh lãi suất theo điều kiện hợp đồng
+        <button onclick="RateCenter.addAdjustment('${projectId}','${pkgId}')"
+          style="margin-left:auto;padding:4px 12px;border-radius:7px;border:1px dashed rgba(245,158,11,0.4);
+          background:rgba(245,158,11,0.08);color:#f59e0b;font-size:0.75rem;cursor:pointer;font-family:inherit;font-weight:600;">
+          + Thêm rule điều chỉnh
+        </button>
+      </div>
+      <div class="rc-bucket-info" style="border-left-color:rgba(245,158,11,0.5);">
+        ⚡ Mỗi <b>rule</b> gồm một hoặc nhiều điều kiện (AND). Nếu tất cả khớp với dữ liệu hợp đồng → lãi suất sẽ được cộng thêm biên tương ứng.
+        Nhiều rule có thể cùng khớp → biên sẽ được cộng dồn vào lãi suất gốc từ bảng bucket.
+      </div>
+      ${!rules.length ? `<div class="rc-empty" style="padding:24px;">
+        <span class="rc-empty-icon">⚡</span>
+        Chưa có rule nào. Nhấn <b>+ Thêm rule điều chỉnh</b> để tạo.
+      </div>` : rulesHtml}
+    </div>`;
+  },
+
+  // ── CRUD: Rate Adjustment Rules ──────────────────────────────
+  _getAdj(projectId, pkgId) {
+    const proj = RateCenterState.projects.find(p => p.id === projectId);
+    const pkg  = (proj?.packages||[]).find(pk => pk.id === pkgId);
+    return { proj, pkg };
+  },
+
+  addAdjustment(projectId, pkgId) {
+    const { pkg } = this._getAdj(projectId, pkgId);
+    if (!pkg) return;
+    if (!pkg.rateAdjustments) pkg.rateAdjustments = [];
+    pkg.rateAdjustments.push({
+      id: _rcId(), name: '', rateDelta: 0.5, note: '',
+      conditions: [{ field: '', operator: 'equals', value: '' }],
+    });
+    this.save();
+    this.renderDetail(projectId, pkgId);
+  },
+
+  deleteAdjustment(projectId, pkgId, ruleId) {
+    const { pkg } = this._getAdj(projectId, pkgId);
+    if (!pkg) return;
+    pkg.rateAdjustments = (pkg.rateAdjustments||[]).filter(r => r.id !== ruleId);
+    this.save();
+    this.renderDetail(projectId, pkgId);
+  },
+
+  addAdjCondition(projectId, pkgId, ruleId) {
+    const { pkg } = this._getAdj(projectId, pkgId);
+    if (!pkg) return;
+    const rule = (pkg.rateAdjustments||[]).find(r => r.id === ruleId);
+    if (!rule) return;
+    if (!rule.conditions) rule.conditions = [];
+    rule.conditions.push({ field: '', operator: 'equals', value: '' });
+    this.save();
+    this.renderDetail(projectId, pkgId);
+  },
+
+  deleteAdjCondition(projectId, pkgId, ruleId, condIdx) {
+    const { pkg } = this._getAdj(projectId, pkgId);
+    if (!pkg) return;
+    const rule = (pkg.rateAdjustments||[]).find(r => r.id === ruleId);
+    if (!rule) return;
+    rule.conditions.splice(condIdx, 1);
+    this.save();
+    this.renderDetail(projectId, pkgId);
+  },
+
+  setAdjVal(projectId, pkgId, ruleId, key, value) {
+    const { pkg } = this._getAdj(projectId, pkgId);
+    if (!pkg) return;
+    const rule = (pkg.rateAdjustments||[]).find(r => r.id === ruleId);
+    if (!rule) return;
+    // key: 'name' | 'rateDelta' | 'note' | 'cond_field_N' | 'cond_op_N' | 'cond_val_N'
+    const condMatch = key.match(/^cond_(field|op|val)_(\d+)$/);
+    if (condMatch) {
+      const [, part, idxStr] = condMatch;
+      const idx = parseInt(idxStr);
+      if (!rule.conditions[idx]) return;
+      if (part === 'field') rule.conditions[idx].field    = value;
+      if (part === 'op')    rule.conditions[idx].operator = value;
+      if (part === 'val')   rule.conditions[idx].value    = value;
+    } else {
+      rule[key] = key === 'rateDelta' ? parseFloat(value) || 0 : value;
+    }
+    this.save();
+    // Không re-render để tránh mất focus
+  },
+
   // Tab 5: Ngoại lệ dự án
   _renderTabExceptions(projectId, pkgId, pkg) {
     const exceptions = pkg.projectExceptions || [];
@@ -673,8 +1018,64 @@ const RateCenter = {
     const pkg = this._getPkg(projectId, pkgId);
     if (!pkg) return;
     const b = (pkg.rateBuckets||[]).find(x => x.id === bucketId);
-    if (b) b[key] = value;
+    if (b) {
+      if (key === 'maxMonths') {
+        const nextMonths = Math.max(1, Number(value) || 1);
+        const duplicated = (pkg.rateBuckets || []).some(bucket => bucket.id !== bucketId && Number(bucket.maxMonths) === nextMonths);
+        if (duplicated) {
+          if (typeof App !== 'undefined') App.toast(`Bucket ≤ ${nextMonths} tháng đã tồn tại`, 'warning');
+          this.renderDetail(projectId, pkgId);
+          return;
+        }
+        b.maxMonths = nextMonths;
+        b.label = `≤ ${nextMonths} tháng`;
+      } else {
+        b[key] = value;
+      }
+    }
+    if (b && key === 'rate' && String(value || '').trim() !== '') {
+      (pkg.rateBuckets || []).forEach(bucket => {
+        const isSmallerBucket = Number(bucket.maxMonths) < Number(b.maxMonths);
+        const isEmptyRate = bucket.rate === undefined || String(bucket.rate).trim() === '';
+        if (isSmallerBucket && isEmptyRate) bucket.rate = value;
+      });
+    }
+    pkg.rateBuckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
     this.save();
+    if (key === 'maxMonths' || key === 'rate') this.renderDetail(projectId, pkgId);
+  },
+
+  addBucket(projectId, pkgId) {
+    const pkg = this._getPkg(projectId, pkgId);
+    if (!pkg) return;
+    if (!pkg.rateBuckets) pkg.rateBuckets = [];
+    const sorted = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
+    const lastMonths = sorted.length ? Number(sorted[sorted.length - 1].maxMonths) || 0 : 0;
+    const maxMonths = lastMonths + 6;
+    pkg.rateBuckets.push({
+      id: _rcId(),
+      maxMonths,
+      label: `≤ ${maxMonths} tháng`,
+      rate: '',
+      margin: '',
+      note: ''
+    });
+    pkg.rateBuckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
+    this.save();
+    this.renderDetail(projectId, pkgId);
+  },
+
+  deleteBucket(projectId, pkgId, bucketId) {
+    const pkg = this._getPkg(projectId, pkgId);
+    if (!pkg || !pkg.rateBuckets) return;
+    if (pkg.rateBuckets.length <= 1) {
+      if (typeof App !== 'undefined') App.toast('Cần giữ ít nhất 1 bucket lãi suất', 'warning');
+      return;
+    }
+    pkg.rateBuckets = pkg.rateBuckets.filter(bucket => bucket.id !== bucketId);
+    pkg.rateBuckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
+    this.save();
+    this.renderDetail(projectId, pkgId);
   },
 
   setFeeVal(projectId, pkgId, feeId, value) {
@@ -777,6 +1178,7 @@ const RateCenter = {
       'Thời gian áp dụng từ','Thời gian áp dụng đến','Trạng thái áp dụng',
       'Điều kiện đi kèm','Ghi chú chính sách',
       'Bucket HTLS','Lãi suất áp dụng','Biên độ',
+      'Nguồn bucket lãi suất','Kế thừa bucket lớn hơn',
       'Phí TNTH hiện hành','Giai đoạn TNTH',
       'Ân hạn gốc tối đa','Ghi chú rule','Điều kiện đủ',
     ];

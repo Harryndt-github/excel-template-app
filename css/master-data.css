@@ -1598,6 +1598,63 @@
   min-width: 100px;
   display: inline-block;
 }
+.rc-bucket-month-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  min-width: 130px;
+}
+.rc-bucket-prefix,
+.rc-bucket-suffix {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+.rc-bucket-month-input {
+  max-width: 78px;
+  text-align: center;
+}
+.rc-effective-rate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  min-width: 150px;
+  color: var(--text-primary);
+}
+.rc-effective-rate strong {
+  color: #10b981;
+  font-size: 0.86rem;
+}
+.rc-effective-rate > span {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+.rc-inherited-badge,
+.rc-own-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.rc-inherited-badge {
+  background: rgba(16,185,129,0.12);
+  color: #10b981;
+}
+.rc-own-badge {
+  background: rgba(99,102,241,0.12);
+  color: var(--accent);
+}
+.rc-effective-rate .rc-inherited-badge {
+  color: #10b981;
+}
+.rc-effective-rate .rc-own-badge {
+  color: var(--accent);
+}
 .rc-fee-list {
   display: flex;
   flex-direction: column;
@@ -1638,4 +1695,110 @@
   gap: 8px;
   margin-bottom: 8px;
   flex-wrap: wrap;
+}
+
+/* ── Expiry badges for preferential rate ── */
+.rc-expire-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  white-space: nowrap;
+  margin-top: 3px;
+}
+.rc-expire-ok   { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
+.rc-expire-warn { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+.rc-expire-done { background: rgba(239,68,68,0.12);  color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
+
+/* ── Scrollable rate table (wide columns) ── */
+#md-view-ratecenter .rc-detail-panel .rc-tiers-table { min-width: 700px; }
+
+/* ── Rate Adjustment Rules ── */
+.rc-adj-rule-card {
+  border: 1px solid rgba(245,158,11,0.2);
+  border-radius: 10px;
+  background: rgba(245,158,11,0.04);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.rc-adj-rule-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(245,158,11,0.07);
+  border-bottom: 1px solid rgba(245,158,11,0.12);
+  flex-wrap: wrap;
+}
+.rc-adj-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245,158,11,0.12);
+  border: 1px solid rgba(245,158,11,0.25);
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.rc-adj-name {
+  flex: 1;
+  min-width: 160px;
+  font-weight: 600;
+}
+.rc-adj-delta-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.rc-adj-conds-wrap {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rc-adj-conds-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rc-adj-conds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rc-adj-cond-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.rc-adj-select {
+  padding: 5px 8px;
+  border: 1px solid rgba(245,158,11,0.2);
+  border-radius: 6px;
+  background: rgba(245,158,11,0.05);
+}
+.rc-adj-add-cond-btn {
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px dashed rgba(245,158,11,0.35);
+  background: transparent;
+  color: #f59e0b;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.rc-adj-add-cond-btn:hover { background: rgba(245,158,11,0.1); }
+.rc-adj-note-row {
+  padding: 6px 14px 10px;
+  border-top: 1px solid rgba(245,158,11,0.08);
 }

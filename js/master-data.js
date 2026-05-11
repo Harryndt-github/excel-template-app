@@ -151,7 +151,7 @@ const MasterData = {
     // Hide all panels
     document.querySelectorAll('.md-view-panel').forEach(p => p.style.display = 'none');
     const panel = document.getElementById(`md-view-${mode}`);
-    const flexModes = ['config', 'ratecenter'];
+    const flexModes = ['config', 'ratecenter', 'advisor'];
     if (panel) panel.style.display = flexModes.includes(mode) ? 'flex' : 'block';
 
     // Sidebar: only show for mindmap
@@ -161,6 +161,7 @@ const MasterData = {
     if (mode === 'mindmap')    { this.renderMindmap(); this.renderEntityList(); }
     if (mode === 'config')     this.cfgRenderEntityList();
     if (mode === 'ratecenter') RateCenter.render();
+    if (mode === 'advisor')    { if (typeof PolicyAdvisorUI !== 'undefined') PolicyAdvisorUI.render(); }
   },
 
   // ── Entity List (sidebar on master data page) ──
