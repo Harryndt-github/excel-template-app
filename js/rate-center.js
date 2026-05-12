@@ -42,9 +42,17 @@ const RC_DEFAULT_RATE_BUCKETS = [
 
 const RC_DEFAULT_FEE_RULES = [
   { id:'fr_htls',   phase:'inHTLS',          fee:'', label:'Trong thời gian hỗ trợ lãi' },
-  { id:'fr_post60', phase:'afterHTLS_to60',  fee:'', label:'Sau hỗ trợ lãi đến T60' },
-  { id:'fr_61up',   phase:'from61',          fee:'', label:'Từ T61 trở đi' },
+  { id:'fr_post60', phase:'afterHTLS_to60',  fee:'', label:'Sau hỗ trợ lãi đến T{cutoff}' },
+  { id:'fr_61up',   phase:'from61',          fee:'', label:'Từ T{cutoffPlus1} trở đi' },
 ];
+
+/** Trả về label hiển thị cho fee rule, thay thế placeholder {cutoff} bằng giá trị thực */
+function _rcFeeLabel(f, cutoffMonth) {
+  const c = Number(cutoffMonth) || 60;
+  return (f.label || f.phase)
+    .replace('{cutoff}', c)
+    .replace('{cutoffPlus1}', c + 1);
+}
 
 const RC_DEFAULT_GRACE_RULES = {
   baseMonths: 0,
@@ -118,18 +126,23 @@ const RateRuleEngine = {
 
   /**
    * Tính phí TNTH theo giai đoạn
-   * Phase xác định bởi tháng hiện tại so với thời gian hỗ trợ lãi và mốc T60
+   * Phase xác định bởi tháng hiện tại so với thời gian hỗ trợ lãi và mốc tùy chỉnh (cutoffMonth)
+   * cutoffMonth mặc định là 60 nếu không được cấu hình
    */
   calcFee(feeRules, context) {
     if (!feeRules || !feeRules.length) return null;
-    const { currentMonth, htlsMonths } = context;
+    const { currentMonth, htlsMonths, cutoffMonth } = context;
     const month = Number(currentMonth) || 0;
     const htls = Number(htlsMonths) || 0;
+    const cutoff = Number(cutoffMonth) || 60;
     let phase;
     if (month <= htls) phase = 'inHTLS';
-    else if (month <= 60) phase = 'afterHTLS_to60';
+    else if (month <= cutoff) phase = 'afterHTLS_to60';
     else phase = 'from61';
-    return feeRules.find(r => r.phase === phase) || null;
+    const rule = feeRules.find(r => r.phase === phase) || null;
+    // Trả về bản copy với label đã được resolve theo cutoff
+    if (rule) return { ...rule, label: _rcFeeLabel(rule, cutoff) };
+    return null;
   },
 
   /**
@@ -256,7 +269,8 @@ const RateRuleEngine = {
     const bucket = this.resolveEffectiveBucket(pkg.rateBuckets, selectedBucket);
 
     // 2. Phí TNTH
-    const feeRule = this.calcFee(pkg.feeRules, { currentMonth: input.currentMonth, htlsMonths });
+    const feeCutoff = Number(pkg.feeCutoffMonth) || 60;
+    const feeRule = this.calcFee(pkg.feeRules, { currentMonth: input.currentMonth, htlsMonths, cutoffMonth: feeCutoff });
 
     // 3. Ân hạn gốc
     const { grace, notes: graceNotes } = this.calcGrace(
@@ -762,7 +776,8 @@ const RateCenter = {
   // Tab 3: Nghĩa vụ trả lãi / Tích hợp chính sách
   _renderTabSupport(projectId, pkgId, pkg) {
     const rules = { ...RC_DEFAULT_INTEREST_SUPPORT_RULES, ...(pkg.interestSupportRules || {}) };
-    const fees = pkg.feeRules || RC_DEFAULT_FEE_RULES;
+    const feeCutoffDisplay = Number(pkg.feeCutoffMonth) || 60;
+    const fees = (pkg.feeRules || RC_DEFAULT_FEE_RULES).map(f => ({ ...f, label: _rcFeeLabel(f, feeCutoffDisplay) }));
     const supportPolicies = RateCenterState.supportPolicies || [];
     const feePolicies = RateCenterState.feePolicies || [];
     const selectedSupportId = rules.sourceSupportPolicyId || '';
@@ -849,7 +864,7 @@ const RateCenter = {
       </div>
 
       <div class="rc-detail-section-title" style="margin-top:20px;">💼 Bảng phí TNTH</div>
-      <div class="rc-bucket-info">ℹ️ Phí tự động xác định theo giai đoạn (Trong HTLS / Sau HTLS đến T60 / Từ T61).</div>
+      <div class="rc-bucket-info">ℹ️ Phí tự động xác định theo giai đoạn. Mốc thời gian T${feeCutoffDisplay} được cấu hình theo chính sách trong Thư viện.</div>
       <div class="rc-fee-list">${feeRows}</div>
     </div>`;
   },
@@ -1293,6 +1308,8 @@ const RateCenter = {
     pkg.interestSupportRules.feePolicyCode = policy.code || '';
     pkg.interestSupportRules.feePolicyName = policy.name || '';
     pkg.feeRules = (policy.feeRules || RC_DEFAULT_FEE_RULES).map(rule => ({ ...rule, id: _rcId() }));
+    // Copy cutoffMonth từ chính sách Thư viện để đảm bảo logic tính phí nhất quán
+    pkg.feeCutoffMonth = Number(policy.cutoffMonth) || 60;
     this.save();
     this.renderDetail(projectId, pkgId);
     if (typeof App !== 'undefined') App.toast('Đã áp dụng chính sách phí TNTH', 'success');
@@ -1601,7 +1618,8 @@ const RateCenter = {
           const badge = n > 0
             ? `<span class="rc-lib-badge used">Dùng bởi ${n} gói</span>`
             : `<span class="rc-lib-badge">Chưa dùng</span>`;
-          const feeRules = p.feeRules || RC_DEFAULT_FEE_RULES;
+          const cutoff = Number(p.cutoffMonth) || 60;
+          const feeRules = (p.feeRules || RC_DEFAULT_FEE_RULES).map(f => ({ ...f, label: _rcFeeLabel(f, cutoff) }));
           const summary = feeRules.map(f => `${f.label||f.phase}: ${f.fee||'—'}%`).join(' · ');
           const isEdit = editId === p.id;
           const form = isEdit ? `<div class="rc-lib-form">
@@ -1609,9 +1627,17 @@ const RateCenter = {
               <div class="rc-field-item"><label class="rc-field-label">Mã</label><input class="rc-field-input" id="rle-fcode-${p.id}" value="${_rcEsc(p.code||'')}"></div>
               <div class="rc-field-item"><label class="rc-field-label">Tên</label><input class="rc-field-input" id="rle-fname-${p.id}" value="${_rcEsc(p.name||'')}"></div>
             </div>
-            <div style="margin-top:8px;">
+            <div class="rc-field-item" style="margin-top:8px;">
+              <label class="rc-field-label">🕐 Mốc thời gian kết thúc giai đoạn 2 (T?)</label>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:.82rem;color:var(--text-muted);">T</span>
+                <input class="rc-tier-input" type="number" min="1" step="1" value="${cutoff}" id="rle-cutoff-${p.id}" placeholder="60" style="width:80px;" title="Giai đoạn 2 kết thúc ở tháng này" oninput="RateCenter._libPreviewCutoff('${p.id}',this.value)">
+                <span style="font-size:.78rem;color:var(--text-muted);">→ Từ T<span id="rle-cutoffPlus1-${p.id}">${cutoff+1}</span> trở đi là giai đoạn 3</span>
+              </div>
+            </div>
+            <div style="margin-top:8px;" id="rle-fee-rows-${p.id}">
               ${(p.feeRules||RC_DEFAULT_FEE_RULES).map(f=>`<div class="rc-fee-row" style="margin-bottom:6px;">
-                <div class="rc-fee-phase">${_rcEsc(f.label)}</div>
+                <div class="rc-fee-phase" id="rle-label-${p.id}-${f.id}">${_rcEsc(_rcFeeLabel(f, cutoff))}</div>
                 <div class="rc-fee-input-wrap"><input class="rc-tier-input" type="number" step="0.01" value="${_rcEsc(f.fee||'')}" id="rle-fee-${p.id}-${f.id}" placeholder="VD: 0.5"><span class="rc-fee-unit">%</span></div>
               </div>`).join('')}
             </div>
@@ -1641,9 +1667,17 @@ const RateCenter = {
         <div class="rc-field-item"><label class="rc-field-label">Mã</label><input class="rc-field-input" id="rln-fcode" placeholder="VD: TNTH-STD"></div>
         <div class="rc-field-item"><label class="rc-field-label">Tên</label><input class="rc-field-input" id="rln-fname" placeholder="VD: Phí TNTH theo giai đoạn HTLS"></div>
       </div>
-      <div style="margin-top:8px;">
+      <div class="rc-field-item" style="margin-top:8px;">
+        <label class="rc-field-label">🕐 Mốc thời gian kết thúc giai đoạn 2 (T?)</label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:.82rem;color:var(--text-muted);">T</span>
+          <input class="rc-tier-input" type="number" min="1" step="1" value="60" id="rln-fcutoff" placeholder="60" style="width:80px;" title="Mặc định T60. Giai đoạn 2 kết thúc ở tháng này" oninput="RateCenter._libPreviewNewCutoff(this.value)">
+          <span style="font-size:.78rem;color:var(--text-muted);">→ Từ T<span id="rln-fcutoffPlus1">61</span> trở đi là giai đoạn 3</span>
+        </div>
+      </div>
+      <div style="margin-top:8px;" id="rln-fee-rows">
         ${RC_DEFAULT_FEE_RULES.map(f=>`<div class="rc-fee-row" style="margin-bottom:6px;">
-          <div class="rc-fee-phase">${_rcEsc(f.label)}</div>
+          <div class="rc-fee-phase" id="rln-flabel-${f.id}">${_rcEsc(_rcFeeLabel(f, 60))}</div>
           <div class="rc-fee-input-wrap"><input class="rc-tier-input" type="number" step="0.01" id="rln-fee-${f.id}" placeholder="VD: 0.5"><span class="rc-fee-unit">%</span></div>
         </div>`).join('')}
       </div>
@@ -1706,22 +1740,48 @@ const RateCenter = {
     if (id === 'new') {
       const name = g('rln-fname');
       if (!name) { if(typeof App!=='undefined') App.toast('Nhập tên chính sách','warn'); return; }
+      const cutoffMonth = parseInt(g('rln-fcutoff')) || 60;
       const feeRules = RC_DEFAULT_FEE_RULES.map(f => ({
         ...f, id: _rcId(), fee: g(`rln-fee-${f.id}`),
       }));
       RateCenterState.feePolicies.push({
-        id: _rcId(), code: g('rln-fcode'), name, feeRules,
+        id: _rcId(), code: g('rln-fcode'), name, feeRules, cutoffMonth,
         createdAt: new Date().toISOString(),
       });
     } else {
       const p = (RateCenterState.feePolicies||[]).find(x => x.id === id);
       if (!p) return;
       p.code = g(`rle-fcode-${id}`); p.name = g(`rle-fname-${id}`);
+      p.cutoffMonth = parseInt(g(`rle-cutoff-${id}`)) || 60;
       (p.feeRules||[]).forEach(f => { const v = g(`rle-fee-${id}-${f.id}`); if(v!=='') f.fee = v; });
       p.updatedAt = new Date().toISOString();
     }
     this._libEditId = null; this.save(); this.renderPolicyLibrary();
     if (typeof App!=='undefined') App.toast('Đã lưu chính sách Phí TNTH','success');
+  },
+
+  /** Cập nhật live preview label khi thay đổi cutoff trong form tạo mới */
+  _libPreviewNewCutoff(val) {
+    const c = parseInt(val) || 60;
+    const plus1El = document.getElementById('rln-fcutoffPlus1');
+    if (plus1El) plus1El.textContent = c + 1;
+    RC_DEFAULT_FEE_RULES.forEach(f => {
+      const el = document.getElementById(`rln-flabel-${f.id}`);
+      if (el) el.textContent = _rcFeeLabel(f, c);
+    });
+  },
+
+  /** Cập nhật live preview label khi thay đổi cutoff trong form chỉnh sửa */
+  _libPreviewCutoff(policyId, val) {
+    const c = parseInt(val) || 60;
+    const plus1El = document.getElementById(`rle-cutoffPlus1-${policyId}`);
+    if (plus1El) plus1El.textContent = c + 1;
+    const p = (RateCenterState.feePolicies||[]).find(x => x.id === policyId);
+    const rules = p ? (p.feeRules || RC_DEFAULT_FEE_RULES) : RC_DEFAULT_FEE_RULES;
+    rules.forEach(f => {
+      const el = document.getElementById(`rle-label-${policyId}-${f.id}`);
+      if (el) el.textContent = _rcFeeLabel(f, c);
+    });
   },
 
   _libDelFee(id) {
