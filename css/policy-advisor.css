@@ -98,3 +98,63 @@
 .pg-score-bar-track { flex:1; height:5px; border-radius:99px; background:rgba(255,255,255,0.07); overflow:hidden; }
 .pg-score-bar-fill { height:100%; border-radius:99px; transition:width 0.4s ease; }
 .pg-score-bar-pts { font-size:0.68rem; font-weight:700; width:28px; text-align:right; flex-shrink:0; }
+
+/* ── Hybrid Rule Engine v3 additions ── */
+
+/* Auto-compute badge */
+.pa-auto-badge {
+  display:inline-block; margin-left:5px; padding:0 5px; border-radius:99px;
+  background:rgba(16,185,129,0.15); color:#10b981; font-size:0.62rem; font-weight:600;
+  vertical-align:middle;
+}
+
+/* Full-width field in 2-col grid */
+.pa-grid-2-full { grid-column: span 2; }
+
+/* Reason text */
+.pa-reason-text {
+  font-size:0.73rem; color:#94a3b8; padding:6px 10px; margin-bottom:10px;
+  background:rgba(99,102,241,0.05); border-left:2px solid #6366f1; border-radius:0 6px 6px 0;
+  line-height:1.5;
+}
+
+/* 3-Group score layout */
+.pa-score-groups { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
+@media(max-width:700px){ .pa-score-groups { grid-template-columns:1fr; } }
+
+.pa-score-group {
+  background:rgba(255,255,255,0.03); border:1px solid rgba(99,102,241,0.1);
+  border-radius:10px; padding:8px 10px; display:flex; flex-direction:column; gap:4px;
+}
+.pa-score-group-header {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:4px; padding-bottom:4px; border-bottom:1px solid rgba(255,255,255,0.05);
+}
+
+/* Adjustment badge */
+.pa-adj-badge {
+  font-size:0.68rem; padding:1px 5px; border-radius:99px;
+  background:rgba(245,158,11,0.15); color:#f59e0b; margin-left:4px;
+}
+
+/* Ineligible panel */
+.pa-ineligible-panel {
+  margin-top:14px; border:1px solid rgba(245,158,11,0.25);
+  border-radius:10px; overflow:hidden;
+}
+.pa-ineligible-toggle {
+  padding:10px 14px; background:rgba(245,158,11,0.08); color:#f59e0b;
+  font-size:0.78rem; font-weight:600; cursor:pointer; user-select:none;
+  transition:background .15s;
+}
+.pa-ineligible-toggle:hover { background:rgba(245,158,11,0.14); }
+.pa-ineligible-body { display:none; padding:8px 14px; }
+.pa-ineligible-open .pa-ineligible-body { display:block; }
+.pa-ineligible-item {
+  display:flex; flex-direction:column; gap:2px;
+  padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+  font-size:0.75rem;
+}
+.pa-ineligible-item:last-child { border-bottom:none; }
+.pa-ineligible-name { font-weight:600; color:var(--text-primary,#e8eaf0); }
+.pa-ineligible-reasons { color:#f59e0b; font-size:0.68rem; }
