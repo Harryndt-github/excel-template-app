@@ -759,7 +759,7 @@ const RateCenter = {
       </div></div>`;
   },
 
-  // Tab 3: Nghĩa vụ trả lãi giữa Chủ đầu tư và Khách hàng
+  // Tab 3: Nghĩa vụ trả lãi / Tích hợp chính sách
   _renderTabSupport(projectId, pkgId, pkg) {
     const rules = { ...RC_DEFAULT_INTEREST_SUPPORT_RULES, ...(pkg.interestSupportRules || {}) };
     const fees = pkg.feeRules || RC_DEFAULT_FEE_RULES;
@@ -767,14 +767,32 @@ const RateCenter = {
     const feePolicies = RateCenterState.feePolicies || [];
     const selectedSupportId = rules.sourceSupportPolicyId || '';
     const selectedFeeId = rules.sourceFeePolicyId || '';
-    const supportPolicyOptions = supportPolicies.map(policy => {
-      const label = [policy.code, policy.name].filter(Boolean).join(' - ') || 'Chính sách hỗ trợ';
-      return `<option value="${policy.id}" ${policy.id === selectedSupportId ? 'selected' : ''}>${_rcEsc(label)}</option>`;
+
+    const supportOpts = supportPolicies.map(p => {
+      const lbl = [p.code, p.name].filter(Boolean).join(' – ') || 'Chính sách hỗ trợ';
+      return `<option value="${p.id}" ${p.id === selectedSupportId ? 'selected' : ''}>${_rcEsc(lbl)}</option>`;
     }).join('');
-    const feePolicyOptions = feePolicies.map(policy => {
-      const label = [policy.code, policy.name].filter(Boolean).join(' - ') || 'Chính sách phí TNTH';
-      return `<option value="${policy.id}" ${policy.id === selectedFeeId ? 'selected' : ''}>${_rcEsc(label)}</option>`;
+    const feeOpts = feePolicies.map(p => {
+      const lbl = [p.code, p.name].filter(Boolean).join(' – ') || 'Chính sách phí TNTH';
+      return `<option value="${p.id}" ${p.id === selectedFeeId ? 'selected' : ''}>${_rcEsc(lbl)}</option>`;
     }).join('');
+
+    const selSP = supportPolicies.find(p => p.id === selectedSupportId);
+    const supportSummary = selSP ? `
+<div class="rc-lib-summary">
+  <div class="rc-lib-summary-row"><span>Mã</span><b>${_rcEsc(selSP.code||'—')}</b></div>
+  <div class="rc-lib-summary-row"><span>Tên</span><b>${_rcEsc(selSP.name||'—')}</b></div>
+  <div class="rc-lib-summary-row"><span>Thời gian HT</span><b>${selSP.defaultSupportMonths||0} tháng</b></div>
+  <div class="rc-lib-summary-row"><span>Bên trả lãi</span><b>${_rcEsc(selSP.supportPayer||'—')}</b></div>
+</div>` : `<div class="rc-lib-empty-hint">Chưa chọn. Nhấn <b>📚 Thư viện</b> để khai báo và chọn chính sách.</div>`;
+
+    const selFP = feePolicies.find(p => p.id === selectedFeeId);
+    const feeSummary = selFP ? `
+<div class="rc-lib-summary" style="margin-bottom:10px;">
+  <div class="rc-lib-summary-row"><span>Mã</span><b>${_rcEsc(selFP.code||'—')}</b></div>
+  <div class="rc-lib-summary-row"><span>Tên</span><b>${_rcEsc(selFP.name||'—')}</b></div>
+</div>` : '';
+
     const feeRows = fees.map(f => `
       <div class="rc-fee-row">
         <div class="rc-fee-phase">${_rcEsc(f.label)}</div>
@@ -784,117 +802,56 @@ const RateCenter = {
           <span class="rc-fee-unit">%</span>
         </div>
       </div>`).join('');
+
     return `<div class="rc-detail-section">
-      <div class="rc-detail-section-title">🤝 Cấu hình chính sách hỗ trợ lãi & phí TNTH</div>
+      <div class="rc-detail-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        🤝 Tích hợp chính sách Hỗ trợ lãi &amp; Phí TNTH
+        <button onclick="RateCenter.openPolicyLibrary()"
+          style="padding:4px 14px;border-radius:8px;border:1px solid rgba(139,92,246,.4);background:rgba(139,92,246,.1);color:#8b5cf6;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">
+          📚 Thư viện chính sách
+        </button>
+      </div>
       <div class="rc-bucket-info">
-        💡 Đây là layer cấu hình cấp <b>chính sách bán hàng</b>. Chỉ cần bật <b>Hỗ trợ lãi suất</b> một lần tại đây; khi chọn chính sách bán hàng, hệ thống sẽ lấy kèm chính sách hỗ trợ lãi suất và phí TNTH đã cấu hình.
+        💡 Chọn chính sách từ <b>Thư viện</b> để tích hợp. Mọi khai báo, chỉnh sửa và theo dõi trạng thái chính sách được thực hiện tập trung tại Thư viện.
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px;margin-bottom:14px;">
-        <div class="rc-field-item">
-          <label class="rc-field-label">Chọn chính sách hỗ trợ lãi suất từ nguồn chung</label>
-          <div style="display:flex;gap:8px;align-items:center;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;">
+        <div>
+          <div class="rc-field-item" style="margin-bottom:8px;">
+            <label class="rc-field-label">Chính sách Hỗ trợ lãi suất</label>
             <select class="rc-field-input" onchange="RateCenter.applySupportPolicy('${projectId}','${pkgId}',this.value)">
-              <option value="">-- Chọn chính sách hỗ trợ --</option>
-              ${supportPolicyOptions}
+              <option value="">-- Chọn từ Thư viện --</option>
+              ${supportOpts}
             </select>
-            <button class="rc-act-btn" title="Lưu cấu hình hiện tại thành chính sách hỗ trợ dùng chung"
-              onclick="RateCenter.saveSupportPolicyFromCurrent('${projectId}','${pkgId}')">＋</button>
-            <button class="rc-act-btn del" title="Xóa chính sách hỗ trợ đang chọn khỏi nguồn chung"
-              onclick="RateCenter.deleteSupportPolicy('${projectId}','${pkgId}')">✕</button>
           </div>
-          <small style="display:block;margin-top:6px;color:var(--text-muted);font-size:0.72rem;">
-            Mini master: chọn một mẫu để tự điền mã, tên, thời gian hỗ trợ, bên trả lãi và nguyên tắc trả gốc.
-          </small>
+          ${supportSummary}
         </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Chọn chính sách phí TNTH từ nguồn chung</label>
-          <div style="display:flex;gap:8px;align-items:center;">
+        <div>
+          <div class="rc-field-item" style="margin-bottom:8px;">
+            <label class="rc-field-label">Chính sách Phí TNTH</label>
             <select class="rc-field-input" onchange="RateCenter.applyFeePolicy('${projectId}','${pkgId}',this.value)">
-              <option value="">-- Chọn chính sách phí TNTH --</option>
-              ${feePolicyOptions}
+              <option value="">-- Chọn từ Thư viện --</option>
+              ${feeOpts}
             </select>
-            <button class="rc-act-btn" title="Lưu cấu hình phí hiện tại thành chính sách phí dùng chung"
-              onclick="RateCenter.saveFeePolicyFromCurrent('${projectId}','${pkgId}')">＋</button>
-            <button class="rc-act-btn del" title="Xóa chính sách phí đang chọn khỏi nguồn chung"
-              onclick="RateCenter.deleteFeePolicy('${projectId}','${pkgId}')">✕</button>
           </div>
-          <small style="display:block;margin-top:6px;color:var(--text-muted);font-size:0.72rem;">
-            Mini master: chọn một mẫu để tự điền mã, tên và các mức phí TNTH theo giai đoạn.
-          </small>
+          ${feeSummary}
         </div>
       </div>
 
-      <div class="rc-fields-grid" style="margin-top:12px;">
-        <div class="rc-field-item" style="grid-column:1/-1">
-          <label class="rc-field-label">Hỗ trợ lãi suất</label>
-          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(99,102,241,0.14);border-radius:10px;background:rgba(99,102,241,0.04);cursor:pointer;">
-            <input type="checkbox" ${rules.enabled!==false?'checked':''}
-              onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','enabled',this.checked)">
-            <span style="font-size:0.86rem;color:var(--text-secondary);">Áp dụng chính sách hỗ trợ lãi suất cho chính sách bán hàng này</span>
-          </label>
-        </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Mã chính sách hỗ trợ lãi suất</label>
-          <input class="rc-field-input" value="${_rcEsc(rules.supportPolicyCode||'')}" placeholder="VD: HTLS-ECO-24"
-            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','supportPolicyCode',this.value)">
-        </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Tên chính sách hỗ trợ lãi suất</label>
-          <input class="rc-field-input" value="${_rcEsc(rules.supportPolicyName||'')}" placeholder="VD: CĐT hỗ trợ lãi 24 tháng"
-            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','supportPolicyName',this.value)">
-        </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Thời gian CĐT trả lãi mặc định <small style="color:var(--text-muted)">(tháng)</small></label>
-          <input class="rc-field-input" type="number" min="0" step="1" value="${_rcEsc(rules.defaultSupportMonths||'')}"
-            placeholder="VD: 24"
-            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','defaultSupportMonths',this.value)">
-        </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Bên trả lãi trong thời gian hỗ trợ</label>
-          <input class="rc-field-input" value="${_rcEsc(rules.supportPayer||'Chủ đầu tư')}"
-            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','supportPayer',this.value)">
-        </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Bên trả lãi sau hỗ trợ</label>
-          <input class="rc-field-input" value="${_rcEsc(rules.customerPayer||'Khách hàng')}"
-            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','customerPayer',this.value)">
-        </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Bên trả nợ gốc</label>
-          <input class="rc-field-input" value="${_rcEsc(rules.principalPayer||'Khách hàng')}"
-            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','principalPayer',this.value)">
-        </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Mã chính sách phí TNTH</label>
-          <input class="rc-field-input" value="${_rcEsc(rules.feePolicyCode||'')}" placeholder="VD: TNTH-STD"
-            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','feePolicyCode',this.value)">
-        </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Tên chính sách phí TNTH</label>
-          <input class="rc-field-input" value="${_rcEsc(rules.feePolicyName||'')}" placeholder="VD: Phí TNTH theo giai đoạn hỗ trợ"
-            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','feePolicyName',this.value)">
-        </div>
-        <div class="rc-field-item" style="grid-column:1/-1">
-          <label class="rc-field-label">Nguyên tắc trả nợ gốc</label>
-          <input class="rc-field-input" value="${_rcEsc(rules.principalRule||'')}"
-            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','principalRule',this.value)">
-        </div>
-        <div class="rc-field-item" style="grid-column:1/-1">
-          <label class="rc-field-label">Ghi chú hỗ trợ lãi</label>
-          <input class="rc-field-input" value="${_rcEsc(rules.note||'')}" placeholder="VD: CĐT hỗ trợ theo từng lần giải ngân..."
-            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','note',this.value)">
-        </div>
+      <div class="rc-field-item" style="margin-top:14px;">
+        <label class="rc-field-label">Bật / Tắt hỗ trợ lãi suất</label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(99,102,241,0.14);border-radius:10px;background:rgba(99,102,241,0.04);cursor:pointer;">
+          <input type="checkbox" ${rules.enabled!==false?'checked':''}
+            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','enabled',this.checked)">
+          <span style="font-size:0.86rem;color:var(--text-secondary);">Áp dụng chính sách hỗ trợ lãi suất cho gói này</span>
+        </label>
       </div>
 
-      <div class="rc-detail-section-title" style="margin-top:22px;">💼 Phí TNTH cấp chính sách</div>
-      <div class="rc-bucket-info">
-        ℹ️ Phí TNTH là cấu hình cấp chính sách, không phụ thuộc từng bucket. Rule Engine tự xác định giai đoạn dựa trên tháng hiện tại so với thời gian CĐT hỗ trợ và mốc T60.
-      </div>
+      <div class="rc-detail-section-title" style="margin-top:20px;">💼 Bảng phí TNTH</div>
+      <div class="rc-bucket-info">ℹ️ Phí tự động xác định theo giai đoạn (Trong HTLS / Sau HTLS đến T60 / Từ T61).</div>
       <div class="rc-fee-list">${feeRows}</div>
     </div>`;
   },
-
   // Tab 3: Ân hạn gốc
   _renderTabGrace(projectId, pkgId, pkg) {
     const gr = pkg.graceRules || RC_DEFAULT_GRACE_RULES;
@@ -1531,6 +1488,245 @@ const RateCenter = {
 
     return data;
   },
+
+  // ── Policy Library Modal ────────────────────────────────────────
+  _libTab: 'support',
+  _libEditId: null,
+
+  openPolicyLibrary() {
+    const el = document.getElementById('rc-policy-library-modal');
+    if (el) { el.style.display = 'flex'; this._libTab = 'support'; this._libEditId = null; this.renderPolicyLibrary(); }
+  },
+
+  closePolicyLibrary() {
+    const el = document.getElementById('rc-policy-library-modal');
+    if (el) el.style.display = 'none';
+  },
+
+  switchLibTab(tab) {
+    this._libTab = tab; this._libEditId = null;
+    document.querySelectorAll('.rc-lib-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    this.renderPolicyLibrary();
+  },
+
+  _libUsage(policyId, type) {
+    let n = 0;
+    (RateCenterState.projects || []).forEach(pr => (pr.packages || []).forEach(pk => {
+      const r = pk.interestSupportRules || {};
+      if (type === 'support' && r.sourceSupportPolicyId === policyId) n++;
+      if (type === 'fee' && r.sourceFeePolicyId === policyId) n++;
+    }));
+    return n;
+  },
+
+  renderPolicyLibrary() {
+    const body = document.getElementById('rc-lib-body');
+    if (!body) return;
+    body.innerHTML = this._libTab === 'support' ? this._renderLibSupport() : this._renderLibFee();
+  },
+
+  _renderLibSupport() {
+    const policies = RateCenterState.supportPolicies || [];
+    const editId = this._libEditId;
+    const list = !policies.length
+      ? `<div class="rc-empty" style="padding:30px;text-align:center;">Chưa có chính sách HTLS nào.<br>Nhấn <b>+ Thêm mới</b> để tạo.</div>`
+      : policies.map(p => {
+          const n = this._libUsage(p.id, 'support');
+          const badge = n > 0
+            ? `<span class="rc-lib-badge used">Dùng bởi ${n} gói</span>`
+            : `<span class="rc-lib-badge">Chưa dùng</span>`;
+          const isEdit = editId === p.id;
+          const form = isEdit ? `<div class="rc-lib-form">
+            <div class="rc-lib-form-grid">
+              <div class="rc-field-item"><label class="rc-field-label">Mã</label><input class="rc-field-input" id="rle-code-${p.id}" value="${_rcEsc(p.code||'')}"></div>
+              <div class="rc-field-item"><label class="rc-field-label">Tên</label><input class="rc-field-input" id="rle-name-${p.id}" value="${_rcEsc(p.name||'')}"></div>
+              <div class="rc-field-item"><label class="rc-field-label">Số tháng HTLS</label><input class="rc-field-input" type="number" id="rle-months-${p.id}" value="${p.defaultSupportMonths||''}"></div>
+              <div class="rc-field-item"><label class="rc-field-label">Bên trả lãi</label><input class="rc-field-input" id="rle-payer-${p.id}" value="${_rcEsc(p.supportPayer||'Chủ đầu tư')}"></div>
+              <div class="rc-field-item"><label class="rc-field-label">Bên trả sau HT</label><input class="rc-field-input" id="rle-cpayer-${p.id}" value="${_rcEsc(p.customerPayer||'Khách hàng')}"></div>
+              <div class="rc-field-item"><label class="rc-field-label">Nguyên tắc gốc</label><input class="rc-field-input" id="rle-prule-${p.id}" value="${_rcEsc(p.principalRule||'')}"></div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+              <button class="rc-act-btn" onclick="RateCenter._libCancelEdit()">Hủy</button>
+              <button class="md-cfg-add-btn" onclick="RateCenter._libSaveSupport('${p.id}')">💾 Lưu</button>
+            </div>
+          </div>` : '';
+          return `<div class="rc-lib-item ${isEdit ? 'rc-lib-item-editing' : ''}">
+            <div class="rc-lib-item-row">
+              <div class="rc-lib-item-info">
+                <span class="rc-lib-item-code">${_rcEsc(p.code||'—')}</span>
+                <span class="rc-lib-item-name">${_rcEsc(p.name||'Chưa đặt tên')}</span>
+                ${badge}
+                <span class="rc-lib-item-meta">${p.defaultSupportMonths||0}T · ${_rcEsc(p.supportPayer||'')}</span>
+              </div>
+              <div class="rc-lib-item-btns">
+                <button class="rc-act-btn" onclick="RateCenter._libToggleEdit('${p.id}')" title="Sửa">✎</button>
+                <button class="rc-act-btn del" onclick="RateCenter._libDelSupport('${p.id}')" ${n>0?'disabled title="Đang được sử dụng"':''}>✕</button>
+              </div>
+            </div>${form}
+          </div>`;
+        }).join('');
+    const newForm = editId === 'new' ? `<div class="rc-lib-form" style="margin-top:12px;border:1px dashed rgba(99,102,241,.3);border-radius:10px;padding:14px;">
+      <div style="font-size:.78rem;font-weight:700;color:#6366f1;margin-bottom:8px;">+ Chính sách HTLS mới</div>
+      <div class="rc-lib-form-grid">
+        <div class="rc-field-item"><label class="rc-field-label">Mã</label><input class="rc-field-input" id="rln-code" placeholder="VD: HTLS-24"></div>
+        <div class="rc-field-item"><label class="rc-field-label">Tên</label><input class="rc-field-input" id="rln-name" placeholder="VD: CĐT hỗ trợ lãi 24T"></div>
+        <div class="rc-field-item"><label class="rc-field-label">Số tháng HTLS</label><input class="rc-field-input" type="number" id="rln-months" placeholder="24"></div>
+        <div class="rc-field-item"><label class="rc-field-label">Bên trả lãi</label><input class="rc-field-input" id="rln-payer" value="Chủ đầu tư"></div>
+        <div class="rc-field-item"><label class="rc-field-label">Bên trả sau HT</label><input class="rc-field-input" id="rln-cpayer" value="Khách hàng"></div>
+        <div class="rc-field-item"><label class="rc-field-label">Nguyên tắc gốc</label><input class="rc-field-input" id="rln-prule" placeholder="VD: KH trả gốc theo lịch..."></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+        <button class="rc-act-btn" onclick="RateCenter._libCancelEdit()">Hủy</button>
+        <button class="md-cfg-add-btn" onclick="RateCenter._libSaveSupport('new')">💾 Thêm vào Thư viện</button>
+      </div>
+    </div>` : '';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span style="font-size:.78rem;color:var(--text-muted)">${policies.length} chính sách hỗ trợ lãi suất</span>
+      <button class="md-cfg-add-btn" onclick="RateCenter._libToggleEdit('new')">+ Thêm mới</button>
+    </div>${list}${newForm}`;
+  },
+
+  _renderLibFee() {
+    const policies = RateCenterState.feePolicies || [];
+    const editId = this._libEditId;
+    const list = !policies.length
+      ? `<div class="rc-empty" style="padding:30px;text-align:center;">Chưa có chính sách phí TNTH nào.<br>Nhấn <b>+ Thêm mới</b> để tạo.</div>`
+      : policies.map(p => {
+          const n = this._libUsage(p.id, 'fee');
+          const badge = n > 0
+            ? `<span class="rc-lib-badge used">Dùng bởi ${n} gói</span>`
+            : `<span class="rc-lib-badge">Chưa dùng</span>`;
+          const feeRules = p.feeRules || RC_DEFAULT_FEE_RULES;
+          const summary = feeRules.map(f => `${f.label||f.phase}: ${f.fee||'—'}%`).join(' · ');
+          const isEdit = editId === p.id;
+          const form = isEdit ? `<div class="rc-lib-form">
+            <div class="rc-lib-form-grid">
+              <div class="rc-field-item"><label class="rc-field-label">Mã</label><input class="rc-field-input" id="rle-fcode-${p.id}" value="${_rcEsc(p.code||'')}"></div>
+              <div class="rc-field-item"><label class="rc-field-label">Tên</label><input class="rc-field-input" id="rle-fname-${p.id}" value="${_rcEsc(p.name||'')}"></div>
+            </div>
+            <div style="margin-top:8px;">
+              ${(p.feeRules||RC_DEFAULT_FEE_RULES).map(f=>`<div class="rc-fee-row" style="margin-bottom:6px;">
+                <div class="rc-fee-phase">${_rcEsc(f.label)}</div>
+                <div class="rc-fee-input-wrap"><input class="rc-tier-input" type="number" step="0.01" value="${_rcEsc(f.fee||'')}" id="rle-fee-${p.id}-${f.id}" placeholder="VD: 0.5"><span class="rc-fee-unit">%</span></div>
+              </div>`).join('')}
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+              <button class="rc-act-btn" onclick="RateCenter._libCancelEdit()">Hủy</button>
+              <button class="md-cfg-add-btn" onclick="RateCenter._libSaveFee('${p.id}')">💾 Lưu</button>
+            </div>
+          </div>` : '';
+          return `<div class="rc-lib-item ${isEdit ? 'rc-lib-item-editing' : ''}">
+            <div class="rc-lib-item-row">
+              <div class="rc-lib-item-info">
+                <span class="rc-lib-item-code">${_rcEsc(p.code||'—')}</span>
+                <span class="rc-lib-item-name">${_rcEsc(p.name||'Chưa đặt tên')}</span>
+                ${badge}
+                <span class="rc-lib-item-meta" style="font-size:.68rem;">${summary}</span>
+              </div>
+              <div class="rc-lib-item-btns">
+                <button class="rc-act-btn" onclick="RateCenter._libToggleEdit('${p.id}')" title="Sửa">✎</button>
+                <button class="rc-act-btn del" onclick="RateCenter._libDelFee('${p.id}')" ${n>0?'disabled title="Đang được sử dụng"':''}>✕</button>
+              </div>
+            </div>${form}
+          </div>`;
+        }).join('');
+    const newForm = editId === 'new' ? `<div class="rc-lib-form" style="margin-top:12px;border:1px dashed rgba(99,102,241,.3);border-radius:10px;padding:14px;">
+      <div style="font-size:.78rem;font-weight:700;color:#6366f1;margin-bottom:8px;">+ Chính sách Phí TNTH mới</div>
+      <div class="rc-lib-form-grid">
+        <div class="rc-field-item"><label class="rc-field-label">Mã</label><input class="rc-field-input" id="rln-fcode" placeholder="VD: TNTH-STD"></div>
+        <div class="rc-field-item"><label class="rc-field-label">Tên</label><input class="rc-field-input" id="rln-fname" placeholder="VD: Phí TNTH theo giai đoạn HTLS"></div>
+      </div>
+      <div style="margin-top:8px;">
+        ${RC_DEFAULT_FEE_RULES.map(f=>`<div class="rc-fee-row" style="margin-bottom:6px;">
+          <div class="rc-fee-phase">${_rcEsc(f.label)}</div>
+          <div class="rc-fee-input-wrap"><input class="rc-tier-input" type="number" step="0.01" id="rln-fee-${f.id}" placeholder="VD: 0.5"><span class="rc-fee-unit">%</span></div>
+        </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+        <button class="rc-act-btn" onclick="RateCenter._libCancelEdit()">Hủy</button>
+        <button class="md-cfg-add-btn" onclick="RateCenter._libSaveFee('new')">💾 Thêm vào Thư viện</button>
+      </div>
+    </div>` : '';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span style="font-size:.78rem;color:var(--text-muted)">${policies.length} chính sách phí TNTH</span>
+      <button class="md-cfg-add-btn" onclick="RateCenter._libToggleEdit('new')">+ Thêm mới</button>
+    </div>${list}${newForm}`;
+  },
+
+  _libToggleEdit(id) { this._libEditId = (this._libEditId === id) ? null : id; this.renderPolicyLibrary(); },
+  _libCancelEdit() { this._libEditId = null; this.renderPolicyLibrary(); },
+
+  _libSaveSupport(id) {
+    const g = sid => document.getElementById(sid)?.value?.trim() || '';
+    if (!Array.isArray(RateCenterState.supportPolicies)) RateCenterState.supportPolicies = [];
+    if (id === 'new') {
+      const name = g('rln-name');
+      if (!name) { if(typeof App!=='undefined') App.toast('Nhập tên chính sách','warn'); return; }
+      RateCenterState.supportPolicies.push({
+        id: _rcId(), code: g('rln-code'), name,
+        defaultSupportMonths: parseInt(g('rln-months'))||0,
+        supportPayer: g('rln-payer')||'Chủ đầu tư',
+        customerPayer: g('rln-cpayer')||'Khách hàng',
+        principalPayer: 'Khách hàng',
+        principalRule: g('rln-prule')||RC_DEFAULT_INTEREST_SUPPORT_RULES.principalRule,
+        enabled: true, createdAt: new Date().toISOString(),
+      });
+    } else {
+      const p = (RateCenterState.supportPolicies||[]).find(x => x.id === id);
+      if (!p) return;
+      p.code = g(`rle-code-${id}`); p.name = g(`rle-name-${id}`);
+      p.defaultSupportMonths = parseInt(g(`rle-months-${id}`))||0;
+      p.supportPayer = g(`rle-payer-${id}`)||'Chủ đầu tư';
+      p.customerPayer = g(`rle-cpayer-${id}`)||'Khách hàng';
+      p.principalRule = g(`rle-prule-${id}`);
+      p.updatedAt = new Date().toISOString();
+    }
+    this._libEditId = null; this.save(); this.renderPolicyLibrary();
+    if (typeof App!=='undefined') App.toast('Đã lưu chính sách HTLS','success');
+  },
+
+  _libDelSupport(id) {
+    if (this._libUsage(id,'support') > 0) { if(typeof App!=='undefined') App.toast('Đang được sử dụng, không thể xóa','warn'); return; }
+    if (!confirm('Xóa chính sách khỏi Thư viện?')) return;
+    RateCenterState.supportPolicies = (RateCenterState.supportPolicies||[]).filter(x => x.id !== id);
+    this.save(); this.renderPolicyLibrary();
+    if (typeof App!=='undefined') App.toast('Đã xóa','success');
+  },
+
+  _libSaveFee(id) {
+    const g = sid => document.getElementById(sid)?.value?.trim() || '';
+    if (!Array.isArray(RateCenterState.feePolicies)) RateCenterState.feePolicies = [];
+    if (id === 'new') {
+      const name = g('rln-fname');
+      if (!name) { if(typeof App!=='undefined') App.toast('Nhập tên chính sách','warn'); return; }
+      const feeRules = RC_DEFAULT_FEE_RULES.map(f => ({
+        ...f, id: _rcId(), fee: g(`rln-fee-${f.id}`),
+      }));
+      RateCenterState.feePolicies.push({
+        id: _rcId(), code: g('rln-fcode'), name, feeRules,
+        createdAt: new Date().toISOString(),
+      });
+    } else {
+      const p = (RateCenterState.feePolicies||[]).find(x => x.id === id);
+      if (!p) return;
+      p.code = g(`rle-fcode-${id}`); p.name = g(`rle-fname-${id}`);
+      (p.feeRules||[]).forEach(f => { const v = g(`rle-fee-${id}-${f.id}`); if(v!=='') f.fee = v; });
+      p.updatedAt = new Date().toISOString();
+    }
+    this._libEditId = null; this.save(); this.renderPolicyLibrary();
+    if (typeof App!=='undefined') App.toast('Đã lưu chính sách Phí TNTH','success');
+  },
+
+  _libDelFee(id) {
+    if (this._libUsage(id,'fee') > 0) { if(typeof App!=='undefined') App.toast('Đang được sử dụng, không thể xóa','warn'); return; }
+    if (!confirm('Xóa chính sách khỏi Thư viện?')) return;
+    RateCenterState.feePolicies = (RateCenterState.feePolicies||[]).filter(x => x.id !== id);
+    this.save(); this.renderPolicyLibrary();
+    if (typeof App!=='undefined') App.toast('Đã xóa','success');
+  },
+
 };
 
 RateCenter.load();
