@@ -30,12 +30,12 @@ const RC_DEFAULT_FIELDS = [
 ];
 
 const RC_DEFAULT_RATE_BUCKETS = [
-  { id:'rb_6',  maxMonths: 6,  rate:'', margin:'', label:'≤ 6 tháng',  note:'', hasInterestSupport:true },
-  { id:'rb_12', maxMonths: 12, rate:'', margin:'', label:'≤ 12 tháng', note:'', hasInterestSupport:true },
-  { id:'rb_18', maxMonths: 18, rate:'', margin:'', label:'≤ 18 tháng', note:'', hasInterestSupport:true },
-  { id:'rb_24', maxMonths: 24, rate:'', margin:'', label:'≤ 24 tháng', note:'', hasInterestSupport:true },
-  { id:'rb_30', maxMonths: 30, rate:'', margin:'', label:'≤ 30 tháng', note:'', hasInterestSupport:true },
-  { id:'rb_36', maxMonths: 36, rate:'', margin:'', label:'≤ 36 tháng', note:'', hasInterestSupport:true },
+  { id:'rb_6',  maxMonths: 6,  rate:'', margin:'', label:'≤ 6 tháng',  note:'' },
+  { id:'rb_12', maxMonths: 12, rate:'', margin:'', label:'≤ 12 tháng', note:'' },
+  { id:'rb_18', maxMonths: 18, rate:'', margin:'', label:'≤ 18 tháng', note:'' },
+  { id:'rb_24', maxMonths: 24, rate:'', margin:'', label:'≤ 24 tháng', note:'' },
+  { id:'rb_30', maxMonths: 30, rate:'', margin:'', label:'≤ 30 tháng', note:'' },
+  { id:'rb_36', maxMonths: 36, rate:'', margin:'', label:'≤ 36 tháng', note:'' },
 ];
 
 const RC_DEFAULT_FEE_RULES = [
@@ -55,6 +55,10 @@ const RC_DEFAULT_GRACE_RULES = {
 
 const RC_DEFAULT_INTEREST_SUPPORT_RULES = {
   enabled: true,
+  supportPolicyCode: '',
+  supportPolicyName: '',
+  feePolicyCode: '',
+  feePolicyName: '',
   defaultSupportMonths: '',
   supportPayer: 'Chủ đầu tư',
   customerPayer: 'Khách hàng',
@@ -103,7 +107,6 @@ const RateRuleEngine = {
       margin: source && String(selectedBucket.margin || '').trim() === '' ? source.margin : selectedBucket.margin,
       effectiveSourceLabel: source ? source.label : selectedBucket.label,
       inherited: !!source && source.id !== selectedBucket.id,
-      hasInterestSupport: source ? source.hasInterestSupport !== false : selectedBucket.hasInterestSupport !== false,
       effectiveRate: source ? source.rate : selectedBucket.rate,
       preferentialExpired: false,
       expiryNote: '',
@@ -173,7 +176,7 @@ const RateRuleEngine = {
   },
 
   /**
-   * Tách rõ nghĩa vụ trả lãi: CĐT hỗ trợ trả lãi trong N tháng, sau đó KH trả lãi.
+   * Tách rõ nghĩa vụ trả lãi: hỗ trợ lãi suất trong N tháng, sau đó KH trả lãi.
    * Nợ gốc mặc định luôn do khách hàng trả theo lịch, độc lập với hỗ trợ lãi.
    */
   calcInterestResponsibility(pkg, input, bucket) {
@@ -183,8 +186,7 @@ const RateRuleEngine = {
     const configuredSupportMonths = input.cdtSupportMonths !== undefined && input.cdtSupportMonths !== ''
       ? Number(input.cdtSupportMonths)
       : Number(input.htlsMonths || rules.defaultSupportMonths || 0);
-    const bucketAllowsSupport = !bucket || bucket.hasInterestSupport !== false;
-    const hasDeveloperSupport = rules.enabled !== false && bucketAllowsSupport && input.loanType !== 'standard' && configuredSupportMonths > 0;
+    const hasDeveloperSupport = rules.enabled !== false && input.loanType !== 'standard' && configuredSupportMonths > 0;
     const supportMonths = hasDeveloperSupport
       ? Math.max(0, loanTermMonths ? Math.min(configuredSupportMonths, loanTermMonths) : configuredSupportMonths)
       : 0;
@@ -200,8 +202,6 @@ const RateRuleEngine = {
     if (hasDeveloperSupport) {
       notes.push(`${rules.supportPayer} trả lãi trong ${supportMonths} tháng đầu`);
       notes.push(`${rules.customerPayer} bắt đầu trả lãi từ tháng ${customerStartMonth}`);
-    } else if (bucket && bucket.hasInterestSupport === false) {
-      notes.push('Bucket lãi suất này không tích hỗ trợ lãi; khách hàng trả lãi từ tháng 1');
     } else {
       notes.push('Không có hỗ trợ lãi từ Chủ đầu tư; khách hàng trả lãi từ tháng 1');
     }
@@ -279,7 +279,11 @@ const RateRuleEngine = {
       'Biên độ':            bucket ? bucket.margin : '',
       'Nguồn bucket lãi suất': bucket ? bucket.effectiveSourceLabel : '',
       'Kế thừa bucket lớn hơn': bucket && bucket.inherited ? 'Có' : 'Không',
-      'Có hỗ trợ lãi suất': bucket && bucket.hasInterestSupport !== false ? 'Có' : 'Không',
+      'Có hỗ trợ lãi suất': supportRules.enabled !== false ? 'Có' : 'Không',
+      'Mã chính sách hỗ trợ lãi suất': supportRules.supportPolicyCode || '',
+      'Chính sách hỗ trợ lãi suất': supportRules.supportPolicyName || '',
+      'Mã chính sách phí TNTH': supportRules.feePolicyCode || '',
+      'Chính sách phí TNTH': supportRules.feePolicyName || '',
       'Thời gian CĐT trả lãi': responsibility.supportMonths ? `${responsibility.supportMonths} tháng` : 'Không áp dụng',
       'Tháng khách hàng bắt đầu trả lãi': responsibility.customerStartMonth,
       'Thời gian khách hàng trả lãi': responsibility.customerInterestMonths === null
@@ -387,7 +391,6 @@ const RateCenter = {
           const label = `≤ ${months} tháng`;
           if (!bucket.label || bucket.label !== label) { bucket.label = label; changed = true; }
           if (bucket.note === undefined) { bucket.note = ''; changed = true; }
-          if (bucket.hasInterestSupport === undefined) { bucket.hasInterestSupport = true; changed = true; }
         });
         pkg.rateBuckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
         if (!pkg.feeRules)    { pkg.feeRules    = RC_DEFAULT_FEE_RULES.map(r => ({...r, id:_rcId()})); changed = true; }
@@ -697,7 +700,6 @@ const RateCenter = {
       const inheritedLabel = effective.inherited
         ? `<span class="rc-inherited-badge">Kế thừa ${_rcEsc(effective.effectiveSourceLabel)}</span>`
         : '';
-      const supportChecked = b.hasInterestSupport !== false ? 'checked' : '';
       return `
       <tr>
         <td>
@@ -712,14 +714,6 @@ const RateCenter = {
           onchange="RateCenter.setBucketVal('${projectId}','${pkgId}','${b.id}','rate',this.value)"> %/năm</td>
         <td><input class="rc-tier-input" type="number" step="0.01" value="${_rcEsc(b.margin||'')}" placeholder="VD: 3.5"
           onchange="RateCenter.setBucketVal('${projectId}','${pkgId}','${b.id}','margin',this.value)"> %</td>
-        <td>
-          <div style="display:flex;align-items:center;gap:8px;justify-content:center;">
-            <input type="checkbox" ${supportChecked}
-              title="Tích nếu mức lãi suất này được áp dụng chính sách CĐT hỗ trợ lãi"
-              onchange="RateCenter.setBucketVal('${projectId}','${pkgId}','${b.id}','hasInterestSupport',this.checked)">
-            <span style="font-size:0.72rem;color:var(--text-muted);">${b.hasInterestSupport !== false ? 'Có' : 'Không'}</span>
-          </div>
-        </td>
         <td>
           <div class="rc-effective-rate">
             ${inheritedLabel}
@@ -743,7 +737,7 @@ const RateCenter = {
         </span>
       </div>
       <div class="rc-bucket-info">
-        ℹ️ Bảng này chỉ quản lý <b>mức lãi suất ngân hàng</b>, <b>biên độ</b> và <b>thời gian áp dụng</b>. Cột <b>CĐT hỗ trợ?</b> chỉ đánh dấu bucket nào được phép áp dụng chính sách hỗ trợ lãi; chi tiết hỗ trợ và phí TNTH nằm ở tab <b>Hỗ trợ & Phí</b>.
+        ℹ️ Bảng này chỉ quản lý <b>mức lãi suất ngân hàng</b>, <b>biên độ</b> và <b>thời gian áp dụng</b>. Hỗ trợ lãi suất và phí TNTH là cấu hình chung cấp chính sách tại tab <b>Hỗ trợ & Phí</b>.
       </div>
       <div style="overflow-x:auto;">
       <table class="rc-tiers-table">
@@ -751,7 +745,6 @@ const RateCenter = {
           <th>Áp dụng đến</th>
           <th>Lãi suất</th>
           <th>Biên độ</th>
-          <th>CĐT hỗ trợ?</th>
           <th>Ghi chú</th>
           <th></th>
         </tr></thead>
@@ -776,15 +769,26 @@ const RateCenter = {
     return `<div class="rc-detail-section">
       <div class="rc-detail-section-title">🤝 Cấu hình chính sách hỗ trợ lãi & phí TNTH</div>
       <div class="rc-bucket-info">
-        💡 Đây là layer cấu hình cấp <b>chính sách bán hàng</b>, áp dụng chung cho các bucket được tích <b>CĐT hỗ trợ?</b> trong Bảng lãi suất. Nợ gốc được tách riêng và mặc định khách hàng vẫn trả theo lịch.
+        💡 Đây là layer cấu hình cấp <b>chính sách bán hàng</b>. Chỉ cần bật <b>Hỗ trợ lãi suất</b> một lần tại đây; khi chọn chính sách bán hàng, hệ thống sẽ lấy kèm chính sách hỗ trợ lãi suất và phí TNTH đã cấu hình.
       </div>
       <div class="rc-fields-grid" style="margin-top:12px;">
+        <div class="rc-field-item" style="grid-column:1/-1">
+          <label class="rc-field-label">Hỗ trợ lãi suất</label>
+          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(99,102,241,0.14);border-radius:10px;background:rgba(99,102,241,0.04);cursor:pointer;">
+            <input type="checkbox" ${rules.enabled!==false?'checked':''}
+              onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','enabled',this.checked)">
+            <span style="font-size:0.86rem;color:var(--text-secondary);">Áp dụng chính sách hỗ trợ lãi suất cho chính sách bán hàng này</span>
+          </label>
+        </div>
         <div class="rc-field-item">
-          <label class="rc-field-label">Có hỗ trợ lãi từ CĐT?</label>
-          <select class="rc-field-input" onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','enabled',this.value==='true')">
-            <option value="true" ${rules.enabled!==false?'selected':''}>Có</option>
-            <option value="false" ${rules.enabled===false?'selected':''}>Không</option>
-          </select>
+          <label class="rc-field-label">Mã chính sách hỗ trợ lãi suất</label>
+          <input class="rc-field-input" value="${_rcEsc(rules.supportPolicyCode||'')}" placeholder="VD: HTLS-ECO-24"
+            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','supportPolicyCode',this.value)">
+        </div>
+        <div class="rc-field-item">
+          <label class="rc-field-label">Tên chính sách hỗ trợ lãi suất</label>
+          <input class="rc-field-input" value="${_rcEsc(rules.supportPolicyName||'')}" placeholder="VD: CĐT hỗ trợ lãi 24 tháng"
+            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','supportPolicyName',this.value)">
         </div>
         <div class="rc-field-item">
           <label class="rc-field-label">Thời gian CĐT trả lãi mặc định <small style="color:var(--text-muted)">(tháng)</small></label>
@@ -806,6 +810,16 @@ const RateCenter = {
           <label class="rc-field-label">Bên trả nợ gốc</label>
           <input class="rc-field-input" value="${_rcEsc(rules.principalPayer||'Khách hàng')}"
             onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','principalPayer',this.value)">
+        </div>
+        <div class="rc-field-item">
+          <label class="rc-field-label">Mã chính sách phí TNTH</label>
+          <input class="rc-field-input" value="${_rcEsc(rules.feePolicyCode||'')}" placeholder="VD: TNTH-STD"
+            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','feePolicyCode',this.value)">
+        </div>
+        <div class="rc-field-item">
+          <label class="rc-field-label">Tên chính sách phí TNTH</label>
+          <input class="rc-field-input" value="${_rcEsc(rules.feePolicyName||'')}" placeholder="VD: Phí TNTH theo giai đoạn hỗ trợ"
+            onchange="RateCenter.setSupportVal('${projectId}','${pkgId}','feePolicyName',this.value)">
         </div>
         <div class="rc-field-item" style="grid-column:1/-1">
           <label class="rc-field-label">Nguyên tắc trả nợ gốc</label>
@@ -1116,8 +1130,6 @@ const RateCenter = {
         }
         b.maxMonths = nextMonths;
         b.label = `≤ ${nextMonths} tháng`;
-      } else if (key === 'hasInterestSupport') {
-        b.hasInterestSupport = value === true || value === 'true';
       } else {
         b[key] = value;
       }
@@ -1131,7 +1143,7 @@ const RateCenter = {
     }
     pkg.rateBuckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
     this.save();
-    if (key === 'maxMonths' || key === 'rate' || key === 'hasInterestSupport') this.renderDetail(projectId, pkgId);
+    if (key === 'maxMonths' || key === 'rate') this.renderDetail(projectId, pkgId);
   },
 
   addBucket(projectId, pkgId) {
@@ -1147,7 +1159,6 @@ const RateCenter = {
       label: `≤ ${maxMonths} tháng`,
       rate: '',
       margin: '',
-      hasInterestSupport: false,
       note: ''
     });
     pkg.rateBuckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
@@ -1234,7 +1245,7 @@ const RateCenter = {
     const pkg  = proj && (proj.packages||[]).find(k => k.id === pkgId);
     if (!pkg) return;
 
-    const htls = prompt('Thời gian CĐT hỗ trợ trả lãi (tháng):', '24');
+    const htls = prompt('Thời gian hỗ trợ lãi suất (tháng):', '24');
     if (htls === null) return;
     const loanTerm = prompt('Tổng kỳ hạn vay (tháng, để trống nếu chưa có):', '240');
     if (loanTerm === null) return;
@@ -1282,6 +1293,8 @@ const RateCenter = {
       'Điều kiện đi kèm','Ghi chú chính sách',
       'Bucket HTLS','Bucket lãi suất','Lãi suất áp dụng','Lãi suất hiệu lực','Lãi suất bucket','Biên độ',
       'Nguồn bucket lãi suất','Kế thừa bucket lớn hơn','Có hỗ trợ lãi suất',
+      'Mã chính sách hỗ trợ lãi suất','Chính sách hỗ trợ lãi suất',
+      'Mã chính sách phí TNTH','Chính sách phí TNTH',
       'Thời gian CĐT trả lãi','Tháng khách hàng bắt đầu trả lãi',
       'Thời gian khách hàng trả lãi','Bên trả lãi hiện tại',
       'Lãi suất CĐT trả','Lãi suất khách hàng trả',

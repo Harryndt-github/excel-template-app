@@ -657,7 +657,7 @@ const WordGenerator = {
         <div style="display:none;padding:0 18px 16px;">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:12px;">
             <div>
-	              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Thời gian CĐT hỗ trợ trả lãi (tháng)</label>
+	              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Thời gian hỗ trợ lãi suất (tháng)</label>
 	              <input type="number" min="0" class="mapping-select" placeholder="VD: 24"
 	                value="${this._runtimeConditions.htlsMonths||''}"
 	                oninput="WordGenerator._runtimeConditions.htlsMonths=this.value">
