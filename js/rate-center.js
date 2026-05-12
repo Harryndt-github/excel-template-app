@@ -5,6 +5,8 @@
 
 const RateCenterState = {
   projects: [],
+  supportPolicies: [],
+  feePolicies: [],
   selectedProject: null,
   selectedPackage: null,
   activeTab: 'buckets',
@@ -360,6 +362,8 @@ const RateCenter = {
     try {
       localStorage.setItem(this._storageKey, JSON.stringify({
         projects: RateCenterState.projects,
+        supportPolicies: RateCenterState.supportPolicies,
+        feePolicies: RateCenterState.feePolicies,
         selectedProject: RateCenterState.selectedProject,
         selectedPackage: RateCenterState.selectedPackage,
       }));
@@ -376,6 +380,8 @@ const RateCenter = {
 
   _ensureDataShape() {
     let changed = false;
+    if (!Array.isArray(RateCenterState.supportPolicies)) { RateCenterState.supportPolicies = []; changed = true; }
+    if (!Array.isArray(RateCenterState.feePolicies)) { RateCenterState.feePolicies = []; changed = true; }
     (RateCenterState.projects || []).forEach(project => {
       if (!project.packages) { project.packages = []; changed = true; }
       project.packages.forEach(pkg => {
@@ -757,6 +763,18 @@ const RateCenter = {
   _renderTabSupport(projectId, pkgId, pkg) {
     const rules = { ...RC_DEFAULT_INTEREST_SUPPORT_RULES, ...(pkg.interestSupportRules || {}) };
     const fees = pkg.feeRules || RC_DEFAULT_FEE_RULES;
+    const supportPolicies = RateCenterState.supportPolicies || [];
+    const feePolicies = RateCenterState.feePolicies || [];
+    const selectedSupportId = rules.sourceSupportPolicyId || '';
+    const selectedFeeId = rules.sourceFeePolicyId || '';
+    const supportPolicyOptions = supportPolicies.map(policy => {
+      const label = [policy.code, policy.name].filter(Boolean).join(' - ') || 'Chính sách hỗ trợ';
+      return `<option value="${policy.id}" ${policy.id === selectedSupportId ? 'selected' : ''}>${_rcEsc(label)}</option>`;
+    }).join('');
+    const feePolicyOptions = feePolicies.map(policy => {
+      const label = [policy.code, policy.name].filter(Boolean).join(' - ') || 'Chính sách phí TNTH';
+      return `<option value="${policy.id}" ${policy.id === selectedFeeId ? 'selected' : ''}>${_rcEsc(label)}</option>`;
+    }).join('');
     const feeRows = fees.map(f => `
       <div class="rc-fee-row">
         <div class="rc-fee-phase">${_rcEsc(f.label)}</div>
@@ -771,6 +789,42 @@ const RateCenter = {
       <div class="rc-bucket-info">
         💡 Đây là layer cấu hình cấp <b>chính sách bán hàng</b>. Chỉ cần bật <b>Hỗ trợ lãi suất</b> một lần tại đây; khi chọn chính sách bán hàng, hệ thống sẽ lấy kèm chính sách hỗ trợ lãi suất và phí TNTH đã cấu hình.
       </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:12px;margin-bottom:14px;">
+        <div class="rc-field-item">
+          <label class="rc-field-label">Chọn chính sách hỗ trợ lãi suất từ nguồn chung</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select class="rc-field-input" onchange="RateCenter.applySupportPolicy('${projectId}','${pkgId}',this.value)">
+              <option value="">-- Chọn chính sách hỗ trợ --</option>
+              ${supportPolicyOptions}
+            </select>
+            <button class="rc-act-btn" title="Lưu cấu hình hiện tại thành chính sách hỗ trợ dùng chung"
+              onclick="RateCenter.saveSupportPolicyFromCurrent('${projectId}','${pkgId}')">＋</button>
+            <button class="rc-act-btn del" title="Xóa chính sách hỗ trợ đang chọn khỏi nguồn chung"
+              onclick="RateCenter.deleteSupportPolicy('${projectId}','${pkgId}')">✕</button>
+          </div>
+          <small style="display:block;margin-top:6px;color:var(--text-muted);font-size:0.72rem;">
+            Mini master: chọn một mẫu để tự điền mã, tên, thời gian hỗ trợ, bên trả lãi và nguyên tắc trả gốc.
+          </small>
+        </div>
+        <div class="rc-field-item">
+          <label class="rc-field-label">Chọn chính sách phí TNTH từ nguồn chung</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select class="rc-field-input" onchange="RateCenter.applyFeePolicy('${projectId}','${pkgId}',this.value)">
+              <option value="">-- Chọn chính sách phí TNTH --</option>
+              ${feePolicyOptions}
+            </select>
+            <button class="rc-act-btn" title="Lưu cấu hình phí hiện tại thành chính sách phí dùng chung"
+              onclick="RateCenter.saveFeePolicyFromCurrent('${projectId}','${pkgId}')">＋</button>
+            <button class="rc-act-btn del" title="Xóa chính sách phí đang chọn khỏi nguồn chung"
+              onclick="RateCenter.deleteFeePolicy('${projectId}','${pkgId}')">✕</button>
+          </div>
+          <small style="display:block;margin-top:6px;color:var(--text-muted);font-size:0.72rem;">
+            Mini master: chọn một mẫu để tự điền mã, tên và các mức phí TNTH theo giai đoạn.
+          </small>
+        </div>
+      </div>
+
       <div class="rc-fields-grid" style="margin-top:12px;">
         <div class="rc-field-item" style="grid-column:1/-1">
           <label class="rc-field-label">Hỗ trợ lãi suất</label>
@@ -1186,6 +1240,150 @@ const RateCenter = {
     pkg.interestSupportRules[key] = value;
     this.save();
     if (key === 'enabled') this.renderDetail(projectId, pkgId);
+  },
+
+  applySupportPolicy(projectId, pkgId, policyId) {
+    const pkg = this._getPkg(projectId, pkgId);
+    if (!pkg) return;
+    if (!pkg.interestSupportRules) pkg.interestSupportRules = { ...RC_DEFAULT_INTEREST_SUPPORT_RULES };
+    if (!policyId) {
+      pkg.interestSupportRules.sourceSupportPolicyId = '';
+      this.save();
+      this.renderDetail(projectId, pkgId);
+      return;
+    }
+    const policy = (RateCenterState.supportPolicies || []).find(item => item.id === policyId);
+    if (!policy) return;
+    Object.assign(pkg.interestSupportRules, {
+      sourceSupportPolicyId: policy.id,
+      enabled: policy.enabled !== false,
+      supportPolicyCode: policy.code || '',
+      supportPolicyName: policy.name || '',
+      defaultSupportMonths: policy.defaultSupportMonths || '',
+      supportPayer: policy.supportPayer || 'Chủ đầu tư',
+      customerPayer: policy.customerPayer || 'Khách hàng',
+      principalPayer: policy.principalPayer || 'Khách hàng',
+      principalRule: policy.principalRule || RC_DEFAULT_INTEREST_SUPPORT_RULES.principalRule,
+      note: policy.note || '',
+    });
+    this.save();
+    this.renderDetail(projectId, pkgId);
+    if (typeof App !== 'undefined') App.toast('Đã áp dụng chính sách hỗ trợ lãi suất', 'success');
+  },
+
+  saveSupportPolicyFromCurrent(projectId, pkgId) {
+    const pkg = this._getPkg(projectId, pkgId);
+    if (!pkg) return;
+    const rules = { ...RC_DEFAULT_INTEREST_SUPPORT_RULES, ...(pkg.interestSupportRules || {}) };
+    const defaultName = rules.supportPolicyName || pkg.name || 'Chính sách hỗ trợ lãi suất';
+    this._showNameModal('Tên chính sách hỗ trợ lãi suất dùng chung', defaultName, name => {
+      if (!name || !String(name).trim()) return;
+      if (!Array.isArray(RateCenterState.supportPolicies)) RateCenterState.supportPolicies = [];
+      const existingId = rules.sourceSupportPolicyId;
+      const target = existingId
+        ? RateCenterState.supportPolicies.find(item => item.id === existingId)
+        : null;
+      const data = {
+        id: target ? target.id : _rcId(),
+        code: rules.supportPolicyCode || '',
+        name: String(name).trim(),
+        enabled: rules.enabled !== false,
+        defaultSupportMonths: rules.defaultSupportMonths || '',
+        supportPayer: rules.supportPayer || 'Chủ đầu tư',
+        customerPayer: rules.customerPayer || 'Khách hàng',
+        principalPayer: rules.principalPayer || 'Khách hàng',
+        principalRule: rules.principalRule || RC_DEFAULT_INTEREST_SUPPORT_RULES.principalRule,
+        note: rules.note || '',
+      };
+      if (target) Object.assign(target, data);
+      else RateCenterState.supportPolicies.push(data);
+      pkg.interestSupportRules.sourceSupportPolicyId = data.id;
+      pkg.interestSupportRules.supportPolicyName = data.name;
+      this.save();
+      this.renderDetail(projectId, pkgId);
+      if (typeof App !== 'undefined') App.toast('Đã lưu vào nguồn chính sách hỗ trợ lãi suất', 'success');
+    });
+  },
+
+  deleteSupportPolicy(projectId, pkgId) {
+    const pkg = this._getPkg(projectId, pkgId);
+    const policyId = pkg && pkg.interestSupportRules && pkg.interestSupportRules.sourceSupportPolicyId;
+    if (!policyId) {
+      if (typeof App !== 'undefined') App.toast('Chưa chọn chính sách hỗ trợ để xóa', 'warning');
+      return;
+    }
+    if (!confirm('Xóa chính sách hỗ trợ lãi suất này khỏi nguồn dùng chung?')) return;
+    RateCenterState.supportPolicies = (RateCenterState.supportPolicies || []).filter(item => item.id !== policyId);
+    pkg.interestSupportRules.sourceSupportPolicyId = '';
+    this.save();
+    this.renderDetail(projectId, pkgId);
+  },
+
+  applyFeePolicy(projectId, pkgId, policyId) {
+    const pkg = this._getPkg(projectId, pkgId);
+    if (!pkg) return;
+    if (!pkg.interestSupportRules) pkg.interestSupportRules = { ...RC_DEFAULT_INTEREST_SUPPORT_RULES };
+    if (!policyId) {
+      pkg.interestSupportRules.sourceFeePolicyId = '';
+      this.save();
+      this.renderDetail(projectId, pkgId);
+      return;
+    }
+    const policy = (RateCenterState.feePolicies || []).find(item => item.id === policyId);
+    if (!policy) return;
+    pkg.interestSupportRules.sourceFeePolicyId = policy.id;
+    pkg.interestSupportRules.feePolicyCode = policy.code || '';
+    pkg.interestSupportRules.feePolicyName = policy.name || '';
+    pkg.feeRules = (policy.feeRules || RC_DEFAULT_FEE_RULES).map(rule => ({ ...rule, id: _rcId() }));
+    this.save();
+    this.renderDetail(projectId, pkgId);
+    if (typeof App !== 'undefined') App.toast('Đã áp dụng chính sách phí TNTH', 'success');
+  },
+
+  saveFeePolicyFromCurrent(projectId, pkgId) {
+    const pkg = this._getPkg(projectId, pkgId);
+    if (!pkg) return;
+    const rules = { ...RC_DEFAULT_INTEREST_SUPPORT_RULES, ...(pkg.interestSupportRules || {}) };
+    const defaultName = rules.feePolicyName || pkg.name || 'Chính sách phí TNTH';
+    this._showNameModal('Tên chính sách phí TNTH dùng chung', defaultName, name => {
+      if (!name || !String(name).trim()) return;
+      if (!Array.isArray(RateCenterState.feePolicies)) RateCenterState.feePolicies = [];
+      const existingId = rules.sourceFeePolicyId;
+      const target = existingId
+        ? RateCenterState.feePolicies.find(item => item.id === existingId)
+        : null;
+      const data = {
+        id: target ? target.id : _rcId(),
+        code: rules.feePolicyCode || '',
+        name: String(name).trim(),
+        feeRules: (pkg.feeRules || RC_DEFAULT_FEE_RULES).map(rule => ({
+          phase: rule.phase,
+          fee: rule.fee || '',
+          label: rule.label || '',
+        })),
+      };
+      if (target) Object.assign(target, data);
+      else RateCenterState.feePolicies.push(data);
+      pkg.interestSupportRules.sourceFeePolicyId = data.id;
+      pkg.interestSupportRules.feePolicyName = data.name;
+      this.save();
+      this.renderDetail(projectId, pkgId);
+      if (typeof App !== 'undefined') App.toast('Đã lưu vào nguồn chính sách phí TNTH', 'success');
+    });
+  },
+
+  deleteFeePolicy(projectId, pkgId) {
+    const pkg = this._getPkg(projectId, pkgId);
+    const policyId = pkg && pkg.interestSupportRules && pkg.interestSupportRules.sourceFeePolicyId;
+    if (!policyId) {
+      if (typeof App !== 'undefined') App.toast('Chưa chọn chính sách phí TNTH để xóa', 'warning');
+      return;
+    }
+    if (!confirm('Xóa chính sách phí TNTH này khỏi nguồn dùng chung?')) return;
+    RateCenterState.feePolicies = (RateCenterState.feePolicies || []).filter(item => item.id !== policyId);
+    pkg.interestSupportRules.sourceFeePolicyId = '';
+    this.save();
+    this.renderDetail(projectId, pkgId);
   },
 
   setFeeVal(projectId, pkgId, feeId, value) {
