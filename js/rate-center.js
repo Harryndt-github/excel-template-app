@@ -784,6 +784,7 @@ const RateCenter = {
   <div class="rc-lib-summary-row"><span>Tên</span><b>${_rcEsc(selSP.name||'—')}</b></div>
   <div class="rc-lib-summary-row"><span>Thời gian HT</span><b>${selSP.defaultSupportMonths||0} tháng</b></div>
   <div class="rc-lib-summary-row"><span>Bên trả lãi</span><b>${_rcEsc(selSP.supportPayer||'—')}</b></div>
+  <div class="rc-lib-summary-row"><span>Kết thúc HT</span><b>${selSP.supportEndDate ? selSP.supportEndDate : 'Không giới hạn'}</b></div>
 </div>` : `<div class="rc-lib-empty-hint">Chưa chọn. Nhấn <b>📚 Thư viện</b> để khai báo và chọn chính sách.</div>`;
 
     const selFP = feePolicies.find(p => p.id === selectedFeeId);
@@ -1545,6 +1546,7 @@ const RateCenter = {
               <div class="rc-field-item"><label class="rc-field-label">Số tháng HTLS</label><input class="rc-field-input" type="number" id="rle-months-${p.id}" value="${p.defaultSupportMonths||''}"></div>
               <div class="rc-field-item"><label class="rc-field-label">Bên trả lãi</label><input class="rc-field-input" id="rle-payer-${p.id}" value="${_rcEsc(p.supportPayer||'Chủ đầu tư')}"></div>
               <div class="rc-field-item"><label class="rc-field-label">Bên trả sau HT</label><input class="rc-field-input" id="rle-cpayer-${p.id}" value="${_rcEsc(p.customerPayer||'Khách hàng')}"></div>
+              <div class="rc-field-item"><label class="rc-field-label">Ngày kết thúc HTLS</label><input class="rc-field-input" type="date" id="rle-enddate-${p.id}" value="${_rcEsc(p.supportEndDate||'')}"><small style="color:var(--text-muted);font-size:.68rem;">HĐ ký sau ngày này không được áp dụng chính sách</small></div>
               <div class="rc-field-item"><label class="rc-field-label">Nguyên tắc gốc</label><input class="rc-field-input" id="rle-prule-${p.id}" value="${_rcEsc(p.principalRule||'')}"></div>
             </div>
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
@@ -1558,7 +1560,7 @@ const RateCenter = {
                 <span class="rc-lib-item-code">${_rcEsc(p.code||'—')}</span>
                 <span class="rc-lib-item-name">${_rcEsc(p.name||'Chưa đặt tên')}</span>
                 ${badge}
-                <span class="rc-lib-item-meta">${p.defaultSupportMonths||0}T · ${_rcEsc(p.supportPayer||'')}</span>
+                <span class="rc-lib-item-meta">${p.defaultSupportMonths||0}T · ${_rcEsc(p.supportPayer||'')}${p.supportEndDate ? ' · HH: '+p.supportEndDate : ''}</span>
               </div>
               <div class="rc-lib-item-btns">
                 <button class="rc-act-btn" onclick="RateCenter._libToggleEdit('${p.id}')" title="Sửa">✎</button>
@@ -1575,6 +1577,7 @@ const RateCenter = {
         <div class="rc-field-item"><label class="rc-field-label">Số tháng HTLS</label><input class="rc-field-input" type="number" id="rln-months" placeholder="24"></div>
         <div class="rc-field-item"><label class="rc-field-label">Bên trả lãi</label><input class="rc-field-input" id="rln-payer" value="Chủ đầu tư"></div>
         <div class="rc-field-item"><label class="rc-field-label">Bên trả sau HT</label><input class="rc-field-input" id="rln-cpayer" value="Khách hàng"></div>
+        <div class="rc-field-item"><label class="rc-field-label">Ngày kết thúc HTLS</label><input class="rc-field-input" type="date" id="rln-enddate"><small style="color:var(--text-muted);font-size:.68rem;">HĐ ký sau ngày này không được áp dụng</small></div>
         <div class="rc-field-item"><label class="rc-field-label">Nguyên tắc gốc</label><input class="rc-field-input" id="rln-prule" placeholder="VD: KH trả gốc theo lịch..."></div>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
@@ -1670,6 +1673,7 @@ const RateCenter = {
         supportPayer: g('rln-payer')||'Chủ đầu tư',
         customerPayer: g('rln-cpayer')||'Khách hàng',
         principalPayer: 'Khách hàng',
+        supportEndDate: g('rln-enddate')||'',
         principalRule: g('rln-prule')||RC_DEFAULT_INTEREST_SUPPORT_RULES.principalRule,
         enabled: true, createdAt: new Date().toISOString(),
       });
@@ -1680,6 +1684,7 @@ const RateCenter = {
       p.defaultSupportMonths = parseInt(g(`rle-months-${id}`))||0;
       p.supportPayer = g(`rle-payer-${id}`)||'Chủ đầu tư';
       p.customerPayer = g(`rle-cpayer-${id}`)||'Khách hàng';
+      p.supportEndDate = g(`rle-enddate-${id}`);
       p.principalRule = g(`rle-prule-${id}`);
       p.updatedAt = new Date().toISOString();
     }
