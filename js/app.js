@@ -2248,6 +2248,7 @@ const Generator = {
   _selectedRatePolicyId: '',
   _runtimeConditions: {
     htlsMonths: '',
+    loanTermMonths: '',
     disbursementDate: '',
     loanType: 'HTLS',
     hasSupplementGrace: false,
@@ -2564,18 +2565,25 @@ const Generator = {
         <div style="padding:12px 18px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;"
              onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.rc-expand-icon').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'">
           <span style="font-size:0.9rem;font-weight:700;color:#10b981;">⚙️ Điều kiện tính Rule Lãi suất</span>
-          <span style="font-size:0.75rem;color:var(--text-muted);">Nhập để Rule Engine tự tính bucket, ân hạn, phí TNTH</span>
+	          <span style="font-size:0.75rem;color:var(--text-muted);">Nhập để Rule Engine tự tính CĐT/KH trả lãi, bucket, ân hạn, phí TNTH</span>
           <span class="rc-expand-icon" style="margin-left:auto;color:#10b981;font-size:0.8rem;">▶</span>
         </div>
         <div style="display:none;padding:0 18px 16px;">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px;">
             <div>
-              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Thời gian HTLS/CĐLS (tháng)</label>
-              <input type="number" min="0" class="mapping-select" id="rc-runtime-htls"
-                placeholder="VD: 24"
-                value="${this._runtimeConditions.htlsMonths||''}"
-                oninput="Generator._runtimeConditions.htlsMonths=this.value">
-            </div>
+	              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Thời gian CĐT hỗ trợ trả lãi (tháng)</label>
+	              <input type="number" min="0" class="mapping-select" id="rc-runtime-htls"
+	                placeholder="VD: 24"
+	                value="${this._runtimeConditions.htlsMonths||''}"
+	                oninput="Generator._runtimeConditions.htlsMonths=this.value">
+	            </div>
+	            <div>
+	              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Tổng kỳ hạn vay (tháng)</label>
+	              <input type="number" min="1" class="mapping-select" id="rc-runtime-term"
+	                placeholder="VD: 240"
+	                value="${this._runtimeConditions.loanTermMonths||''}"
+	                oninput="Generator._runtimeConditions.loanTermMonths=this.value">
+	            </div>
             <div>
               <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Tháng hiện tại trong khoản vay</label>
               <input type="number" min="1" class="mapping-select" id="rc-runtime-month"
@@ -2615,7 +2623,7 @@ const Generator = {
               <div>
                 <label style="display:block;margin-bottom:3px;font-size:0.75rem;font-weight:600;color:var(--text-secondary);">${field}</label>
                 <input type="text" class="mapping-select" placeholder="Để trống = không áp dụng"
-                  value="${this._runtimeConditions.contractFields['${field}']||''}"
+	                  value="${this._runtimeConditions.contractFields[field]||''}"
                   oninput="Generator._runtimeConditions.contractFields['${field}']=this.value">
               </div>`).join('')}
             </div>
@@ -2817,6 +2825,8 @@ const Generator = {
 
     const input = {
       htlsMonths:         Number(this._runtimeConditions.htlsMonths) || 0,
+      cdtSupportMonths:   Number(this._runtimeConditions.htlsMonths) || 0,
+      loanTermMonths:     Number(this._runtimeConditions.loanTermMonths) || 0,
       currentMonth:       Number(this._runtimeConditions.currentMonth) || 1,
       hasHTLS:            this._runtimeConditions.loanType === 'HTLS',
       hasSupplementGrace: this._runtimeConditions.hasSupplementGrace,
