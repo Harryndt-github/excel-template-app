@@ -677,8 +677,8 @@ const WordGenerator = {
             <div>
               <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Loại khoản vay</label>
               <select class="mapping-select" onchange="WordGenerator._runtimeConditions.loanType=this.value">
-                <option value="HTLS" ${this._runtimeConditions.loanType==='HTLS'?'selected':''}>Có HTLS từ CĐT</option>
-                <option value="standard" ${this._runtimeConditions.loanType==='standard'?'selected':''}>Không có HTLS</option>
+                <option value="HTLS" ${this._runtimeConditions.loanType==='HTLS'?'selected':''}>Có hỗ trợ lãi từ CĐT</option>
+                <option value="standard" ${this._runtimeConditions.loanType==='standard'?'selected':''}>Không có hỗ trợ lãi</option>
               </select>
             </div>
             <div>
