@@ -822,32 +822,75 @@ const DataSources = {
     container.querySelectorAll('img').forEach(img => {
       const declW = img.style.width || img.getAttribute('width');
       const declH = img.style.height || img.getAttribute('height');
-      if (declW) img.style.width  = declW;   // keep explicit width
-      if (declH) img.style.height = declH;   // keep explicit height
-      if (!declW && !declH) {
-        img.style.maxWidth  = '100%';
-        img.style.height    = 'auto';
-      }
+      if (declW) img.style.width  = declW;
+      if (declH) img.style.height = declH;
+      if (!declW && !declH) { img.style.maxWidth = '100%'; img.style.height = 'auto'; }
       img.style.display = img.style.display || 'inline-block';
     });
 
-    // 2. Fix tables: preserve column widths, prevent collapse
+    // 2. Fix tables: preserve ALL column widths (prevent narrow cols from collapsing)
     container.querySelectorAll('table').forEach(table => {
       if (!table.style.width) table.style.width = '100%';
       table.style.borderCollapse = 'collapse';
-      table.style.tableLayout    = 'auto';  // auto respects col widths from Word
+      table.style.tableLayout    = 'fixed'; // fixed = honour col widths from Word
+    });
+    // Preserve explicit col widths as min-width
+    container.querySelectorAll('col').forEach(col => {
+      const w = col.style.width || col.getAttribute('width');
+      if (w) { col.style.width = w; col.style.minWidth = w; }
     });
     container.querySelectorAll('td, th').forEach(cell => {
-      if (!cell.style.border) cell.style.border = '1px solid #999';
-      if (!cell.style.padding) cell.style.padding = '3px 6px';
-      // Preserve background-color if set (e.g. yellow header cells)
+      if (!cell.style.border)   cell.style.border   = '1px solid #999';
+      if (!cell.style.padding)  cell.style.padding  = '3px 6px';
+      if (!cell.style.verticalAlign) cell.style.verticalAlign = 'top';
+      const cellW = cell.style.width;
+      if (cellW) cell.style.minWidth = cellW; // prevent collapse
       const bg = cell.style.backgroundColor;
-      if (bg) cell.setAttribute('bgcolor', bg); // belt-and-suspenders for email/PDF renderers
+      if (bg) cell.setAttribute('bgcolor', bg);
     });
 
-    // 3. Prevent paragraph line-height collapse
+    // 3. Fix numbered list ordering (loi 5: so thu tu loan xa)
+    this._fixDocxListNumbering(container);
+
+    // 4. Prevent paragraph line-height collapse
     container.querySelectorAll('p').forEach(p => {
       if (!p.style.lineHeight) p.style.lineHeight = '1.4';
+    });
+  },
+
+  /* ── Fix list numbering: docx-preview splits one Word list into multiple <ol>
+       each restarting from 1. Detect continuations and set correct start attr. ── */
+  _fixDocxListNumbering(container) {
+    const allOls = Array.from(container.querySelectorAll('ol'));
+    if (allOls.length < 2) return;
+
+    // docx-preview adds class names like "docx-num-{numId}-{ilvl}" on <li> elements.
+    // Use those to group lists by numId. Fall back to style+indent fingerprint.
+    const getListId = (ol) => {
+      const firstLi = ol.querySelector(':scope > li');
+      if (!firstLi) return null;
+      const numClass = Array.from(firstLi.classList).find(c => /docx-num-\d/.test(c));
+      if (numClass) return numClass; // e.g. "docx-num-3-0"
+      // Fallback: style + rounded indent
+      const style  = ol.style.listStyleType || 'decimal';
+      const indent = Math.round(parseFloat(ol.style.marginLeft || ol.style.paddingLeft || '0') / 10) * 10;
+      return `${style}|${indent}`;
+    };
+
+    // Track cumulative item count per list-id
+    const counters = {}; // listId -> lastItemNumber
+    allOls.forEach(ol => {
+      const lid = getListId(ol);
+      if (!lid) return;
+      const itemCount = ol.querySelectorAll(':scope > li').length;
+      const existingStart = parseInt(ol.getAttribute('start') || '1');
+      if (counters[lid] !== undefined) {
+        // Continuation: set start to pick up where previous block ended
+        ol.setAttribute('start', counters[lid] + 1);
+        counters[lid] += itemCount;
+      } else {
+        counters[lid] = existingStart - 1 + itemCount;
+      }
     });
   },
 
@@ -859,7 +902,8 @@ const DataSources = {
     const keepPatterns = [
       /img/i, /table/i, /figure/i, /header/i, /footer/i,
       /page/i, /section/i, /article/i, /::before/i, /::after/i,
-      /\[style/i, /border/i, /background/i, /margin/i, /padding/i
+      /\[style/i, /border/i, /background/i, /margin/i, /padding/i,
+      /counter/i, /list/i, /num/i, /ol/i, /li/i  // preserve list/counter CSS
     ];
     const blocks = [];
     let depth = 0, block = '';
