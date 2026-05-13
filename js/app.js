@@ -1080,6 +1080,7 @@ const DataSources = {
       name: source.name,
       content,
       placeholders,
+      manualFields: [],
       originalDocxBase64: '',
       nativeDocx: true,
       _docxInIDB: true,

@@ -82,7 +82,7 @@ const DocxEngine = {
     return DocxStore.has(templateId);
   },
 
-  async exportDocx(templateId, replacements, repeatBlocks = {}) {
+  async exportDocx(templateId, replacements, repeatBlocks = {}, directReplacements = []) {
     if (typeof JSZip === 'undefined') {
       throw new Error('JSZip chưa được tải');
     }
@@ -104,6 +104,7 @@ const DocxEngine = {
       let xml = await file.async('string');
       xml = this.processRepeatBlocks(xml, repeatBlocks);
       xml = this.replacePlaceholdersInXml(xml, replacements);
+      xml = this.replaceDirectTextInXml(xml, directReplacements);
       zip.file(fileName, xml);
     }
 
@@ -168,6 +169,72 @@ const DocxEngine = {
     });
 
     return changed ? new XMLSerializer().serializeToString(doc) : xmlText;
+  },
+
+  replaceDirectTextInXml(xmlText, directReplacements) {
+    const pairs = (directReplacements || [])
+      .filter(item => item && item.targetText && item.value !== undefined && item.value !== null)
+      .map(item => ({ target: String(item.targetText), value: String(item.value) }));
+    if (!pairs.length) return xmlText;
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) return xmlText;
+
+    const wordNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    const paragraphs = Array.from(doc.getElementsByTagNameNS(wordNs, 'p'));
+    let changed = false;
+    paragraphs.forEach(paragraph => {
+      const textNodes = Array.from(paragraph.getElementsByTagNameNS(wordNs, 't'));
+      if (this.replaceTextPairsInNodes(textNodes, pairs)) changed = true;
+    });
+    return changed ? new XMLSerializer().serializeToString(doc) : xmlText;
+  },
+
+  replaceTextPairsInNodes(textNodes, pairs) {
+    if (!textNodes.length || !pairs.length) return false;
+    let fullText = textNodes.map(node => node.textContent || '').join('');
+    const jobs = [];
+
+    pairs.forEach(pair => {
+      let index = fullText.indexOf(pair.target);
+      while (index !== -1) {
+        jobs.push({ start: index, end: index + pair.target.length, value: pair.value });
+        index = fullText.indexOf(pair.target, index + pair.target.length);
+      }
+    });
+    if (!jobs.length) return false;
+
+    const ranges = [];
+    let cursor = 0;
+    textNodes.forEach((node, nodeIndex) => {
+      const len = (node.textContent || '').length;
+      ranges.push({ node, nodeIndex, start: cursor, end: cursor + len });
+      cursor += len;
+    });
+
+    jobs.sort((a, b) => b.start - a.start).forEach(job => {
+      const startInfo = ranges.find(item => job.start >= item.start && job.start <= item.end);
+      const endInfo = ranges.find(item => job.end >= item.start && job.end <= item.end);
+      if (!startInfo || !endInfo) return;
+      const startText = startInfo.node.textContent || '';
+      const endText = endInfo.node.textContent || '';
+      const startOffset = job.start - startInfo.start;
+      const endOffset = job.end - endInfo.start;
+
+      if (startInfo.nodeIndex === endInfo.nodeIndex) {
+        startInfo.node.textContent = startText.slice(0, startOffset) + job.value + startText.slice(endOffset);
+      } else {
+        startInfo.node.textContent = startText.slice(0, startOffset) + job.value;
+        for (let i = startInfo.nodeIndex + 1; i < endInfo.nodeIndex; i++) {
+          ranges[i].node.textContent = '';
+        }
+        endInfo.node.textContent = endText.slice(endOffset);
+      }
+      startInfo.node.setAttribute('xml:space', 'preserve');
+    });
+
+    return true;
   },
 
   replaceInTextNodes(textNodes, replacements) {
