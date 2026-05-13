@@ -59,7 +59,10 @@ const WordEditor = {
     const n = document.getElementById('word-template-name');
     if (n) n.value = '';
     const a = document.getElementById('word-editor-area');
-    if (a) a.innerHTML = '<p><br></p>';
+    if (a) {
+      a.contentEditable = 'true';
+      a.innerHTML = '<p><br></p>';
+    }
     this.updatePlaceholdersList();
   },
 
@@ -256,6 +259,21 @@ const WordEditor = {
   updatePlaceholdersList() {
     const list = document.getElementById('word-placeholders-list');
     if (!list) return;
+    const currentTpl = WordState.editingId ? WordState.templates.find(t => t.id === WordState.editingId) : null;
+    if (currentTpl && currentTpl.nativeDocx) {
+      const phs = (currentTpl.placeholders || []).map(name => ({ name, source: 'DOCX gốc' }));
+      if (phs.length === 0) {
+        list.innerHTML = '<p class="text-muted">Chưa có {{placeholder}} trong file Word gốc</p>';
+        return;
+      }
+      list.innerHTML = phs.map(p => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--accent-light);border-radius:8px;margin-bottom:6px;">
+          <span style="font-weight:700;color:var(--accent);">⧉</span>
+          <span style="flex:1;font-size:0.82rem;"><b>{{${_wEsc(p.name)}}}</b></span>
+          <span class="ss-source-badge">${_wEsc(p.source)}</span>
+        </div>`).join('');
+      return;
+    }
     const editor = document.getElementById('word-editor-area');
     if (!editor) return;
 
@@ -301,15 +319,20 @@ const WordEditor = {
       return;
     }
     const editor = document.getElementById('word-editor-area');
-    const content = editor ? editor.innerHTML : '';
-    const placeholders = this.getPlaceholders();
+    const existingTpl = WordState.editingId ? WordState.templates.find(t => t.id === WordState.editingId) : null;
+    const isNativeDocx = !!(existingTpl && existingTpl.nativeDocx);
+    const content = isNativeDocx ? existingTpl.content : (editor ? editor.innerHTML : '');
+    const placeholders = isNativeDocx ? (existingTpl.placeholders || []) : this.getPlaceholders();
     const originalDocxBase64 = WordState.currentOriginalDocxBase64 || '';
     const now = new Date().toISOString();
 
     if (WordState.editingId) {
       const idx = WordState.templates.findIndex(t => t.id === WordState.editingId);
       if (idx !== -1) {
-        Object.assign(WordState.templates[idx], { name, content, placeholders, originalDocxBase64, updatedAt: now });
+        const patch = isNativeDocx
+          ? { name, content, placeholders, updatedAt: now }
+          : { name, content, placeholders, originalDocxBase64, updatedAt: now };
+        Object.assign(WordState.templates[idx], patch);
       }
       App.toast('Template Word đã được cập nhật!', 'success');
     } else {
@@ -333,7 +356,19 @@ const WordEditor = {
     document.getElementById('word-template-name').value = tpl.name;
     document.getElementById('word-editor-title').textContent = `Chỉnh sửa: ${tpl.name}`;
     const editor = document.getElementById('word-editor-area');
-    if (editor) editor.innerHTML = tpl.content;
+    if (editor) {
+      if (tpl.nativeDocx) {
+        editor.contentEditable = 'false';
+        editor.innerHTML = tpl.content || `
+          <div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:12px;padding:14px 16px;color:#92400e;">
+            <strong>Template DOCX native - chỉ đọc</strong><br>
+            Sửa layout và thêm placeholder trực tiếp trong Microsoft Word, sau đó upload lại nếu cần.
+          </div>`;
+      } else {
+        editor.contentEditable = 'true';
+        editor.innerHTML = tpl.content || '<p><br></p>';
+      }
+    }
     this.updatePlaceholdersList();
     App.navigateTo('word-editor');
   },
@@ -341,6 +376,10 @@ const WordEditor = {
   duplicateTemplate(id) {
     const tpl = WordState.templates.find(t => t.id === id);
     if (!tpl) return;
+    if (tpl.nativeDocx) {
+      App.toast('Template DOCX native cần upload lại file gốc để tạo bản sao an toàn.', 'warning');
+      return;
+    }
     const newTpl = {
       ...JSON.parse(JSON.stringify(tpl)),
       id: 'wtpl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
@@ -354,6 +393,10 @@ const WordEditor = {
 
   deleteTemplate(id) {
     if (!confirm('Bạn có chắc muốn xóa template Word này?')) return;
+    const tpl = WordState.templates.find(t => t.id === id);
+    if (tpl && tpl.nativeDocx && typeof DocxStore !== 'undefined') {
+      DocxStore.remove(id).catch(err => console.warn('Cannot remove DOCX from IndexedDB:', err));
+    }
     WordState.templates = WordState.templates.filter(t => t.id !== id);
     this.saveState();
     this.renderTemplatesList();
@@ -1100,6 +1143,38 @@ const WordGenerator = {
   async exportDOCX() {
     const tpl = WordState.templates.find(t => t.id === WordState.selectedTemplateId);
     if (!tpl) { App.toast('Vui lòng chọn template Word', 'warning'); return; }
+    if (tpl.nativeDocx) {
+      if (typeof DocxEngine === 'undefined') {
+        App.toast('DocxEngine chưa được tải. Kiểm tra js/docx-engine.js', 'error');
+        return;
+      }
+      const replacements = this._collectReplacements(tpl);
+      try {
+        const hasOriginal = await DocxEngine.hasOriginalDocx(tpl.id);
+        if (!hasOriginal) {
+          App.toast('Không tìm thấy file .docx gốc trong IndexedDB. Vui lòng upload lại template Word.', 'warning');
+          return;
+        }
+        App.toast('Đang xuất Word từ file .docx gốc...', 'info');
+        const blob = await DocxEngine.exportDocx(tpl.id, replacements, {});
+        const fileName = (tpl.name || 'word-template').replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() || 'document';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${fileName}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        WordState.exportCount++;
+        WordEditor.saveState();
+        App.toast('Đã xuất Word từ DOCX gốc, giữ nguyên định dạng', 'success');
+      } catch (err) {
+        console.error('Native DOCX export error:', err);
+        App.toast(`Lỗi xuất Word: ${err.message}`, 'error');
+      }
+      return;
+    }
     if (!tpl.originalDocxBase64) {
       App.toast('Template này chưa lưu file .docx gốc. Hãy upload file .docx mẫu và lưu lại template để xuất Word giữ nguyên định dạng.', 'warning');
       return;

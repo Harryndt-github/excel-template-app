@@ -433,6 +433,12 @@ const FileValidator = {
 // ============================================
 // DATA SOURCES — dynamic from uploaded Excel files
 // ============================================
+function _escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text == null ? '' : String(text);
+  return div.innerHTML;
+}
+
 const DataSources = {
   // Runtime store: [{ id, name, filename, fields:[], rawFile: File|null }]
   _sources: [],
@@ -470,8 +476,17 @@ const DataSources = {
       }
       try {
         let fields, htmlContent = null, isHighFidelity = false, docxBase64 = '';
+        let nativeDocx = false, idbKey = null;
         const isWord = wordExts.includes(ext);
-        if (isWord) {
+        const sourceId = 'ds_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        if (isWord && ext === 'docx') {
+          const result = await this._readNativeDocx(file, sourceId);
+          fields = result.fields;
+          htmlContent = result.htmlContent || null;
+          isHighFidelity = false;
+          nativeDocx = true;
+          idbKey = sourceId;
+        } else if (isWord) {
           const result = await this._readWordFields(file);
           fields = result.fields;
           htmlContent = result.htmlContent;
@@ -481,20 +496,24 @@ const DataSources = {
           fields = await this._readHeaders(file);
         }
         const source = {
-          id: 'ds_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          id: sourceId,
           name: file.name.replace(/\.[^.]+$/, ''),
           filename: file.name,
           fileType: isWord ? 'word' : 'excel',
           fields,
           htmlContent,
           isHighFidelity,
-          docxBase64
+          docxBase64,
+          nativeDocx,
+          _docxInIDB: nativeDocx,
+          _idbKey: idbKey
         };
         this._sources.push(source);
         App.toast(`Đã đọc ${fields.length} trường từ "${file.name}"`, 'success');
 
-        // Auto-load Word content into editor if on Word editor page
-        if (isWord && htmlContent) {
+        if (isWord && nativeDocx) {
+          this._promptCreateNativeTemplate(source);
+        } else if (isWord && htmlContent) {
           this._promptLoadWordContent(source);
         }
       } catch (err) {
@@ -507,6 +526,10 @@ const DataSources = {
   },
 
   removeSource(id) {
+    const source = this._sources.find(s => s.id === id);
+    if (source && source._docxInIDB && typeof DocxStore !== 'undefined') {
+      DocxStore.remove(source._idbKey || source.id).catch(err => console.warn('Cannot remove DOCX from IndexedDB:', err));
+    }
     this._sources = this._sources.filter(s => s.id !== id);
     this._renderList();
     this._persistMeta();
@@ -521,7 +544,10 @@ const DataSources = {
       fields: s.fields,
 	      htmlContent: s.htmlContent || null,
 	      isHighFidelity: s.isHighFidelity || false,
-	      docxBase64: s.docxBase64 || ''
+	      docxBase64: s.nativeDocx ? '' : (s.docxBase64 || ''),
+	      nativeDocx: !!s.nativeDocx,
+	      _docxInIDB: !!s._docxInIDB,
+	      _idbKey: s._idbKey || null
     }));
     try { localStorage.setItem('excelmapper_datasources', JSON.stringify(meta)); } catch (_) { }
     // update badge
@@ -591,6 +617,27 @@ const DataSources = {
       reader.onerror = reject;
       reader.readAsArrayBuffer(file);
     });
+  },
+
+  async _readNativeDocx(file, sourceId) {
+    if (typeof DocxEngine === 'undefined') {
+      throw new Error('DocxEngine chưa được tải. Kiểm tra js/docx-engine.js');
+    }
+    const result = await DocxEngine.importDocx(file, sourceId);
+    const fields = (result.placeholders || [])
+      .map(f => String(f || '').trim())
+      .filter(f => f && !f.startsWith('/') && !f.startsWith('#'));
+
+    if (fields.length === 0) {
+      App.toast(`"${file.name}" chưa có placeholder {{...}}. Hãy thêm field trong Word rồi upload lại để mapping.`, 'warning');
+    }
+
+    return {
+      fields,
+      htmlContent: null,
+      nativeDocx: true,
+      _docxInIDB: true
+    };
   },
 
   /* ── read field names from Word document (.doc/.docx) ── */
@@ -974,7 +1021,81 @@ const DataSources = {
     // to avoid breaking descendant CSS selectors still in effect during style application
   },
 
-  /* ── Prompt user to load Word content into the editor ── */
+  /* ── Prompt user to create a native DOCX template without touching layout ── */
+  _promptCreateNativeTemplate(source) {
+    const existing = document.getElementById('word-native-template-modal');
+    if (existing) existing.remove();
+
+    const placeholders = (source.fields || []).slice(0, 30);
+    const placeholderHtml = placeholders.length
+      ? placeholders.map(f => `<span style="display:inline-block;padding:3px 8px;margin:2px;border-radius:6px;background:rgba(99,102,241,0.12);color:var(--accent);font-size:0.78rem;font-weight:600;">{{${_escapeHtml(f)}}}</span>`).join('')
+      : '<em style="color:var(--text-muted);font-size:0.82rem;">Không tìm thấy placeholder. Hãy thêm {{ten_truong}} trong file Word rồi upload lại.</em>';
+
+    const modal = document.createElement('div');
+    modal.id = 'word-native-template-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.62);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = `
+      <div style="background:var(--surface,#1e1e2e);border:1px solid rgba(99,102,241,0.25);border-radius:18px;padding:26px 30px;width:min(92vw,620px);max-height:82vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,0.5);">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;">
+          <div>
+            <div style="font-size:1rem;font-weight:800;color:var(--text-primary);">Tạo Word Template native</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:3px;">${_escapeHtml(source.filename)}</div>
+          </div>
+          <button onclick="document.getElementById('word-native-template-modal').remove()" style="margin-left:auto;background:transparent;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;">x</button>
+        </div>
+        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.24);border-radius:12px;padding:12px 14px;margin-bottom:14px;">
+          <div style="font-weight:700;color:#10b981;font-size:0.84rem;margin-bottom:6px;">File .docx gốc đã được lưu vào IndexedDB</div>
+          <div style="font-size:0.82rem;color:var(--text-secondary);">Hệ thống sẽ không đưa Word vào HTML editor. Khi xuất, dữ liệu được thay trực tiếp trong OOXML để giữ logo, bảng, footer và căn lề.</div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:0.82rem;font-weight:700;color:var(--text-secondary);margin-bottom:8px;">Placeholder tìm thấy (${placeholders.length})</div>
+          <div style="line-height:1.9;">${placeholderHtml}</div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="DataSources._autoCreateTemplate('${source.id}');document.getElementById('word-native-template-modal').remove()">Tạo Template Mapping</button>
+          <button class="btn btn-outline" onclick="document.getElementById('word-native-template-modal').remove()">Để sau</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  },
+
+  _autoCreateTemplate(sourceId) {
+    const source = this._sources.find(s => s.id === sourceId);
+    if (!source || typeof WordState === 'undefined') return;
+
+    const tplId = source._idbKey || source.id;
+    const now = new Date().toISOString();
+    const placeholders = (source.fields || []).filter(f => !String(f).startsWith('/') && !String(f).startsWith('#'));
+    const content = `
+      <div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:12px;padding:14px 16px;color:#92400e;">
+        <strong>Template DOCX native - chỉ đọc</strong><br>
+        File Word gốc được lưu trong trình duyệt. Vui lòng sửa layout và thêm placeholder trực tiếp trong Microsoft Word, sau đó upload lại nếu cần.
+      </div>
+      <p style="margin-top:12px;"><strong>File gốc:</strong> ${_escapeHtml(source.filename)}</p>
+      <p><strong>Số placeholder:</strong> ${placeholders.length}</p>
+    `;
+
+    const tpl = {
+      id: tplId,
+      name: source.name,
+      content,
+      placeholders,
+      originalDocxBase64: '',
+      nativeDocx: true,
+      _docxInIDB: true,
+      sourceFileName: source.filename,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    WordState.templates = WordState.templates.filter(t => t.id !== tplId);
+    WordState.templates.push(tpl);
+    if (typeof WordEditor !== 'undefined') WordEditor.saveState();
+    App.toast(`Đã tạo template native "${source.name}" với ${placeholders.length} placeholder`, 'success');
+    App.navigateTo('word-templates');
+  },
+
+  /* ── Legacy prompt: load converted Word HTML into editor (.doc/fallback only) ── */
   _promptLoadWordContent(source) {
     const editor = document.getElementById('word-editor-area');
     if (!editor) return; // not on Word editor page
@@ -1092,15 +1213,21 @@ const DataSources = {
       const isWord = src.fileType === 'word';
       const icon = isWord ? '📝' : '📊';
       const typeLabel = isWord ? 'Word' : 'Excel';
-      const loadBtn = (isWord && src.htmlContent)
-        ? `<button class="ds-load-btn" onclick="event.stopPropagation();DataSources.loadWordContentToEditor('${src.id}')" title="Tải nội dung vào Editor">📥 Tải vào Editor</button>`
+      let loadBtn = '';
+      if (isWord && src.nativeDocx) {
+        loadBtn = `<button class="ds-load-btn" onclick="event.stopPropagation();DataSources._autoCreateTemplate('${src.id}')" title="Tạo template mapping từ DOCX gốc">Tạo Template</button>`;
+      } else if (isWord && src.htmlContent) {
+        loadBtn = `<button class="ds-load-btn" onclick="event.stopPropagation();DataSources.loadWordContentToEditor('${src.id}')" title="Legacy: tải HTML vào Editor">Tải vào Editor</button>`;
+      }
+      const nativeBadge = src.nativeDocx
+        ? '<span style="font-size:0.68rem;padding:1px 6px;border-radius:4px;background:rgba(16,185,129,0.1);color:#10b981;margin-left:4px;">DOCX native</span>'
         : '';
       return `
       <div class="ds-file-item">
         <div class="ds-file-info">
           <span class="ds-file-icon">${icon}</span>
           <div>
-            <div class="ds-file-name">${src.filename}</div>
+            <div class="ds-file-name">${src.filename}${nativeBadge}</div>
             <div class="ds-file-fields">${src.fields.length} trường (${typeLabel}): ${src.fields.slice(0, 4).join(', ')}${src.fields.length > 4 ? '…' : ''}</div>
             ${loadBtn}
           </div>
