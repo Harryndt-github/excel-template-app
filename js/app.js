@@ -706,7 +706,7 @@ const DataSources = {
     });
   },
 
-  /* ── Render .docx with docx-preview (preserves original formatting) ── */
+  /* ── Render .docx with docx-preview (preserves original formatting + logo) ── */
   async _renderDocxPreview(arrayBuffer) {
     // Create temporary containers for rendering
     const tempContainer = document.createElement('div');
@@ -726,41 +726,96 @@ const DataSources = {
         breakPages: true,
         renderHeaders: true,
         renderFooters: true,
-        useBase64URL: true,
+        useBase64URL: true,   // embed images as data-URL so they survive DOM removal
         experimental: true
       });
 
-      // Convert class-based CSS to inline styles for portability
+      // === Step 1: Convert any remaining blob: URLs to base64 data-URLs BEFORE extracting HTML ===
+      // (useBase64URL should handle most, but guard against edge cases)
+      const imgEls = tempContainer.querySelectorAll('img[src^="blob:"]');
+      await Promise.all(Array.from(imgEls).map(img => new Promise(resolve => {
+        try {
+          const canvas = document.createElement('canvas');
+          const image = new Image();
+          image.crossOrigin = 'anonymous';
+          image.onload = () => {
+            canvas.width = image.naturalWidth || image.width || 1;
+            canvas.height = image.naturalHeight || image.height || 1;
+            canvas.getContext('2d').drawImage(image, 0, 0);
+            img.src = canvas.toDataURL();
+            resolve();
+          };
+          image.onerror = () => resolve(); // keep original if fails
+          image.src = img.src;
+        } catch (_) { resolve(); }
+      })));
+
+      // === Step 2: Capture CSS text BEFORE removing style element ===
       const cssText = tempStyleEl.textContent || tempStyleEl.innerText || '';
+
+      // === Step 3: Apply inline styles while DOM is still live ===
       this._applyInlineStyles(tempContainer, cssText);
 
-      // Extract content from rendered pages
+      // === Step 4: Extract HTML content while container is STILL in DOM ===
       let html = '';
       const sections = tempContainer.querySelectorAll('section');
       if (sections.length > 0) {
         sections.forEach((section, index) => {
           const article = section.querySelector('article') || section;
           if (index > 0) {
-            // Add page break marker between pages
             html += '<div style="page-break-before:always;break-before:page;height:0;margin:0;padding:0;"></div>';
           }
           html += article.innerHTML;
         });
       } else {
-        // No sections found, extract all content
         html = tempContainer.innerHTML;
       }
 
-      // Clean up wrapper artifacts from docx-preview
+      // === Step 5: Clean up docx-preview wrapper class artifacts ===
       html = html.replace(/<div[^>]*class="[^"]*docx-import[^"]*"[^>]*>/gi, '<div>')
                  .replace(/class="[^"]*docx-import[^"]*"/gi, '');
 
+      // === Step 6: Embed critical CSS rules as a scoped style block ===
+      // Carry over docx-preview styles that couldn't be fully inlined
+      // (e.g. flex/grid children, pseudo-elements, complex selectors)
+      const criticalCss = this._extractCriticalCss(cssText);
+      if (criticalCss) {
+        html = `<style class="docx-imported-styles">${criticalCss}</style>` + html;
+      }
+
       return html;
     } finally {
-      // Always cleanup temp elements
-      tempContainer.remove();
-      tempStyleEl.remove();
+      // Cleanup temp elements AFTER HTML has been extracted
+      try { tempContainer.remove(); } catch (_) {}
+      try { tempStyleEl.remove(); } catch (_) {}
     }
+  },
+
+  /* ── Extract critical CSS rules that can't be fully inlined ── */
+  _extractCriticalCss(cssText) {
+    if (!cssText) return '';
+    // Keep rules for images, tables, page layout, and complex selectors
+    const lines = cssText.split('\n');
+    const keepPatterns = [
+      /img/i, /table/i, /figure/i, /header/i, /footer/i,
+      /page/i, /section/i, /article/i, /::before/i, /::after/i,
+      /\[style/i, /border/i, /background/i, /margin/i, /padding/i
+    ];
+    const blocks = [];
+    let depth = 0, block = '';
+    for (const line of lines) {
+      block += line + '\n';
+      depth += (line.match(/\{/g) || []).length;
+      depth -= (line.match(/\}/g) || []).length;
+      if (depth <= 0 && block.trim()) {
+        if (keepPatterns.some(p => p.test(block))) {
+          blocks.push(block);
+        }
+        block = '';
+        depth = 0;
+      }
+    }
+    return blocks.join('\n');
   },
 
   /* ── Convert CSS class-based styles to inline styles for portability ── */
@@ -782,13 +837,14 @@ const DataSources = {
                   const prop = rule.style[j];
                   const val = rule.style.getPropertyValue(prop);
                   const priority = rule.style.getPropertyPriority(prop);
+                  // Don't overwrite existing inline styles already set
                   if (val && !el.style.getPropertyValue(prop)) {
                     el.style.setProperty(prop, val, priority);
                   }
                 }
               });
             } catch (selectorErr) {
-              // Skip invalid selectors
+              // Skip invalid selectors silently
             }
           }
         }
@@ -796,11 +852,8 @@ const DataSources = {
     } finally {
       tempStyle.remove();
     }
-
-    // Remove class attributes since styles are now inline
-    container.querySelectorAll('[class]').forEach(el => {
-      el.removeAttribute('class');
-    });
+    // NOTE: Do NOT strip class attributes here — they are stripped after HTML extraction
+    // to avoid breaking descendant CSS selectors still in effect during style application
   },
 
   /* ── Prompt user to load Word content into the editor ── */
