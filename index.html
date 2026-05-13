@@ -745,7 +745,7 @@
       <div class="page-header">
         <div>
           <h2 class="page-title" id="word-editor-title">Tạo Template Word mới</h2>
-          <p class="page-subtitle">Soạn thảo văn bản Word — chèn trường dữ liệu từ file Excel</p>
+          <p class="page-subtitle">Quản lý Word Template native — mapping dữ liệu vào file .docx gốc để giữ nguyên định dạng</p>
         </div>
         <div class="header-actions">
           <button class="btn btn-outline" onclick="App.navigateTo('word-templates')">← Quay lại</button>
@@ -808,7 +808,7 @@
             <!-- Data Sources Upload -->
             <div class="word-ds-panel">
               <h4>📂 Nguồn dữ liệu</h4>
-              <p class="ds-hint">Upload file Word (.doc/.docx) để tải nguyên mẫu vào editor, hoặc Excel để lấy trường dữ liệu</p>
+              <p class="ds-hint">Upload Word (.docx) để quét {{placeholder}} và giữ file gốc; upload Excel để lấy trường dữ liệu mapping. Preview HTML chỉ là xem nhanh.</p>
               <div class="ds-upload-zone" id="word-ds-upload-zone"
                 ondragover="event.preventDefault(); this.classList.add('dragover')"
                 ondragleave="this.classList.remove('dragover')"
@@ -1642,6 +1642,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="js/docx-engine.js"></script>
   <script src="js/spreadsheet.js"></script>
   <script src="js/app.js"></script>
   <script src="js/master-data.js"></script>
