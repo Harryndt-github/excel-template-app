@@ -753,31 +753,57 @@ const DataSources = {
       // === Step 2: Capture CSS text BEFORE removing style element ===
       const cssText = tempStyleEl.textContent || tempStyleEl.innerText || '';
 
-      // === Step 3: Apply inline styles while DOM is still live ===
+      // === Step 3: Normalize rendering before style inlining ===
+      this._normalizeDocxRendering(tempContainer);
+
+      // === Step 4: Apply inline styles while DOM is still live ===
       this._applyInlineStyles(tempContainer, cssText);
 
-      // === Step 4: Extract HTML content while container is STILL in DOM ===
+      // === Step 5: Extract HTML content while container is STILL in DOM ===
+      // IMPORTANT: page <header> is a SIBLING of <article>, not inside it.
+      // We must include it explicitly so the yellow IVB banner renders at top.
       let html = '';
       const sections = tempContainer.querySelectorAll('section');
       if (sections.length > 0) {
         sections.forEach((section, index) => {
-          const article = section.querySelector('article') || section;
           if (index > 0) {
-            html += '<div style="page-break-before:always;break-before:page;height:0;margin:0;padding:0;"></div>';
+            html += '<div style="page-break-before:always;break-before:page;height:2px;margin:20px 0;"></div>';
           }
-          html += article.innerHTML;
+          // Include page header (yellow banner with logo) first
+          const pageHeader = section.querySelector(':scope > header');
+          const pageFooter = section.querySelector(':scope > footer');
+          const article   = section.querySelector(':scope > article');
+
+          if (pageHeader) {
+            // Convert absolutely-positioned header to flow layout
+            pageHeader.style.position = 'relative';
+            pageHeader.style.top = '';
+            pageHeader.style.left = '';
+            pageHeader.style.width = '100%';
+            html += pageHeader.outerHTML;
+          }
+          if (article) {
+            html += article.innerHTML;
+          } else {
+            // No distinct article: use whole section but exclude header/footer tags
+            const clone = section.cloneNode(true);
+            clone.querySelectorAll(':scope > header, :scope > footer').forEach(el => el.remove());
+            html += clone.innerHTML;
+          }
+          if (pageFooter) {
+            pageFooter.style.position = 'relative';
+            html += pageFooter.outerHTML;
+          }
         });
       } else {
         html = tempContainer.innerHTML;
       }
 
-      // === Step 5: Clean up docx-preview wrapper class artifacts ===
+      // === Step 6: Clean up docx-preview wrapper class artifacts ===
       html = html.replace(/<div[^>]*class="[^"]*docx-import[^"]*"[^>]*>/gi, '<div>')
                  .replace(/class="[^"]*docx-import[^"]*"/gi, '');
 
-      // === Step 6: Embed critical CSS rules as a scoped style block ===
-      // Carry over docx-preview styles that couldn't be fully inlined
-      // (e.g. flex/grid children, pseudo-elements, complex selectors)
+      // === Step 7: Embed critical CSS rules as a scoped style block ===
       const criticalCss = this._extractCriticalCss(cssText);
       if (criticalCss) {
         html = `<style class="docx-imported-styles">${criticalCss}</style>` + html;
@@ -785,10 +811,44 @@ const DataSources = {
 
       return html;
     } finally {
-      // Cleanup temp elements AFTER HTML has been extracted
       try { tempContainer.remove(); } catch (_) {}
       try { tempStyleEl.remove(); } catch (_) {}
     }
+  },
+
+  /* ── Normalize docx-preview DOM before style extraction ── */
+  _normalizeDocxRendering(container) {
+    // 1. Fix images: respect declared size, add safety max-width
+    container.querySelectorAll('img').forEach(img => {
+      const declW = img.style.width || img.getAttribute('width');
+      const declH = img.style.height || img.getAttribute('height');
+      if (declW) img.style.width  = declW;   // keep explicit width
+      if (declH) img.style.height = declH;   // keep explicit height
+      if (!declW && !declH) {
+        img.style.maxWidth  = '100%';
+        img.style.height    = 'auto';
+      }
+      img.style.display = img.style.display || 'inline-block';
+    });
+
+    // 2. Fix tables: preserve column widths, prevent collapse
+    container.querySelectorAll('table').forEach(table => {
+      if (!table.style.width) table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.style.tableLayout    = 'auto';  // auto respects col widths from Word
+    });
+    container.querySelectorAll('td, th').forEach(cell => {
+      if (!cell.style.border) cell.style.border = '1px solid #999';
+      if (!cell.style.padding) cell.style.padding = '3px 6px';
+      // Preserve background-color if set (e.g. yellow header cells)
+      const bg = cell.style.backgroundColor;
+      if (bg) cell.setAttribute('bgcolor', bg); // belt-and-suspenders for email/PDF renderers
+    });
+
+    // 3. Prevent paragraph line-height collapse
+    container.querySelectorAll('p').forEach(p => {
+      if (!p.style.lineHeight) p.style.lineHeight = '1.4';
+    });
   },
 
   /* ── Extract critical CSS rules that can't be fully inlined ── */
