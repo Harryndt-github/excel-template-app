@@ -469,13 +469,14 @@ const DataSources = {
         continue;
       }
       try {
-        let fields, htmlContent = null, isHighFidelity = false;
+        let fields, htmlContent = null, isHighFidelity = false, docxBase64 = '';
         const isWord = wordExts.includes(ext);
         if (isWord) {
           const result = await this._readWordFields(file);
           fields = result.fields;
           htmlContent = result.htmlContent;
           isHighFidelity = result._isHighFidelity || false;
+          docxBase64 = result.docxBase64 || '';
         } else {
           fields = await this._readHeaders(file);
         }
@@ -486,7 +487,8 @@ const DataSources = {
           fileType: isWord ? 'word' : 'excel',
           fields,
           htmlContent,
-          isHighFidelity
+          isHighFidelity,
+          docxBase64
         };
         this._sources.push(source);
         App.toast(`Đã đọc ${fields.length} trường từ "${file.name}"`, 'success');
@@ -517,8 +519,9 @@ const DataSources = {
       id: s.id, name: s.name, filename: s.filename,
       fileType: s.fileType || 'excel',
       fields: s.fields,
-      htmlContent: s.htmlContent || null,
-      isHighFidelity: s.isHighFidelity || false
+	      htmlContent: s.htmlContent || null,
+	      isHighFidelity: s.isHighFidelity || false,
+	      docxBase64: s.docxBase64 || ''
     }));
     try { localStorage.setItem('excelmapper_datasources', JSON.stringify(meta)); } catch (_) { }
     // update badge
@@ -597,8 +600,9 @@ const DataSources = {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          const arrayBuffer = e.target.result;
-          const ext = file.name.split('.').pop().toLowerCase();
+	          const arrayBuffer = e.target.result;
+	          const ext = file.name.split('.').pop().toLowerCase();
+	          const docxBase64 = ext === 'docx' ? DataSources._arrayBufferToBase64(arrayBuffer.slice(0)) : '';
 
           // === Step 1: Extract fields using mammoth.js (text analysis) ===
           const fields = [];
@@ -694,7 +698,7 @@ const DataSources = {
           }
 
           // Mark high-fidelity for the source object
-          const result = { fields, htmlContent };
+	          const result = { fields, htmlContent, docxBase64 };
           if (isHighFidelity) result._isHighFidelity = true;
           resolve(result);
         } catch (err) {
@@ -704,7 +708,17 @@ const DataSources = {
       reader.onerror = reject;
       reader.readAsArrayBuffer(file);
     });
-  },
+	  },
+
+	  _arrayBufferToBase64(arrayBuffer) {
+	    const bytes = new Uint8Array(arrayBuffer);
+	    let binary = '';
+	    const chunkSize = 0x8000;
+	    for (let i = 0; i < bytes.length; i += chunkSize) {
+	      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+	    }
+	    return btoa(binary);
+	  },
 
   /* ── Render .docx with docx-preview (preserves original formatting + logo) ── */
   async _renderDocxPreview(arrayBuffer) {
@@ -1018,9 +1032,12 @@ const DataSources = {
     }
 
     // Use high-fidelity HTML directly (from docx-preview) or enhance mammoth output
-    let html = source.isHighFidelity
-      ? source.htmlContent
-      : this._enhanceWordHtml(source.htmlContent);
+	    let html = source.isHighFidelity
+	      ? source.htmlContent
+	      : this._enhanceWordHtml(source.htmlContent);
+	    if (source.docxBase64 && typeof WordState !== 'undefined') {
+	      WordState.currentOriginalDocxBase64 = source.docxBase64;
+	    }
 
     if (mode === 'append') {
       editor.innerHTML += '<hr style="margin:20px 0;border:1px dashed var(--border);">' + html;

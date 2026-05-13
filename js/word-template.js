@@ -10,7 +10,8 @@ const WordState = {
   selectedTemplateId: null,
   uploadedFiles: {},
   extractedData: {},
-  currentStep: 1
+  currentStep: 1,
+  currentOriginalDocxBase64: ''
 };
 
 /* ── Helpers ── */
@@ -52,6 +53,7 @@ const WordEditor = {
 
   resetEditor() {
     WordState.editingId = null;
+    WordState.currentOriginalDocxBase64 = '';
     const t = document.getElementById('word-editor-title');
     if (t) t.textContent = 'Tạo Template Word mới';
     const n = document.getElementById('word-template-name');
@@ -241,6 +243,13 @@ const WordEditor = {
     const chips = editor.querySelectorAll('.word-placeholder-chip[data-placeholder]');
     const phs = new Set();
     chips.forEach(c => phs.add(c.getAttribute('data-placeholder')));
+    const rawText = editor.textContent || '';
+    const rawRegex = /\{\{([^}]+)\}\}/g;
+    let match;
+    while ((match = rawRegex.exec(rawText)) !== null) {
+      const name = (match[1] || '').trim();
+      if (name) phs.add(name);
+    }
     return Array.from(phs);
   },
 
@@ -250,14 +259,25 @@ const WordEditor = {
     const editor = document.getElementById('word-editor-area');
     if (!editor) return;
 
-    const chips = editor.querySelectorAll('.word-placeholder-chip[data-placeholder]');
-    const phs = [];
-    const seen = new Set();
-    chips.forEach(c => {
-      const name = c.getAttribute('data-placeholder');
-      const source = c.getAttribute('data-source') || '';
-      if (!seen.has(name)) { seen.add(name); phs.push({ name, source }); }
-    });
+	    const chips = editor.querySelectorAll('.word-placeholder-chip[data-placeholder]');
+	    const phs = [];
+	    const seen = new Set();
+	    const pushPlaceholder = (name, source = '') => {
+	      if (!name || seen.has(name)) return;
+	      seen.add(name);
+	      phs.push({ name, source });
+	    };
+	    chips.forEach(c => {
+	      const name = c.getAttribute('data-placeholder');
+	      const source = c.getAttribute('data-source') || '';
+	      pushPlaceholder(name, source);
+	    });
+	    const rawText = editor.textContent || '';
+	    const rawRegex = /\{\{([^}]+)\}\}/g;
+	    let match;
+	    while ((match = rawRegex.exec(rawText)) !== null) {
+	      pushPlaceholder((match[1] || '').trim(), 'Word mẫu');
+	    }
 
     if (phs.length === 0) {
       list.innerHTML = '<p class="text-muted">Chưa có trường dữ liệu nào</p>';
@@ -283,18 +303,19 @@ const WordEditor = {
     const editor = document.getElementById('word-editor-area');
     const content = editor ? editor.innerHTML : '';
     const placeholders = this.getPlaceholders();
+    const originalDocxBase64 = WordState.currentOriginalDocxBase64 || '';
     const now = new Date().toISOString();
 
     if (WordState.editingId) {
       const idx = WordState.templates.findIndex(t => t.id === WordState.editingId);
       if (idx !== -1) {
-        Object.assign(WordState.templates[idx], { name, content, placeholders, updatedAt: now });
+        Object.assign(WordState.templates[idx], { name, content, placeholders, originalDocxBase64, updatedAt: now });
       }
       App.toast('Template Word đã được cập nhật!', 'success');
     } else {
       const tpl = {
         id: 'wtpl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-        name, content, placeholders, createdAt: now, updatedAt: now
+        name, content, placeholders, originalDocxBase64, createdAt: now, updatedAt: now
       };
       WordState.templates.push(tpl);
       WordState.editingId = tpl.id;
@@ -308,6 +329,7 @@ const WordEditor = {
     const tpl = WordState.templates.find(t => t.id === id);
     if (!tpl) return;
     WordState.editingId = id;
+    WordState.currentOriginalDocxBase64 = tpl.originalDocxBase64 || '';
     document.getElementById('word-template-name').value = tpl.name;
     document.getElementById('word-editor-title').textContent = `Chỉnh sửa: ${tpl.name}`;
     const editor = document.getElementById('word-editor-area');
@@ -971,16 +993,7 @@ const WordGenerator = {
   preview() {
     const tpl = WordState.templates.find(t => t.id === WordState.selectedTemplateId);
     if (!tpl) return;
-    const replacements = {};
-    if (tpl.placeholders) {
-      tpl.placeholders.forEach(ph => {
-        const sel = document.getElementById(`wmap-${_wSanId(ph)}`);
-        if (sel && sel.value) {
-          const resolvedValue = this._resolveMappingValue(sel.value);
-          if (resolvedValue !== undefined) replacements[ph] = String(resolvedValue);
-        }
-      });
-    }
+    const replacements = this._collectReplacements(tpl);
     let html = tpl.content || '';
     // Replace placeholders inside chip elements
     const div = document.createElement('div');
@@ -1004,6 +1017,133 @@ const WordGenerator = {
     document.getElementById('word-preview').innerHTML = html;
     this.goToStep(4);
     App.toast('Xem trước đã sẵn sàng!', 'success');
+  },
+
+  _collectReplacements(tpl) {
+    const replacements = {};
+    (tpl.placeholders || []).forEach(ph => {
+      const sel = document.getElementById(`wmap-${_wSanId(ph)}`);
+      if (sel && sel.value) {
+        const resolvedValue = this._resolveMappingValue(sel.value);
+        if (resolvedValue !== undefined) replacements[ph] = String(resolvedValue);
+      }
+    });
+    return replacements;
+  },
+
+  _base64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  },
+
+  _replaceInTextNodes(textNodes, replacements) {
+    if (!textNodes.length) return false;
+    let fullText = textNodes.map(node => node.textContent || '').join('');
+    const jobs = [];
+    Object.entries(replacements).forEach(([key, value]) => {
+      const token = `{{${key}}}`;
+      let index = fullText.indexOf(token);
+      while (index !== -1) {
+        jobs.push({ start: index, end: index + token.length, value });
+        index = fullText.indexOf(token, index + token.length);
+      }
+    });
+    if (!jobs.length) return false;
+
+    const ranges = [];
+    let cursor = 0;
+    textNodes.forEach((node, nodeIndex) => {
+      const len = (node.textContent || '').length;
+      ranges.push({ node, nodeIndex, start: cursor, end: cursor + len });
+      cursor += len;
+    });
+
+    jobs.sort((a, b) => b.start - a.start).forEach(job => {
+      const startInfo = ranges.find(item => job.start >= item.start && job.start <= item.end);
+      const endInfo = ranges.find(item => job.end >= item.start && job.end <= item.end);
+      if (!startInfo || !endInfo) return;
+      const startText = startInfo.node.textContent || '';
+      const endText = endInfo.node.textContent || '';
+      const startOffset = job.start - startInfo.start;
+      const endOffset = job.end - endInfo.start;
+      if (startInfo.nodeIndex === endInfo.nodeIndex) {
+        startInfo.node.textContent = startText.slice(0, startOffset) + job.value + startText.slice(endOffset);
+      } else {
+        startInfo.node.textContent = startText.slice(0, startOffset) + job.value;
+        for (let i = startInfo.nodeIndex + 1; i < endInfo.nodeIndex; i++) {
+          ranges[i].node.textContent = '';
+        }
+        endInfo.node.textContent = endText.slice(endOffset);
+      }
+    });
+    return true;
+  },
+
+  _replacePlaceholdersInXml(xmlText, replacements) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) {
+      return xmlText;
+    }
+    const wordNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    const paragraphs = Array.from(doc.getElementsByTagNameNS(wordNs, 'p'));
+    let changed = false;
+    paragraphs.forEach(paragraph => {
+      const textNodes = Array.from(paragraph.getElementsByTagNameNS(wordNs, 't'));
+      if (this._replaceInTextNodes(textNodes, replacements)) changed = true;
+    });
+    return changed ? new XMLSerializer().serializeToString(doc) : xmlText;
+  },
+
+  async exportDOCX() {
+    const tpl = WordState.templates.find(t => t.id === WordState.selectedTemplateId);
+    if (!tpl) { App.toast('Vui lòng chọn template Word', 'warning'); return; }
+    if (!tpl.originalDocxBase64) {
+      App.toast('Template này chưa lưu file .docx gốc. Hãy upload file .docx mẫu và lưu lại template để xuất Word giữ nguyên định dạng.', 'warning');
+      return;
+    }
+    if (typeof JSZip === 'undefined') {
+      App.toast('Thiếu thư viện JSZip để xuất Word. Kiểm tra kết nối CDN hoặc bundle thư viện nội bộ.', 'error');
+      return;
+    }
+
+    const replacements = this._collectReplacements(tpl);
+    try {
+      App.toast('Đang tạo file Word giữ nguyên định dạng...', 'info');
+      const zip = await JSZip.loadAsync(this._base64ToArrayBuffer(tpl.originalDocxBase64));
+      const xmlFiles = Object.keys(zip.files).filter(name =>
+        name.startsWith('word/') &&
+        name.endsWith('.xml') &&
+        !name.includes('/_rels/')
+      );
+      for (const fileName of xmlFiles) {
+        const file = zip.file(fileName);
+        if (!file) continue;
+        const xml = await file.async('string');
+        zip.file(fileName, this._replacePlaceholdersInXml(xml, replacements));
+      }
+      const blob = await zip.generateAsync({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+      const fileName = (tpl.name || 'word-template').replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() || 'document';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${fileName}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      WordState.exportCount++;
+      WordEditor.saveState();
+      App.toast('Đã xuất Word giữ nguyên định dạng gốc', 'success');
+    } catch (err) {
+      console.error('DOCX export error:', err);
+      App.toast(`Lỗi xuất Word: ${err.message}`, 'error');
+    }
   },
 
   exportPDF() {
