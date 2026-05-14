@@ -374,6 +374,9 @@ const WordEditor = {
       <datalist id="${dlId}">
         ${allKeys.map(k => `<option value="${_wEsc(k)}"></option>`).join('')}
       </datalist>
+      <datalist id="native-ph-datalist">
+        ${docxPhs.map(p => `<option value="${_wEsc(p)}" label="{{${_wEsc(p)}}} — từ DOCX"></option>`).join('')}
+      </datalist>
 
       <div style="margin-top:18px;border:1px solid rgba(99,102,241,0.18);border-radius:14px;overflow:hidden;background:rgba(99,102,241,0.03);">
         <div style="padding:12px 14px;border-bottom:1px solid rgba(99,102,241,0.14);display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
@@ -419,17 +422,10 @@ const WordEditor = {
   _manualFieldRowHtml(field, idx, docxPhs, dlId) {
     docxPhs = docxPhs || [];
     dlId = dlId || 'native-field-datalist';
-    // Build placeholder options: ưu tiên placeholder đã scan từ DOCX, fallback = manual
-    const phOptions = [
-      `<option value="">-- Chọn placeholder --</option>`,
-      ...docxPhs.map(p =>
-        `<option value="${_wEsc(p)}" ${field.placeholder === p ? 'selected' : ''}>{{${_wEsc(p)}}}</option>`
-      ),
-      // Nếu giá trị hiện tại không nằm trong docxPhs, vẫn hiển thị
-      ...(field.placeholder && !docxPhs.includes(field.placeholder)
-        ? [`<option value="${_wEsc(field.placeholder)}" selected>{{${_wEsc(field.placeholder)}}} (thủ công)</option>`]
-        : [])
-    ].join('');
+
+    // Datalist riêng cho cột placeholder — chứa các {{ph}} đã scan từ DOCX
+    const phDlId = 'native-ph-datalist';
+    const currentVal = field.placeholder || field.targetText || '';
 
     return `
       <tr data-manual-field-row>
@@ -445,15 +441,15 @@ const WordEditor = {
           </div>
         </td>
         <td>
-          ${docxPhs.length > 0
-            ? `<select class="mapping-select native-field-target">
-                 ${phOptions}
-               </select>`
-            : `<input class="mapping-select native-field-target"
-                 value="${_wEsc(field.placeholder || field.targetText || '')}"
-                 placeholder="{{ten_khach_hang}} hoặc đoạn text gốc"
-                 style="font-family:monospace;font-size:0.82rem;">`
-          }
+          <div style="position:relative;">
+            <input list="${phDlId}" class="mapping-select native-field-target"
+              value="${_wEsc(currentVal)}"
+              placeholder="Gõ / paste đoạn text hoặc {{placeholder}}"
+              autocomplete="off"
+              style="font-family:monospace;font-size:0.82rem;padding-right:28px;"
+              title="Nhập {{placeholder}} có trong DOCX, hoặc paste đoạn text gốc cần thay">
+            <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:0.75rem;color:var(--text-muted);pointer-events:none;">▾</span>
+          </div>
         </td>
         <td>
           <input class="mapping-select native-field-desc"
@@ -467,19 +463,26 @@ const WordEditor = {
       </tr>`;
   },
 
+
   /* Gợi ý tự động điền placeholder khi tên chỉ tiêu khớp với placeholder DOCX */
   _onFieldNameInput(input) {
     const row = input.closest('[data-manual-field-row]');
     if (!row) return;
-    const targetSel = row.querySelector('.native-field-target');
-    if (!targetSel || targetSel.tagName !== 'SELECT') return;
-    const val = (input.value || '').trim().toLowerCase().replace(/\s+/g,'_');
-    // Tìm option khớp gần nhất
-    const opts = Array.from(targetSel.options);
+    const targetInput = row.querySelector('.native-field-target');
+    if (!targetInput || targetInput.value) return; // chỉ gợi ý khi ô target còn trống
+    const val = (input.value || '').trim().toLowerCase().replace(/\s+/g, '_');
+    if (!val) return;
+    // Lấy gợi ý từ datalist native-ph-datalist
+    const dl = document.getElementById('native-ph-datalist');
+    if (!dl) return;
+    const opts = Array.from(dl.options);
     const exact = opts.find(o => o.value.toLowerCase() === val);
-    const fuzzy = exact || opts.find(o => o.value.toLowerCase().includes(val) || val.includes(o.value.toLowerCase()));
-    if (fuzzy) targetSel.value = fuzzy.value;
+    const fuzzy = exact || opts.find(o =>
+      o.value.toLowerCase().includes(val) || val.includes(o.value.toLowerCase())
+    );
+    if (fuzzy) targetInput.value = fuzzy.value;
   },
+
 
   /* Làm mới toàn bộ panel sau khi Master Data thay đổi */
   refreshManualFieldPanel() {
