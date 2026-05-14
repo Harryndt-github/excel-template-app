@@ -14,6 +14,19 @@ const RateCenterState = {
 
 function _rcId() { return 'rc_' + Math.random().toString(36).slice(2, 9); }
 function _rcEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+/** Format số VND: 350000000 → "350.000.000 đ" */
+function _rcFmt(n, opts) {
+  const num = Number(n) || 0;
+  const str = num.toLocaleString('vi-VN');
+  return opts?.noUnit ? str : str + ' đ';
+}
+/** Format ngày dd/MM/yyyy */
+function _rcFmtDate(d) {
+  if (!d) return '';
+  const dt = (d instanceof Date) ? d : new Date(d);
+  if (isNaN(dt)) return String(d);
+  return dt.toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
 
 const RC_COLORS = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#3b82f6','#ef4444'];
 const RC_PROJECT_ICONS = ['🏢','🏗️','🏠','🏦','🏙️','🌆','🏬','🏭'];
@@ -1502,6 +1515,83 @@ const RateCenter = {
     if (runtimeInput) {
       const derived = RateRuleEngine.evaluate(pkg, project, runtimeInput);
       Object.assign(data, derived);
+    }
+
+    // ══ Loan Calculation Engine ══
+    // Kích hoạt khi có giá trị sản phẩm và chính sách có LTV
+    const ltvRaw = parseFloat(data['LTV tối đa']) || 0;
+    const productValue = runtimeInput?.productValue ? parseFloat(String(runtimeInput.productValue).replace(/[^0-9.]/g,'')) : 0;
+
+    if (ltvRaw > 0 && productValue > 0) {
+      const ltv        = ltvRaw / 100;
+      const loanAmount = productValue * ltv;
+
+      // Kỳ hạn vay (năm → tháng)
+      const termYears  = parseFloat(data['Thời gian vay tối đa']) || 20;
+      const termMonths = Math.round(termYears * 12);
+
+      // Thời gian hỗ trợ lãi suất (tháng)
+      const isr          = pkg.interestSupportRules || {};
+      const supportMo    = parseFloat(isr.defaultSupportMonths) || parseFloat(runtimeInput?.htlsMonths) || 0;
+
+      // Chọn bucket lãi suất theo số tháng HTLS
+      const bucket       = RateRuleEngine.selectBucket(pkg.rateBuckets, supportMo || termMonths);
+      const annualRate   = parseFloat(bucket?.rate) || 0;   // % / năm
+      const monthlyRate  = annualRate / 100 / 12;
+
+      // Công thức dư nợ giảm dần (gốc cố định)
+      const monthlyPrincipal = termMonths > 0 ? loanAmount / termMonths : 0;
+      const monthlyInterest  = loanAmount * monthlyRate;          // lãi tháng đầu (cao nhất)
+      const monthlyTotal     = monthlyPrincipal + monthlyInterest;
+
+      // Ngày kết thúc HTLS = ngày ký + supportMo tháng
+      let htlsEndDate = '';
+      const signingRaw = runtimeInput?.signingDate;
+      if (signingRaw && supportMo > 0) {
+        const signing = new Date(signingRaw);
+        if (!isNaN(signing)) {
+          const end = new Date(signing);
+          end.setMonth(end.getMonth() + supportMo);
+          htlsEndDate = _rcFmtDate(end);
+        }
+      }
+
+      // Tính lãi trong thời gian HTLS (lãi toàn bộ do CĐT trả, KH chỉ trả gốc)
+      const monthlyInterestHTLS  = monthlyInterest;   // lãi tháng 1 (dư nợ = loanAmount)
+      const monthlyInterestAfter = (loanAmount - monthlyPrincipal * supportMo) * monthlyRate; // lãi sau HTLS
+
+      Object.assign(data, {
+        // ― Số tiền vay ―
+        'Số tiền vay tối đa':          _rcFmt(Math.round(loanAmount)),
+        'Số tiền vay tối đa (số)':    Math.round(loanAmount),
+        'LTV áp dụng':               ltvRaw + '%',
+
+        // ― Lãi suất ―
+        'Lãi suất áp dụng':          annualRate + '%/năm',
+        'Lãi suất áp dụng (số)':  annualRate,
+        'Bucket lãi suất':           bucket?.label || '',
+
+        // ― Thời gian ―
+        'Kỳ hạn vay (đời vay)':       termMonths + ' tháng',
+        'Kỳ hạn vay (số)':          termMonths,
+        'Thời gian hỗ trợ lãi':       supportMo + ' tháng',
+        'Ngày kết thúc HTLS':         htlsEndDate,
+
+        // ― Thanh toán hàng tháng (dư nợ giảm dần) ―
+        'Gốc hàng tháng':             _rcFmt(Math.round(monthlyPrincipal)),
+        'Gốc hàng tháng (số)':     Math.round(monthlyPrincipal),
+        'Lãi hàng tháng (T1)':        _rcFmt(Math.round(monthlyInterest)),
+        'Tổng trả tháng đầu':          _rcFmt(Math.round(monthlyTotal)),
+
+        // ― Trong thời gian HTLS ―
+        'Lãi CĐT trả hàng tháng':    _rcFmt(Math.round(monthlyInterestHTLS)),
+        'Lãi KH trả trong HTLS':      _rcFmt(0),           // KH chỉ trả gốc trong HTLS
+        'Gốc + Lãi trong HTLS':       _rcFmt(Math.round(monthlyPrincipal)), // KH chỉ trả gốc
+
+        // ― Sau HTLS ―
+        'Lãi sau HTLS (sớ bộ)':      _rcFmt(Math.round(monthlyInterestAfter)),
+        'Tổng trả sau HTLS (sớ bộ)': _rcFmt(Math.round(monthlyPrincipal + monthlyInterestAfter)),
+      });
     }
 
     return data;

@@ -11,7 +11,8 @@ const WordState = {
   uploadedFiles: {},
   extractedData: {},
   currentStep: 1,
-  currentOriginalDocxBase64: ''
+  currentOriginalDocxBase64: '',
+  currentCalcResult: null,   // Kết quả Loan Calculation Engine
 };
 
 /* ── Helpers ── */
@@ -915,6 +916,40 @@ const WordGenerator = {
         : [])
       : [];
     document.getElementById('word-mapping-container').innerHTML = `
+      <!-- [P3] Loan Calculation Engine Panel -->
+      <div style="margin-bottom:18px;border:1px solid rgba(99,102,241,0.25);border-radius:14px;background:rgba(99,102,241,0.03);">
+        <div style="padding:12px 18px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;"
+             onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.lcalc-exp').textContent=this.nextElementSibling.style.display==='none'?'&#9654;':'&#9660;'">
+          <span style="font-size:0.9rem;font-weight:700;color:#6366f1;">&#128202; Tinh toan khoan vay tu dong</span>
+          <span style="font-size:0.75rem;color:var(--text-muted);">Nhap gia tri san pham + ngay ky hop dong de tinh so tien vay, lai/goc hang thang, ngay ket thuc HTLS</span>
+          <span class="lcalc-exp" style="margin-left:auto;color:#6366f1;font-size:0.8rem;">&#9654;</span>
+        </div>
+        <div style="display:none;padding:0 18px 16px;" id="loan-calc-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px;">
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.8rem;font-weight:600;color:var(--text-secondary);">Gia tri san pham (VND)</label>
+              <input type="text" id="lcalc-product-value" class="mapping-select"
+                placeholder="VD: 500000000"
+                value="${(WordGenerator._loanInput||{}).productValue ? Number((WordGenerator._loanInput||{}).productValue).toLocaleString('vi-VN') : ''}"
+                oninput="WordGenerator._loanInput=WordGenerator._loanInput||{};WordGenerator._loanInput.productValue=this.value.replace(/[^0-9.]/g,'')">
+            </div>
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.8rem;font-weight:600;color:var(--text-secondary);">Ngay ky hop dong</label>
+              <input type="date" id="lcalc-signing-date" class="mapping-select"
+                value="${(WordGenerator._loanInput||{}).signingDate || ''}"
+                oninput="WordGenerator._loanInput=WordGenerator._loanInput||{};WordGenerator._loanInput.signingDate=this.value">
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:8px;">
+              <button onclick="WordGenerator.runLoanCalc()"
+                style="flex:1;padding:9px 14px;border-radius:9px;border:none;background:#6366f1;color:#fff;font-weight:700;cursor:pointer;font-size:0.85rem;font-family:inherit;">
+                &#128260; Tinh toan
+              </button>
+            </div>
+          </div>
+          <div id="lcalc-result" style="font-size:0.82rem;color:var(--text-muted);">&#128161; Nhap gia tri san pham va ngay ky, sau do nhan Tinh toan.</div>
+        </div>
+      </div>
+
       <div class="rate-filter-panel" style="margin-bottom:18px;padding:16px 18px;border:1px solid rgba(99,102,241,0.14);border-radius:14px;background:rgba(99,102,241,0.04);">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
           <div>
@@ -1062,7 +1097,75 @@ const WordGenerator = {
   _getRateTemplateData() {
     if (typeof RateCenter === 'undefined' || typeof RateCenter.getTemplateData !== 'function') return {};
     if (!this._selectedRateProjectId || !this._selectedRatePolicyId) return {};
-    return RateCenter.getTemplateData(this._selectedRateProjectId, this._selectedRatePolicyId);
+    const rInput = Object.assign({}, this._runtimeConditions || {}, this._loanInput || {});
+    return RateCenter.getTemplateData(
+      this._selectedRateProjectId,
+      this._selectedRatePolicyId,
+      Object.keys(rInput).length ? rInput : undefined
+    );
+  },
+
+  /* -- Loan Calculation Engine -- */
+  _loanInput: null,
+
+  runLoanCalc() {
+    const resultEl = document.getElementById('lcalc-result');
+    if (!resultEl) return;
+    const pvInput  = document.getElementById('lcalc-product-value');
+    const dtInput  = document.getElementById('lcalc-signing-date');
+    const productValue = pvInput ? parseFloat(String(pvInput.value).replace(/[^0-9.]/g,'')) : 0;
+    const signingDate  = dtInput ? dtInput.value : '';
+    if (!productValue || productValue <= 0) {
+      resultEl.innerHTML = '<span style="color:#ef4444;">Vui long nhap gia tri san pham hop le.</span>';
+      return;
+    }
+    if (!this._selectedRateProjectId || !this._selectedRatePolicyId) {
+      resultEl.innerHTML = '<span style="color:#f59e0b;">Vui long chon Du an va Chinh sach o panel phia tren.</span>';
+      return;
+    }
+    this._loanInput = { productValue, signingDate };
+    const rInput = Object.assign({}, this._runtimeConditions || {}, { productValue, signingDate });
+    const result = RateCenter.getTemplateData(this._selectedRateProjectId, this._selectedRatePolicyId, rInput);
+    WordState.currentCalcResult = result;
+
+    // Hiển thị tất cả các key là kết quả tính toán (bỏ qua key kỹ thuật và key từ policy tĩnh)
+    const LOAN_CALC_KEYS = [
+      'So tien vay toi da', 'LTV ap dung', 'Lai suat ap dung', 'Bucket lai suat',
+      'Thoi gian ho tro lai', 'Ngay ket thuc HTLS', 'Ky han vay (doi vay)',
+      'Goc hang thang', 'Lai hang thang (T1)', 'Tong tra thang dau',
+      'Lai CDT tra hang thang', 'Goc + Lai trong HTLS',
+      'Lai sau HTLS (so bo)', 'Tong tra sau HTLS (so bo)'
+    ];
+    const rows = Object.keys(result)
+      .filter(k => {
+        if (k.endsWith('(s\u1ed1)') || k.endsWith('(so)')) return false;
+        const v = result[k];
+        return v !== undefined && v !== '' && typeof v !== 'object';
+      })
+      .filter(k => {
+        // Chỉ lấy các key tính toán: có đơn vị tiền/% hoặc là ngày
+        const v = String(result[k] || '');
+        return v.includes('\u0111') || v.includes('%') || v.includes('th\u00e1ng') || v.includes('/20') ||
+          k.includes('vay') || k.includes('l\u00e3i') || k.includes('l\u00e3i') || k.includes('g\u1ed1c') ||
+          k.includes('HTLS') || k.includes('bucket') || k.includes('kh\u1ea3n') || k.includes('LTV') ||
+          k.includes('Bucket') || k.includes('k\u1ef3') || k.includes('K\u1ef3') || k.includes('Lai') || k.includes('Goc') ||
+          k.includes('tien') || k.includes('ti\u1ec1n') || k.includes('S\u1ed1') || k.includes('Ng\u00e0y') || k.includes('Ngay');
+      })
+      .map(k => `<tr><td style="padding:5px 10px;font-size:0.8rem;color:var(--text-secondary);">${_wEsc(k)}</td><td style="padding:5px 10px;font-size:0.82rem;font-weight:600;color:var(--text-primary);">${_wEsc(String(result[k]))}</td></tr>`)
+      .join('');
+    if (!rows) {
+      resultEl.innerHTML = '<span style="color:#f59e0b;">Khong tinh duoc. Kiem tra chinh sach co khai bao LTV% va lai suat bucket chua.</span>';
+      return;
+    }
+    resultEl.innerHTML = `<div style="margin-top:6px;border:1px solid rgba(16,185,129,0.25);border-radius:10px;overflow:hidden;"><div style="padding:8px 12px;background:rgba(16,185,129,0.08);display:flex;justify-content:space-between;align-items:center;"><span style="font-size:0.8rem;font-weight:700;color:#10b981;">Ket qua tinh toan</span><button onclick="WordGenerator.applyLoanCalcResult()" style="padding:5px 14px;border-radius:7px;border:none;background:#10b981;color:#fff;font-weight:700;cursor:pointer;font-size:0.78rem;font-family:inherit;">Dung ket qua nay</button></div><table style="width:100%;border-collapse:collapse;">${rows}</table></div>`;
+    this.buildMappingUI();
+  },
+
+
+  applyLoanCalcResult() {
+    if (!WordState.currentCalcResult) return;
+    if (typeof App !== 'undefined') App.toast('Ket qua tinh toan da duoc ap dung vao mapping', 'success');
+    this.buildMappingUI();
   },
 
   _buildMappingOptions() {
@@ -1111,6 +1214,17 @@ const WordGenerator = {
       });
       options += '</optgroup>';
     }
+    const calcResult = WordState.currentCalcResult || {};
+    const calcKeys = Object.keys(calcResult).filter(k => !k.endsWith('(so)') && !k.endsWith('(s\u1ed1)'));
+    if (calcKeys.length > 0) {
+      options += '<optgroup label="Loan Calc (tinh tu dong)">';
+      calcKeys.forEach(key => {
+        const val = calcResult[key];
+        const disp = String(val || '').substring(0, 50);
+        options += `<option value="loanresult::${_wEsc(key)}" title="${_wEsc(disp)}">[Loan] ${_wEsc(key)} = ${_wEsc(disp)}</option>`;
+      });
+      options += '</optgroup>';
+    }
     return options;
   },
 
@@ -1132,6 +1246,9 @@ const WordGenerator = {
     if (!mappingValue) return undefined;
     const [source, ...rest] = mappingValue.split('::');
     const field = rest.join('::');
+    if (source === 'loanresult') {
+      return (WordState.currentCalcResult || {})[field];
+    }
     if (source === 'manual') {
       const input = document.getElementById(`wmanual-${_wSanId(field)}`);
       return input ? input.value : '';
