@@ -562,6 +562,11 @@ const WordEditor = {
         const patch = isNativeDocx
           ? { name, content, placeholders, manualFields, updatedAt: now }
           : { name, content, placeholders, originalDocxBase64, updatedAt: now };
+        // Giữ _idbKey và _docxInIDB để không bị mất liên kết với IndexedDB
+        if (isNativeDocx && WordState.templates[idx]._idbKey) {
+          patch._idbKey = WordState.templates[idx]._idbKey;
+          patch._docxInIDB = true;
+        }
         Object.assign(WordState.templates[idx], patch);
       }
       App.toast('Template Word đã được cập nhật!', 'success');
@@ -708,20 +713,46 @@ const WordGenerator = {
     WordState.templates.forEach(tpl => {
       const opt = document.createElement('option');
       opt.value = tpl.id;
-      opt.textContent = tpl.name;
+      opt.textContent = tpl.name + (tpl.nativeDocx ? ' [DOCX native]' : '');
       select.appendChild(opt);
     });
 
-    select.onchange = () => {
+    select.onchange = async () => {
       const id = select.value;
       const btn = document.getElementById('btn-word-step1-next');
       const preview = document.getElementById('word-tpl-preview-mini');
       const pc = document.getElementById('word-tpl-preview-content');
+      const idbWarning = document.getElementById('word-idb-warning');
+      if (idbWarning) idbWarning.remove();
+
       if (id) {
         btn.disabled = false;
         WordState.selectedTemplateId = id;
         const tpl = WordState.templates.find(t => t.id === id);
         if (tpl && preview && pc) { preview.style.display = 'block'; pc.innerHTML = tpl.content; }
+
+        // Kiểm tra IDB cho template DOCX native
+        if (tpl && tpl.nativeDocx && typeof DocxEngine !== 'undefined') {
+          const hasIDB = await DocxEngine.hasOriginalDocx(tpl.id);
+          if (!hasIDB) {
+            // Hiển cảnh báo + input re-upload
+            const warning = document.createElement('div');
+            warning.id = 'word-idb-warning';
+            warning.style.cssText = 'margin-top:12px;padding:12px 16px;border-radius:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);';
+            warning.innerHTML = `
+              <div style="font-size:0.85rem;font-weight:700;color:#ef4444;margin-bottom:8px;">&#9888; File DOCX gốc chưa có trong bộ nhớ trình duyệt</div>
+              <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:10px;">
+                Binary DOCX được lưu trong IndexedDB của trình duyệt — có thể đã bị xóa khi xóa cache, mở trình duyệt ắn danh hoặc dùng máy khác.<br>
+                Hãy upload lại file <b>.docx gốc</b> để hệ thống lưu lại vào bộ nhớ.
+              </div>
+              <label style="display:inline-flex;align-items:center;gap:8px;padding:7px 16px;border-radius:8px;background:#6366f1;color:#fff;cursor:pointer;font-size:0.82rem;font-weight:700;">
+                &#128196; Upload lại file DOCX gốc
+                <input type="file" accept=".docx" hidden onchange="WordGenerator.handleDocxReUpload(this.files[0], '${tpl.id}')">
+              </label>
+            `;
+            select.closest('.step-card').appendChild(warning);
+          }
+        }
       } else {
         btn.disabled = true;
         WordState.selectedTemplateId = null;
@@ -731,6 +762,33 @@ const WordGenerator = {
 
     if (WordState.selectedTemplateId) { select.value = WordState.selectedTemplateId; select.onchange(); }
     this.goToStep(1);
+  },
+
+  async handleDocxReUpload(file, templateId) {
+    if (!file || !templateId) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext !== 'docx') {
+      App.toast('Chỉ hỗ trợ file .docx', 'warning');
+      return;
+    }
+    try {
+      // Re-import vào IDB dùng đúng templateId làm key
+      const result = await DocxEngine.importDocx(file, templateId);
+      // Cập nhật placeholders nếu có mới
+      const tpl = WordState.templates.find(t => t.id === templateId);
+      if (tpl && result.placeholders && result.placeholders.length > 0) {
+        tpl.placeholders = Array.from(new Set([...(tpl.placeholders || []), ...result.placeholders]));
+        tpl._docxInIDB = true;
+        WordEditor.saveState();
+      }
+      // Xóa cảnh báo
+      const warning = document.getElementById('word-idb-warning');
+      if (warning) warning.remove();
+      App.toast(`Đã lưu lại file DOCX gốc vào bộ nhớ (${result.placeholders.length} placeholder tìm thấy)`, 'success');
+    } catch (err) {
+      console.error('Re-upload DOCX error:', err);
+      App.toast('Lỗi upload lại: ' + err.message, 'error');
+    }
   },
 
   goToStep(step) {
@@ -1437,8 +1495,21 @@ const WordGenerator = {
         }
       } catch (err) {
         console.error('Preview DOCX error:', err);
-        previewEl.innerHTML = `<div style="color:#ef4444;padding:20px;">Lỗi render: ${_wEsc(err.message)}<br>Nhấn <b>Xuất Word</b> để tải file.</div>`;
-        App.toast('Không thể render preview, nhấn Xuất Word để tải file', 'warning');
+        const errMsg = err.message || 'Lỗi không xác định';
+        const isIdbMissing = errMsg.includes('không tìm thấy') || errMsg.includes('not found') || errMsg.includes('gốc');
+        previewEl.innerHTML = `
+          <div style="padding:20px;border-radius:12px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);">
+            <div style="font-size:0.9rem;font-weight:700;color:#ef4444;margin-bottom:8px;">&#9888; ${_wEsc(errMsg)}</div>
+            ${isIdbMissing ? `
+            <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:12px;">
+              File DOCX gốc đã bị xóa khỏi bộ nhớ trình duyệt (IndexedDB). Hãy upload lại file <b>.docx gốc</b> để tiếp tục.
+            </div>
+            <label style="display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:8px;background:#6366f1;color:#fff;cursor:pointer;font-weight:700;font-size:0.85rem;">
+              &#128196; Upload lại file DOCX gốc
+              <input type="file" accept=".docx" hidden onchange="WordGenerator.handleDocxReUpload(this.files[0], '${_wEsc(tpl.id)}').then(()=>WordGenerator.preview())">
+            </label>` : ''}
+          </div>`;
+        App.toast(isIdbMissing ? 'File DOCX gốc chưa có trong bộ nhớ — upload lại để tiếp tục' : 'Không thể render preview', 'warning');
       }
       return;
     }
