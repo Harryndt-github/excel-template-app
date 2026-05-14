@@ -58,7 +58,7 @@ const MasterData = {
     } catch (e) { console.error('MasterData load error:', e); }
   },
 
-  saveState() {
+  saveState(shouldSync = true) {
     try {
       localStorage.setItem('excelmapper_masterdata', JSON.stringify({
         entities: MasterDataState.entities,
@@ -66,6 +66,7 @@ const MasterData = {
         records: MasterDataState.records
       }));
     } catch (e) { console.error('MasterData save error:', e); }
+    if (shouldSync && typeof UatStorage !== 'undefined') UatStorage.queueSync('master_data');
   },
 
   // ── Auto-create entities from FILE_TYPES (one-time seed) ──

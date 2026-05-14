@@ -385,7 +385,7 @@ const RateCenter = {
     if (!RateCenterState.projects) RateCenterState.projects = [];
   },
 
-  save() {
+  save(shouldSync = true) {
     try {
       localStorage.setItem(this._storageKey, JSON.stringify({
         projects: RateCenterState.projects,
@@ -395,6 +395,7 @@ const RateCenter = {
         selectedPackage: RateCenterState.selectedPackage,
       }));
     } catch(e) {}
+    if (shouldSync && typeof UatStorage !== 'undefined') UatStorage.queueSync('rate_center');
   },
 
   render() {
@@ -1589,8 +1590,8 @@ const RateCenter = {
         'Gốc + Lãi trong HTLS':       _rcFmt(Math.round(monthlyPrincipal)), // KH chỉ trả gốc
 
         // ― Sau HTLS ―
-        'Lãi sau HTLS (sớ bộ)':      _rcFmt(Math.round(monthlyInterestAfter)),
-        'Tổng trả sau HTLS (sớ bộ)': _rcFmt(Math.round(monthlyPrincipal + monthlyInterestAfter)),
+        'Lãi sau HTLS (sơ bộ)':      _rcFmt(Math.round(monthlyInterestAfter)),
+        'Tổng trả sau HTLS (sơ bộ)': _rcFmt(Math.round(monthlyPrincipal + monthlyInterestAfter)),
       });
     }
 

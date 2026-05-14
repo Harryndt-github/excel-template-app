@@ -45,11 +45,12 @@ const WordEditor = {
     } catch (e) { console.error(e); }
   },
 
-  saveState() {
+  saveState(shouldSync = true) {
     try {
       localStorage.setItem('excelmapper_word_templates', JSON.stringify(WordState.templates));
       localStorage.setItem('excelmapper_word_exports', WordState.exportCount.toString());
     } catch (e) { console.error(e); }
+    if (shouldSync && typeof UatStorage !== 'undefined') UatStorage.queueSync('word_templates');
   },
 
   resetEditor() {
@@ -1746,17 +1747,26 @@ const WordGenerator = {
     }
   },
 
-  exportPDF() {
+  async exportPDF() {
     const preview = document.getElementById('word-preview');
+    const tpl = WordState.templates.find(t => t.id === WordState.selectedTemplateId);
+
+    if (tpl && tpl.nativeDocx) {
+      const hasDocxContent = preview && preview.querySelector('.docx-wrapper, .docx, [class*="docx"]');
+      if (!hasDocxContent) {
+        App.toast('Đang render DOCX gốc trước khi xuất PDF...', 'info');
+        await this.preview();
+      }
+    }
+
     if (!preview || !preview.innerHTML.trim()) { App.toast('Không có nội dung để xuất', 'warning'); return; }
 
-    // Kiểm tra nếu đang hiển thị bảng mapping (native DOCX mode) — không nên xuất PDF
-    const tpl = WordState.templates.find(t => t.id === WordState.selectedTemplateId);
+    // Native DOCX PDF export is generated from the rendered preview. For legal-grade
+    // output, keep DOCX as the authoritative file or convert DOCX to PDF server-side.
     if (tpl && tpl.nativeDocx) {
-      // Kiểm tra xem có nội dung DOCX đã được render chưa
       const hasDocxContent = preview.querySelector('.docx-wrapper, .docx, [class*="docx"]');
       if (!hasDocxContent) {
-        App.toast('Template này dùng cơ chế DOCX native. Hãy nhấn “Xuất Word” để tải file .docx đã điền dữ liệu.', 'warning');
+        App.toast('Không thể render preview DOCX để xuất PDF. Hãy xuất Word, hoặc dùng backend chuyển DOCX sang PDF để giữ định dạng tuyệt đối.', 'warning');
         return;
       }
     }
@@ -1801,7 +1811,9 @@ const WordGenerator = {
       pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'thead', 'img'] }
     };
 
-    App.toast('Đang tạo PDF...', 'info');
+    App.toast(tpl && tpl.nativeDocx
+      ? 'Đang tạo PDF từ bản preview DOCX. File Word vẫn là bản giữ định dạng chuẩn nhất.'
+      : 'Đang tạo PDF...', 'info');
 
     html2pdf().set(opt).from(exportDiv).save().then(() => {
       // Cleanup

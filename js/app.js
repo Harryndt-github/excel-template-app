@@ -1282,13 +1282,14 @@ const App = {
     }
   },
 
-  saveState() {
+  saveState(shouldSync = true) {
     try {
       localStorage.setItem('excelmapper_templates', JSON.stringify(AppState.templates));
       localStorage.setItem('excelmapper_exports', AppState.exportCount.toString());
     } catch (e) {
       console.error('Error saving state:', e);
     }
+    if (shouldSync && typeof UatStorage !== 'undefined') UatStorage.queueSync('excel_templates');
   },
 
   bindNavigation() {
