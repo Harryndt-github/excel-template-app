@@ -1392,45 +1392,57 @@ const WordGenerator = {
     } else { el.textContent = '—'; el.title = ''; }
   },
 
-  preview() {
+  async preview() {
     const tpl = WordState.templates.find(t => t.id === WordState.selectedTemplateId);
     if (!tpl) return;
     const baseReplacements = this._collectReplacements(tpl);
     const replacements = this._buildNativeReplacementsFromManual(tpl, baseReplacements);
+    const previewEl = document.getElementById('word-preview');
+
     if (tpl.nativeDocx) {
-      const directReplacements = this._collectDirectReplacements(tpl);
-      const rows = (tpl.manualFields || []).map(field => {
-        // Ưu tiên giá trị từ placeholder mode, sau đó từ name trực tiếp
-        const val = replacements[field.placeholder] || replacements[field.name] || '';
-        const direct = directReplacements.find(item => item.field === field.name);
-        const mode = field.placeholder
-          ? `<code style="font-size:0.78rem;color:#6366f1;">{{${_wEsc(field.placeholder)}}}</code>`
-          : field.targetText
-            ? `<span style="font-size:0.78rem;color:#f59e0b;" title="Fallback: thay trực tiếp text">✂ "${_wEsc((field.targetText||'').substring(0,30))}"</span>`
-            : '<span style="color:#9ca3af;font-size:0.78rem;">Chưa map</span>';
-        const status = (val || direct?.value)
-          ? `<span style="color:#10b981;font-weight:600;">✓</span>`
-          : `<span style="color:#ef4444;">✗ Chưa có giá trị</span>`;
-        return `<tr>
-          <td><b>${_wEsc(field.name || '')}</b></td>
-          <td>${mode}</td>
-          <td>${_wEsc(val || direct?.value || '')} ${status}</td>
-        </tr>`;
-      }).join('');
-      document.getElementById('word-preview').innerHTML = `
-        <div style="padding:18px;border:1px solid rgba(16,185,129,0.24);border-radius:12px;background:rgba(16,185,129,0.05);margin-bottom:16px;">
-          <strong>Preview mapping DOCX native</strong><br>
-          Đây là bản kiểm tra mapping. File Word thật sẽ được điền trực tiếp vào .docx gốc khi bấm <b>Xuất Word</b>.
-          Định dạng gốc (font, màu sắc, bảng biểu, căn lề) được <b>giữ nguyên 100%</b>.
-        </div>
-        <table>
-          <thead><tr><th>Mã chỉ tiêu</th><th>Placeholder / Target DOCX</th><th>Giá trị sẽ điền</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="3">Chưa có chỉ tiêu cần điền</td></tr>'}</tbody>
-        </table>`;
+      previewEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);"><div style="font-size:2rem;margin-bottom:12px;">&#128196;</div><div>Đang render bản xem trước DOCX...</div></div>`;
       this.goToStep(4);
-      App.toast('Preview mapping DOCX native đã sẵn sàng', 'success');
+      try {
+        const directReplacements = this._collectDirectReplacements(tpl);
+        const blob = await DocxEngine.exportDocx(tpl.id, replacements, {}, directReplacements);
+        if (!blob) throw new Error('Không thể tạo file DOCX preview');
+        if (typeof docx !== 'undefined' && typeof docx.renderAsync === 'function') {
+          const container = document.createElement('div');
+          container.style.cssText = 'width:100%;min-height:400px;';
+          previewEl.innerHTML = '';
+          previewEl.appendChild(container);
+          await docx.renderAsync(blob, container, null, {
+            inWrapper: false, ignoreWidth: false, ignoreHeight: false,
+            breakPages: true, useBase64URL: true,
+            renderHeaders: true, renderFooters: true,
+          });
+          App.toast('Xem trước DOCX đã sẵn sàng — bấm Xuất Word để tải file', 'success');
+        } else {
+          const url = URL.createObjectURL(blob);
+          const rows = (tpl.manualFields || []).map(field => {
+            const val = replacements[field.placeholder] || replacements[field.name] || '';
+            const status = val ? `<span style="color:#10b981;font-weight:600;">✓</span>` : `<span style="color:#ef4444;">✗ Chưa có</span>`;
+            return `<tr><td><b>${_wEsc(field.name||'')}</b></td><td>${_wEsc(val)} ${status}</td></tr>`;
+          }).join('');
+          previewEl.innerHTML = `
+            <div style="padding:14px 18px;border-radius:10px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+              <span><b>DOCX đã điền dữ liệu</b> — Nhấn nút bên phải để tải xem.</span>
+              <a href="${url}" download="${_wEsc(tpl.name||'document')}.docx"
+                style="padding:6px 16px;border-radius:7px;background:#6366f1;color:#fff;text-decoration:none;font-size:0.82rem;font-weight:700;"
+                onclick="setTimeout(()=>URL.revokeObjectURL(this.href),5000)">⬇ Tải DOCX xem trước</a>
+            </div>
+            <table><thead><tr><th>Mã chỉ tiêu</th><th>Giá trị sẽ điền</th></tr></thead>
+            <tbody>${rows||'<tr><td colspan="2">Chưa có chỉ tiêu</td></tr>'}</tbody></table>`;
+          App.toast('Bấm "Tải DOCX xem trước" để mở file đã điền', 'info');
+        }
+      } catch (err) {
+        console.error('Preview DOCX error:', err);
+        previewEl.innerHTML = `<div style="color:#ef4444;padding:20px;">Lỗi render: ${_wEsc(err.message)}<br>Nhấn <b>Xuất Word</b> để tải file.</div>`;
+        App.toast('Không thể render preview, nhấn Xuất Word để tải file', 'warning');
+      }
       return;
     }
+
     let html = tpl.content || '';
     // Replace placeholders inside chip elements
     const div = document.createElement('div');
@@ -1666,8 +1678,22 @@ const WordGenerator = {
   exportPDF() {
     const preview = document.getElementById('word-preview');
     if (!preview || !preview.innerHTML.trim()) { App.toast('Không có nội dung để xuất', 'warning'); return; }
+
+    // Kiểm tra nếu đang hiển thị bảng mapping (native DOCX mode) — không nên xuất PDF
     const tpl = WordState.templates.find(t => t.id === WordState.selectedTemplateId);
+    if (tpl && tpl.nativeDocx) {
+      // Kiểm tra xem có nội dung DOCX đã được render chưa
+      const hasDocxContent = preview.querySelector('.docx-wrapper, .docx, [class*="docx"]');
+      if (!hasDocxContent) {
+        App.toast('Template này dùng cơ chế DOCX native. Hãy nhấn “Xuất Word” để tải file .docx đã điền dữ liệu.', 'warning');
+        return;
+      }
+    }
+
     const fileName = tpl ? tpl.name.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() : 'document';
+
+    // A4 ở 96 DPI = 794px, dùng kích thước cố định thay vì scrollWidth (để tránh PDF cắt nửa trang)
+    const A4_WIDTH_PX = 794;
 
     // Create a dedicated render container for PDF generation
     const renderArea = document.getElementById('pdf-render-area');
@@ -1675,54 +1701,47 @@ const WordGenerator = {
 
     const exportDiv = document.createElement('div');
     exportDiv.className = 'pdf-export-content word-pdf-export';
+    exportDiv.style.cssText = `width:${A4_WIDTH_PX}px;box-sizing:border-box;padding:20px;background:#fff;font-family:inherit;`;
     exportDiv.innerHTML = preview.innerHTML;
     renderArea.appendChild(exportDiv);
 
-    // Make render area temporarily visible for html2canvas
-    renderArea.style.position = 'absolute';
-    renderArea.style.left = '0';
-    renderArea.style.top = '0';
-    renderArea.style.zIndex = '-1';
-    renderArea.style.opacity = '0';
+    // Đưa render area ra ngoài viewport nhưng vẫn visible (tránh scrollWidth = 0)
+    renderArea.style.cssText = `position:fixed;left:-${A4_WIDTH_PX + 20}px;top:0;width:${A4_WIDTH_PX}px;z-index:-1;`;
 
     const opt = {
-      margin: [15, 15, 15, 15],
+      margin: [10, 10, 10, 10],
       filename: `${fileName}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg', quality: 0.95 },
       html2canvas: {
         scale: 2,
         useCORS: true,
         letterRendering: true,
         logging: false,
-        width: exportDiv.scrollWidth,
-        windowWidth: exportDiv.scrollWidth
+        width: A4_WIDTH_PX,
+        windowWidth: A4_WIDTH_PX,
+        scrollX: 0,
+        scrollY: 0,
       },
       jsPDF: {
         unit: 'mm',
         format: 'a4',
         orientation: 'portrait'
       },
-      pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'thead'] }
+      pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'thead', 'img'] }
     };
 
     App.toast('Đang tạo PDF...', 'info');
 
     html2pdf().set(opt).from(exportDiv).save().then(() => {
       // Cleanup
-      renderArea.style.position = 'absolute';
-      renderArea.style.left = '-9999px';
-      renderArea.style.top = '-9999px';
-      renderArea.style.opacity = '1';
+      renderArea.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
       renderArea.innerHTML = '';
-
       WordState.exportCount++;
       WordEditor.saveState();
       App.toast('File PDF đã được tải xuống!', 'success');
     }).catch(err => {
       console.error('PDF export error:', err);
-      renderArea.style.position = 'absolute';
-      renderArea.style.left = '-9999px';
-      renderArea.style.top = '-9999px';
+      renderArea.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
       renderArea.innerHTML = '';
       App.toast('Lỗi khi xuất PDF: ' + err.message, 'error');
     });
