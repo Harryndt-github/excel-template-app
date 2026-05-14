@@ -310,49 +310,199 @@ const WordEditor = {
       </div>`).join('');
   },
 
+  /* ── Helper: gom tất cả field keys từ mọi nguồn dữ liệu ── */
+  _getAllFieldKeys() {
+    const keys = new Set();
+    // 1) FILE_TYPES fixed fields
+    Object.entries(FILE_TYPES).forEach(([ftKey, cfg]) => {
+      (cfg.fields || []).forEach(f => keys.add(f));
+    });
+    // 2) MasterData entity fields
+    if (typeof MasterData !== 'undefined' && typeof MasterData.getMappingData === 'function') {
+      Object.keys(MasterData.getMappingData()).forEach(k => {
+        // Strip "[EntityName] " prefix to expose raw field name too
+        keys.add(k);
+        const bare = k.replace(/^\[[^\]]+\]\s*/, '');
+        if (bare) keys.add(bare);
+      });
+    }
+    // 3) RateCenter template data keys
+    if (typeof RateCenter !== 'undefined' && typeof RateCenter.getTemplateData === 'function') {
+      try {
+        const projects = RateCenter.getProjects ? RateCenter.getProjects() : [];
+        if (projects[0]) {
+          const policies = RateCenter.getProjectPolicies ? RateCenter.getProjectPolicies(projects[0].id) : [];
+          if (policies[0]) {
+            Object.keys(RateCenter.getTemplateData(projects[0].id, policies[0].id) || {}).forEach(k => keys.add(k));
+          }
+        }
+      } catch(e) {}
+    }
+    return Array.from(keys).sort((a, b) => a.localeCompare(b, 'vi'));
+  },
+
+  /* ── Helper: trả về danh sách {{placeholder}} đã scan từ DOCX gốc ── */
+  _getDocxPlaceholders(tpl) {
+    return Array.from(new Set(tpl.placeholders || []));
+  },
+
+  /* ── Render panel "Bảng chỉ tiêu" — redesigned ── */
   _renderManualFieldsPanel(tpl) {
     const fields = tpl.manualFields || [];
-    const rows = fields.length ? fields : [{ name: '', targetText: '', description: '' }];
+    const docxPhs = this._getDocxPlaceholders(tpl);  // {{...}} đã có sẵn trong DOCX
+    const allKeys = this._getAllFieldKeys();           // tất cả field keys từ master data
+    const rows = fields.length ? fields : [{ name: '', placeholder: '', description: '' }];
+
+    // datalist ID cho combo-box tên chỉ tiêu
+    const dlId = 'native-field-datalist';
+
+    // Nếu DOCX chưa có placeholder nào → hiển thị hint scan
+    const scanHint = docxPhs.length === 0
+      ? `<div style="margin:10px 14px;padding:10px 14px;border-radius:10px;background:rgba(245,158,11,0.08);
+              border:1px solid rgba(245,158,11,0.25);font-size:0.82rem;color:#92400e;">
+           ⚠️ File DOCX chưa có <code>{{placeholder}}</code> nào. Bạn có thể:<br>
+           &nbsp;• Chỉnh sửa file Word gốc → thêm <code>{{ten_khach_hang}}</code> → upload lại, <b>hoặc</b><br>
+           &nbsp;• Dùng cột "Target text" để thay trực tiếp đoạn text bất kỳ trong Word (chế độ dự phòng).
+         </div>`
+      : `<div style="margin:10px 14px 0;padding:8px 12px;border-radius:8px;background:rgba(16,185,129,0.07);
+              border:1px solid rgba(16,185,129,0.2);font-size:0.8rem;color:#065f46;">
+           ✅ Đã tìm thấy <b>${docxPhs.length}</b> placeholder trong DOCX: 
+           ${docxPhs.map(p => `<code style="background:rgba(16,185,129,0.12);padding:1px 6px;border-radius:4px;margin:0 2px;">{{${_wEsc(p)}}}</code>`).join(' ')}
+         </div>`;
+
     return `
+      <datalist id="${dlId}">
+        ${allKeys.map(k => `<option value="${_wEsc(k)}"></option>`).join('')}
+      </datalist>
+
       <div style="margin-top:18px;border:1px solid rgba(99,102,241,0.18);border-radius:14px;overflow:hidden;background:rgba(99,102,241,0.03);">
-        <div style="padding:12px 14px;border-bottom:1px solid rgba(99,102,241,0.14);">
-          <strong style="color:var(--text-primary);">Bảng chỉ tiêu cần điền</strong>
-          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">Khai báo chỉ tiêu và đoạn text trong Word cần thay. Khi xuất, hệ thống thay trực tiếp vào file .docx gốc.</div>
+        <div style="padding:12px 14px;border-bottom:1px solid rgba(99,102,241,0.14);display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <strong style="color:var(--text-primary);">🗂 Bảng chỉ tiêu → Placeholder mapping</strong>
+            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">
+              Chọn <b>Mã chỉ tiêu</b> từ Master Data &amp; gán vào <b>Placeholder</b> tương ứng trong file DOCX gốc.
+              Khi xuất, hệ thống tự động giữ nguyên toàn bộ định dạng và chỉ thay nội dung.
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline" style="font-size:0.8rem;white-space:nowrap;"
+            onclick="WordEditor.refreshManualFieldPanel()" title="Làm mới datalist từ Master Data">⟳ Làm mới nguồn</button>
         </div>
+        ${scanHint}
         <div style="overflow:auto;">
           <table class="mapping-table" style="margin:0;">
             <thead><tr>
-              <th style="width:24%;">Mã chỉ tiêu</th>
-              <th style="width:42%;">Đoạn text cần thay trong Word</th>
-              <th style="width:26%;">Ghi chú</th>
+              <th style="width:30%;">
+                Mã chỉ tiêu
+                <div style="font-size:0.72rem;font-weight:400;color:var(--text-muted);margin-top:2px;">Gõ hoặc chọn từ Master Data</div>
+              </th>
+              <th style="width:34%;">
+                Placeholder trong DOCX
+                <div style="font-size:0.72rem;font-weight:400;color:var(--text-muted);margin-top:2px;">{{...}} trong file Word gốc</div>
+              </th>
+              <th style="width:28%;">Ghi chú / Giá trị mặc định</th>
               <th style="width:8%;"></th>
             </tr></thead>
             <tbody id="native-manual-fields-body">
-              ${rows.map((field, idx) => this._manualFieldRowHtml(field, idx)).join('')}
+              ${rows.map((field, idx) => this._manualFieldRowHtml(field, idx, docxPhs, dlId)).join('')}
             </tbody>
           </table>
         </div>
-        <div style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;">
-          <button type="button" class="btn btn-outline" onclick="WordEditor.addManualFieldRow()">+ Thêm chỉ tiêu</button>
-          <span style="font-size:0.78rem;color:var(--text-muted);align-self:center;">Ví dụ: Mã chỉ tiêu <b>ten_khach_hang</b>, đoạn text cần thay <b>ÔNG / BÀ …………</b> hoặc <b>{{ten_khach_hang}}</b>.</span>
+        <div style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button type="button" class="btn btn-outline" onclick="WordEditor.addManualFieldRow()">+ Thêm dòng</button>
+          <span style="font-size:0.78rem;color:var(--text-muted);">
+            💡 Mã chỉ tiêu phải khớp với key trong Master Data / Excel nguồn. Placeholder phải khớp đúng <code>{{...}}</code> trong file Word.
+          </span>
         </div>
       </div>`;
   },
 
-  _manualFieldRowHtml(field, idx) {
+  _manualFieldRowHtml(field, idx, docxPhs, dlId) {
+    docxPhs = docxPhs || [];
+    dlId = dlId || 'native-field-datalist';
+    // Build placeholder options: ưu tiên placeholder đã scan từ DOCX, fallback = manual
+    const phOptions = [
+      `<option value="">-- Chọn placeholder --</option>`,
+      ...docxPhs.map(p =>
+        `<option value="${_wEsc(p)}" ${field.placeholder === p ? 'selected' : ''}>{{${_wEsc(p)}}}</option>`
+      ),
+      // Nếu giá trị hiện tại không nằm trong docxPhs, vẫn hiển thị
+      ...(field.placeholder && !docxPhs.includes(field.placeholder)
+        ? [`<option value="${_wEsc(field.placeholder)}" selected>{{${_wEsc(field.placeholder)}}} (thủ công)</option>`]
+        : [])
+    ].join('');
+
     return `
       <tr data-manual-field-row>
-        <td><input class="mapping-select native-field-name" value="${_wEsc(field.name || '')}" placeholder="ten_khach_hang"></td>
-        <td><input class="mapping-select native-field-target" value="${_wEsc(field.targetText || '')}" placeholder="Text/vùng dấu chấm trong Word cần thay"></td>
-        <td><input class="mapping-select native-field-desc" value="${_wEsc(field.description || '')}" placeholder="Tên khách hàng, ngày ký..."></td>
-        <td><button type="button" class="btn btn-outline" onclick="WordEditor.removeManualFieldRow(this)" title="Xóa">x</button></td>
+        <td>
+          <div style="position:relative;">
+            <input list="${dlId}" class="mapping-select native-field-name"
+              value="${_wEsc(field.name || '')}"
+              placeholder="VD: Họ tên bên vay 1"
+              autocomplete="off"
+              style="padding-right:28px;"
+              oninput="WordEditor._onFieldNameInput(this)">
+            <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:0.75rem;color:var(--text-muted);pointer-events:none;">▾</span>
+          </div>
+        </td>
+        <td>
+          ${docxPhs.length > 0
+            ? `<select class="mapping-select native-field-target">
+                 ${phOptions}
+               </select>`
+            : `<input class="mapping-select native-field-target"
+                 value="${_wEsc(field.placeholder || field.targetText || '')}"
+                 placeholder="{{ten_khach_hang}} hoặc đoạn text gốc"
+                 style="font-family:monospace;font-size:0.82rem;">`
+          }
+        </td>
+        <td>
+          <input class="mapping-select native-field-desc"
+            value="${_wEsc(field.description || '')}"
+            placeholder="Mô tả ngắn...">
+        </td>
+        <td>
+          <button type="button" class="btn btn-outline"
+            onclick="WordEditor.removeManualFieldRow(this)" title="Xóa">×</button>
+        </td>
       </tr>`;
+  },
+
+  /* Gợi ý tự động điền placeholder khi tên chỉ tiêu khớp với placeholder DOCX */
+  _onFieldNameInput(input) {
+    const row = input.closest('[data-manual-field-row]');
+    if (!row) return;
+    const targetSel = row.querySelector('.native-field-target');
+    if (!targetSel || targetSel.tagName !== 'SELECT') return;
+    const val = (input.value || '').trim().toLowerCase().replace(/\s+/g,'_');
+    // Tìm option khớp gần nhất
+    const opts = Array.from(targetSel.options);
+    const exact = opts.find(o => o.value.toLowerCase() === val);
+    const fuzzy = exact || opts.find(o => o.value.toLowerCase().includes(val) || val.includes(o.value.toLowerCase()));
+    if (fuzzy) targetSel.value = fuzzy.value;
+  },
+
+  /* Làm mới toàn bộ panel sau khi Master Data thay đổi */
+  refreshManualFieldPanel() {
+    const tpl = WordState.editingId ? WordState.templates.find(t => t.id === WordState.editingId) : null;
+    if (!tpl || !tpl.nativeDocx) return;
+    // Thu thập dữ liệu hiện tại trước khi render lại
+    const currentFields = this.collectManualFields();
+    tpl.manualFields = currentFields;
+    const editor = document.getElementById('word-editor-area');
+    if (editor) {
+      const noticeHtml = editor.querySelector('div[style*="orange"], div[style*="f59e0b"]');
+      const noticeStr = noticeHtml ? noticeHtml.outerHTML : '';
+      editor.innerHTML = noticeStr + this._renderManualFieldsPanel(tpl);
+    }
+    App.toast('Đã làm mới nguồn dữ liệu', 'success');
   },
 
   addManualFieldRow() {
     const body = document.getElementById('native-manual-fields-body');
     if (!body) return;
-    body.insertAdjacentHTML('beforeend', this._manualFieldRowHtml({}, body.querySelectorAll('tr').length));
+    const tpl = WordState.editingId ? WordState.templates.find(t => t.id === WordState.editingId) : null;
+    const docxPhs = tpl ? this._getDocxPlaceholders(tpl) : [];
+    body.insertAdjacentHTML('beforeend', this._manualFieldRowHtml({}, body.querySelectorAll('tr').length, docxPhs));
   },
 
   removeManualFieldRow(button) {
@@ -361,11 +511,20 @@ const WordEditor = {
   },
 
   collectManualFields() {
-    return Array.from(document.querySelectorAll('#native-manual-fields-body [data-manual-field-row]')).map(row => ({
-      name: (row.querySelector('.native-field-name')?.value || '').trim(),
-      targetText: (row.querySelector('.native-field-target')?.value || '').trim(),
-      description: (row.querySelector('.native-field-desc')?.value || '').trim()
-    })).filter(field => field.name || field.targetText || field.description);
+    return Array.from(document.querySelectorAll('#native-manual-fields-body [data-manual-field-row]')).map(row => {
+      const nameInput  = row.querySelector('.native-field-name');
+      const targetEl   = row.querySelector('.native-field-target'); // may be <select> or <input>
+      const descInput  = row.querySelector('.native-field-desc');
+      const name        = (nameInput?.value  || '').trim();
+      const targetRaw   = (targetEl?.value   || '').trim();
+      const description = (descInput?.value  || '').trim();
+      // Normalize: nếu chứa {{...}} giữ nguyên, nếu không thêm vào để tạo placeholder token
+      const placeholder = targetRaw.startsWith('{{') ? targetRaw.replace(/^\{\{|\}\}$/g,'') : targetRaw;
+      // Để tương thích ngược với DocxEngine.replaceDirectTextInXml, targetText = "{{placeholder}}"
+      // Khi placeholder rỗng (fallback mode) → targetText = chuỗi text gốc người dùng nhập
+      const targetText  = placeholder ? '' : targetRaw; // '' = dùng placeholder mode
+      return { name, placeholder, targetText, description };
+    }).filter(field => field.name || field.placeholder || field.targetText);
   },
 
   /* ── Save ── */
@@ -382,7 +541,13 @@ const WordEditor = {
     const manualFields = isNativeDocx ? this.collectManualFields() : [];
     const content = isNativeDocx ? existingTpl.content : (editor ? editor.innerHTML : '');
     const placeholders = isNativeDocx
-      ? Array.from(new Set([...(existingTpl.placeholders || []), ...manualFields.map(f => f.name).filter(Boolean)]))
+      ? Array.from(new Set([
+          ...(existingTpl.placeholders || []),
+          // placeholder mode: mã chỉ tiêu ánh xạ vào {{placeholder}}
+          ...manualFields.map(f => f.placeholder).filter(Boolean),
+          // fallback mode: vẫn giữ name để backward compat
+          ...manualFields.map(f => f.name).filter(Boolean)
+        ]))
       : this.getPlaceholders();
     const originalDocxBase64 = WordState.currentOriginalDocxBase64 || '';
     const now = new Date().toISOString();
@@ -1110,25 +1275,36 @@ const WordGenerator = {
   preview() {
     const tpl = WordState.templates.find(t => t.id === WordState.selectedTemplateId);
     if (!tpl) return;
-    const replacements = this._collectReplacements(tpl);
+    const baseReplacements = this._collectReplacements(tpl);
+    const replacements = this._buildNativeReplacementsFromManual(tpl, baseReplacements);
     if (tpl.nativeDocx) {
       const directReplacements = this._collectDirectReplacements(tpl);
       const rows = (tpl.manualFields || []).map(field => {
-        const value = replacements[field.name] || '';
+        // Ưu tiên giá trị từ placeholder mode, sau đó từ name trực tiếp
+        const val = replacements[field.placeholder] || replacements[field.name] || '';
         const direct = directReplacements.find(item => item.field === field.name);
+        const mode = field.placeholder
+          ? `<code style="font-size:0.78rem;color:#6366f1;">{{${_wEsc(field.placeholder)}}}</code>`
+          : field.targetText
+            ? `<span style="font-size:0.78rem;color:#f59e0b;" title="Fallback: thay trực tiếp text">✂ "${_wEsc((field.targetText||'').substring(0,30))}"</span>`
+            : '<span style="color:#9ca3af;font-size:0.78rem;">Chưa map</span>';
+        const status = (val || direct?.value)
+          ? `<span style="color:#10b981;font-weight:600;">✓</span>`
+          : `<span style="color:#ef4444;">✗ Chưa có giá trị</span>`;
         return `<tr>
-          <td>{{${_wEsc(field.name || '')}}}</td>
-          <td>${_wEsc(field.targetText || '(chưa khai báo đoạn text cần thay)')}</td>
-          <td>${_wEsc(value || direct?.value || '')}</td>
+          <td><b>${_wEsc(field.name || '')}</b></td>
+          <td>${mode}</td>
+          <td>${_wEsc(val || direct?.value || '')} ${status}</td>
         </tr>`;
       }).join('');
       document.getElementById('word-preview').innerHTML = `
         <div style="padding:18px;border:1px solid rgba(16,185,129,0.24);border-radius:12px;background:rgba(16,185,129,0.05);margin-bottom:16px;">
           <strong>Preview mapping DOCX native</strong><br>
           Đây là bản kiểm tra mapping. File Word thật sẽ được điền trực tiếp vào .docx gốc khi bấm <b>Xuất Word</b>.
+          Định dạng gốc (font, màu sắc, bảng biểu, căn lề) được <b>giữ nguyên 100%</b>.
         </div>
         <table>
-          <thead><tr><th>Chỉ tiêu</th><th>Đoạn text trong Word</th><th>Giá trị sẽ điền</th></tr></thead>
+          <thead><tr><th>Mã chỉ tiêu</th><th>Placeholder / Target DOCX</th><th>Giá trị sẽ điền</th></tr></thead>
           <tbody>${rows || '<tr><td colspan="3">Chưa có chỉ tiêu cần điền</td></tr>'}</tbody>
         </table>`;
       this.goToStep(4);
@@ -1174,18 +1350,46 @@ const WordGenerator = {
 
   _collectDirectReplacements(tpl) {
     const fields = tpl.manualFields || [];
-    return fields.map(field => {
-      if (!field.name || !field.targetText) return null;
+    const results = [];
+    fields.forEach(field => {
+      if (!field.name) return;
+      // Resolve giá trị từ mapping UI
       const sel = document.getElementById(`wmap-${_wSanId(field.name)}`);
-      if (!sel || !sel.value) return null;
+      if (!sel || !sel.value) return;
       const resolvedValue = this._resolveMappingValue(sel.value);
-      if (resolvedValue === undefined) return null;
-      return {
-        field: field.name,
-        targetText: field.targetText,
-        value: String(resolvedValue)
-      };
-    }).filter(Boolean);
+      if (resolvedValue === undefined) return;
+      const val = String(resolvedValue);
+
+      if (field.placeholder) {
+        // Mode 1: placeholder mode — {{placeholder}} đã có sẵn trong DOCX
+        // DocxEngine.replacePlaceholdersInXml xử lý via `replacements` object, không cần directReplacements
+        // (không push vào results, đã được hòa tan vào replacements qua buildNativeReplacementsFromManual)
+      } else if (field.targetText) {
+        // Mode 2: fallback — thay trực tiếp đoạn text trong DOCX
+        results.push({
+          field: field.name,
+          targetText: field.targetText,
+          value: val
+        });
+      }
+    });
+    return results;
+  },
+
+  /* Build replacements object từ manualFields placeholder mode để merge vào replacements chính */
+  _buildNativeReplacementsFromManual(tpl, baseReplacements) {
+    const merged = Object.assign({}, baseReplacements);
+    const fields = tpl.manualFields || [];
+    fields.forEach(field => {
+      if (!field.placeholder || !field.name) return;
+      const sel = document.getElementById(`wmap-${_wSanId(field.name)}`);
+      if (!sel || !sel.value) return;
+      const resolvedValue = this._resolveMappingValue(sel.value);
+      if (resolvedValue === undefined) return;
+      // Map: {{placeholder}} -> resolved value
+      merged[field.placeholder] = String(resolvedValue);
+    });
+    return merged;
   },
 
   _base64ToArrayBuffer(base64) {
@@ -1262,7 +1466,9 @@ const WordGenerator = {
         App.toast('DocxEngine chưa được tải. Kiểm tra js/docx-engine.js', 'error');
         return;
       }
-      const replacements = this._collectReplacements(tpl);
+      // Merge: {{placeholder}} từ bảng chỉ tiêu (placeholder mode) vào replacements chính
+      const baseReplacements = this._collectReplacements(tpl);
+      const replacements = this._buildNativeReplacementsFromManual(tpl, baseReplacements);
       try {
         const hasOriginal = await DocxEngine.hasOriginalDocx(tpl.id);
         if (!hasOriginal) {
@@ -1270,6 +1476,7 @@ const WordGenerator = {
           return;
         }
         App.toast('Đang xuất Word từ file .docx gốc...', 'info');
+        // directReplacements: fallback mode — thay đoạn text tùy ý (khi DOCX không có {{placeholder}})
         const directReplacements = this._collectDirectReplacements(tpl);
         const blob = await DocxEngine.exportDocx(tpl.id, replacements, {}, directReplacements);
         const fileName = (tpl.name || 'word-template').replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() || 'document';
