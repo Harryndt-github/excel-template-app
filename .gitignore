@@ -1,4 +1,5 @@
 .DS_Store
+js/config.js
 *.log
 node_modules/
 .env

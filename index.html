@@ -132,9 +132,6 @@
       <div class="top-nav-profile">
         <div class="uat-sync-toolbar" style="display:flex;align-items:center;gap:8px;margin-right:12px;flex-wrap:wrap;">
           <span id="uat-sync-status" style="padding:6px 10px;border-radius:999px;background:rgba(245,158,11,0.14);color:#f59e0b;font-size:0.74rem;font-weight:700;">Local only</span>
-          <button class="btn btn-outline" style="padding:7px 10px;font-size:0.78rem;" onclick="UatStorage.saveConfig()">Cấu hình cloud</button>
-          <button class="btn btn-outline" style="padding:7px 10px;font-size:0.78rem;" onclick="UatStorage.pullAll()">Kéo cloud</button>
-          <button class="btn btn-primary" style="padding:7px 10px;font-size:0.78rem;" onclick="UatStorage.pushAll('manual')">Đẩy cloud</button>
         </div>
         <button class="nav-icon-btn">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1662,6 +1659,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Local scripts: version hash updated on each deploy to bust browser cache -->
   <script>window.APP_VERSION = '20260514_uat_sync';</script>
+  <script src="js/config.js"></script>
   <script src="js/uat-storage.js?v=20260514_uat_sync"></script>
   <script src="js/docx-engine.js?v=20260514_uat_sync"></script>
   <script src="js/spreadsheet.js?v=20260514_uat_sync"></script>

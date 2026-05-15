@@ -51,34 +51,26 @@ const UatStorage = {
     return true;
   },
 
-  saveConfig() {
-    const url = prompt('Supabase URL', this.url || '');
-    if (url === null) return;
-    const key = prompt('Supabase publishable/anon key', this.key || '');
-    if (key === null) return;
-    const scope = prompt('Workspace/UAT scope', this.scope || 'default');
-    if (scope === null) return;
-    const bucket = prompt('Storage bucket for DOCX templates', this.bucket || 'uat-templates');
-    if (bucket === null) return;
-
+  // Credentials được cấu hình bởi Dev trong js/config.js — không expose cho user.
+  // Các hàm dưới chỉ dùng nội bộ / debug qua console nếu cần.
+  _devSetConfig(url, key, scope, bucket) {
     const cfg = {
-      url: url.trim(),
-      key: key.trim(),
-      scope: (scope.trim() || 'default'),
-      bucket: (bucket.trim() || 'uat-templates'),
+      url: (url || '').trim(),
+      key: (key || '').trim(),
+      scope: (scope || 'default').trim(),
+      bucket: (bucket || 'uat-templates').trim(),
     };
     localStorage.setItem(this.configKey, JSON.stringify(cfg));
     this.loadConfig();
     this.renderStatus();
-    this.toast(this.client ? 'Đã cấu hình Supabase UAT Sync' : 'Chưa thể kết nối Supabase. Kiểm tra URL/key và thư viện.', this.client ? 'success' : 'warning');
+    console.info('[UatStorage] Config updated:', cfg.url, '| scope:', cfg.scope);
   },
 
-  clearConfig() {
-    if (!confirm('Xóa cấu hình Supabase trên trình duyệt này? Dữ liệu trên Supabase không bị xóa.')) return;
+  _devClearConfig() {
     localStorage.removeItem(this.configKey);
     this.loadConfig();
     this.renderStatus();
-    this.toast('Đã chuyển về chế độ local only', 'info');
+    console.info('[UatStorage] Cleared — local only mode');
   },
 
   toast(message, type) {
