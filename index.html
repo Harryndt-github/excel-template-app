@@ -966,7 +966,7 @@
       <div class="page-header">
         <div>
           <h2 class="page-title">Master Data</h2>
-          <p class="page-subtitle">Quản lý dữ liệu tổng thể & mối quan hệ giữa các loại dữ liệu</p>
+          <p class="page-subtitle">Quản lý chỉ tiêu &amp; ánh xạ dữ liệu Excel → Template hợp đồng</p>
         </div>
       </div>
 
@@ -1025,19 +1025,19 @@
               <!-- Panel 1: Entity -->
               <div class="md-cfg-panel md-cfg-entities">
                 <div class="md-cfg-panel-hd">
-                  <div class="md-cfg-panel-label"><span class="md-cfg-num">1</span> Entity</div>
+                  <div class="md-cfg-panel-label"><span class="md-cfg-num">1</span> Nhóm chỉ tiêu</div>
                   <button class="md-cfg-add-btn" onclick="MasterData.showAddEntity()">＋ Thêm</button>
                 </div>
-                <p class="md-cfg-hint">Khai báo loại dữ liệu (VD: Khách hàng, Hợp đồng…)</p>
+                <p class="md-cfg-hint">Nhóm chỉ tiêu tương ứng 1 sheet Excel (VD: Thông tin vay, Tài sản…)</p>
                 <div class="md-cfg-entity-list" id="md-cfg-entity-list"></div>
               </div>
               <!-- Panel 2: Columns -->
               <div class="md-cfg-panel md-cfg-columns">
                 <div class="md-cfg-panel-hd">
                   <div class="md-cfg-panel-label"><span class="md-cfg-num">2</span><span id="md-cfg-col-title">Cột dữ liệu</span></div>
-                  <button class="md-cfg-add-btn" id="md-cfg-add-col-btn" onclick="MasterData.cfgAddColumn()" style="display:none;">＋ Cột</button>
+                  <button class="md-cfg-add-btn" id="md-cfg-add-col-btn" onclick="MasterData.cfgAddColumn()" style="display:none;">＋ Chỉ tiêu</button>
                 </div>
-                <p class="md-cfg-hint" id="md-cfg-col-hint">← Chọn Entity để cấu hình các cột</p>
+                <p class="md-cfg-hint" id="md-cfg-col-hint">← Chọn nhóm chỉ tiêu để cấu hình</p>
                 <div id="md-cfg-columns-list"></div>
               </div>
               <!-- Panel 3: Data -->
@@ -1052,6 +1052,9 @@
                     <button class="md-cfg-add-btn" onclick="MdImport.downloadEntityTemplate(MasterDataState.selectedEntity)"
                       style="background:rgba(6,182,212,0.1);border-color:rgba(6,182,212,0.3);color:#06b6d4;"
                       title="Tải template XLSX mẫu">⬇ Template</button>
+                    <button class="md-cfg-add-btn" onclick="MasterData.autoPopulateFromExcel(MasterDataState.selectedEntity)"
+                      style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.3);color:#f59e0b;"
+                      title="Tự động điền dữ liệu từ file Excel đã upload tại trang Tạo tài liệu">⚡ Auto-fill Excel</button>
                   </div>
                 </div>
                 <p class="md-cfg-hint" id="md-cfg-data-hint">← Chọn Entity và cấu hình cột trước</p>
@@ -1553,15 +1556,23 @@
   <div class="md-modal-overlay" id="modal-entity">
     <div class="md-modal">
       <div class="md-modal-header">
-        <h3 id="entity-modal-title">Thêm Entity mới</h3>
+        <h3 id="entity-modal-title">Thêm Nhóm chỉ tiêu mới</h3>
         <button class="md-modal-close" onclick="MasterData.closeEntityModal()">✕</button>
       </div>
       <div class="md-modal-body">
         <input type="hidden" id="entity-modal-id" value="">
 
         <div class="md-form-group">
-          <label class="md-form-label">Tên Entity</label>
-          <input type="text" class="input" id="entity-name-input" placeholder="VD: Khách hàng, Tài sản, Khoản vay...">
+          <label class="md-form-label">Tên nhóm chỉ tiêu</label>
+          <input type="text" class="input" id="entity-name-input" placeholder="VD: Thông tin vay, Tài sản, Chủ tài sản...">
+        </div>
+
+        <div class="md-form-group">
+          <label class="md-form-label">Sheet Excel nguồn</label>
+          <select class="input" id="entity-sheet-key-input">
+            <option value="">-- Không liên kết sheet --</option>
+          </select>
+          <p style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">Chọn sheet Excel tương ứng để hệ thống tự gợi ý tên cột và auto-fill dữ liệu.</p>
         </div>
 
         <div class="md-form-group">
@@ -1591,7 +1602,7 @@
       </div>
       <div class="md-modal-footer">
         <button class="btn btn-outline" onclick="MasterData.closeEntityModal()">Hủy</button>
-        <button class="btn btn-primary" onclick="MasterData.saveEntity()">💾 Lưu Entity</button>
+        <button class="btn btn-primary" onclick="MasterData.saveEntity()">💾 Lưu nhóm chỉ tiêu</button>
       </div>
     </div>
   </div>

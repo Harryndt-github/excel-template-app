@@ -91,10 +91,12 @@ const MasterData = {
         key: key,
         name: cfg.label,
         color: ENTITY_COLORS[idx % ENTITY_COLORS.length],
+        sourceSheetKey: key,
         fields: uniqueFields.slice(0, 20).map(f => ({
           id: _mdId(),
           name: f,
-          type: 'text'
+          type: 'text',
+          excelColumn: f
         })),
         x: pos.x,
         y: pos.y
@@ -1031,10 +1033,14 @@ const MasterData = {
     const entity = entityId ? MasterDataState.entities.find(e => e.id === entityId) : null;
     const isEdit = !!entity;
 
-    document.getElementById('entity-modal-title').textContent = isEdit ? 'Chỉnh sửa Entity' : 'Thêm Entity mới';
+    document.getElementById('entity-modal-title').textContent = isEdit ? 'Chỉnh sửa nhóm chỉ tiêu' : 'Thêm Nhóm chỉ tiêu mới';
     document.getElementById('entity-name-input').value = entity ? entity.name : '';
     document.getElementById('entity-color-input').value = entity ? entity.color : ENTITY_COLORS[MasterDataState.entities.length % ENTITY_COLORS.length];
     document.getElementById('entity-modal-id').value = entityId || '';
+    const sheetKeySelect = document.getElementById('entity-sheet-key-input');
+    if (sheetKeySelect) {
+      sheetKeySelect.innerHTML = MasterData._getSheetOptions(entity ? (entity.sourceSheetKey || entity.key || '') : '');
+    }
 
     // Render fields editor
     const fieldsContainer = document.getElementById('entity-fields-editor');
@@ -1089,6 +1095,7 @@ const MasterData = {
 
     const color = document.getElementById('entity-color-input').value;
     const entityId = document.getElementById('entity-modal-id').value;
+    const sourceSheetKey = (document.getElementById('entity-sheet-key-input') || {}).value || '';
 
     // Collect fields
     const fields = [];
@@ -1107,6 +1114,7 @@ const MasterData = {
       if (ent) {
         ent.name = name;
         ent.color = color;
+        ent.sourceSheetKey = sourceSheetKey;
         ent.fields = fields;
         App.toast('Đã cập nhật entity!', 'success');
       }
@@ -1116,6 +1124,7 @@ const MasterData = {
         id: _mdId(),
         name,
         color,
+        sourceSheetKey,
         fields,
         x: 200 + Math.random() * 600,
         y: 100 + Math.random() * 400
@@ -1527,31 +1536,60 @@ Object.assign(MasterData, {
     if (!listEl) return;
 
     if (!ent) {
-      if (titleEl) titleEl.textContent = 'Cột dữ liệu';
-      if (hintEl)  hintEl.textContent  = '← Chọn Entity để cấu hình các cột';
+      if (titleEl) titleEl.textContent = 'Chỉ tiêu & Ánh xạ';
+      if (hintEl)  hintEl.textContent  = '← Chọn nhóm chỉ tiêu để cấu hình';
       if (addBtn)  addBtn.style.display = 'none';
       listEl.innerHTML = '';
       return;
     }
     if (titleEl) titleEl.textContent = ent.name;
-    if (hintEl)  hintEl.textContent  = `Định nghĩa các cột dữ liệu cho "${ent.name}"`;
+    if (hintEl)  hintEl.textContent  = '';
     if (addBtn)  addBtn.style.display = '';
 
+    const sheetKey = ent.sourceSheetKey || ent.key || '';
+    const sheetColumns = (sheetKey && typeof FILE_TYPES !== 'undefined' && FILE_TYPES[sheetKey])
+      ? (FILE_TYPES[sheetKey].fields || []) : [];
+    const datalistId = `md-excol-dl-${entityId}`;
+
     const icons = {text:'Aa',number:'#',date:'📅',select:'▼',currency:'₫',percent:'%',phone:'☎',email:'@'};
-    listEl.innerHTML = ent.fields.map((f, i) => `
+
+    const sheetBar = `<div class="md-col-sheet-bar">
+      <span class="md-col-sheet-label">📑 Sheet nguồn:</span>
+      <select class="md-col-sheet-sel" onchange="MasterData.cfgSetSheetKey('${entityId}',this.value)">
+        ${MasterData._getSheetOptions(sheetKey)}
+      </select>
+      ${sheetKey ? `<span class="md-col-sheet-count">${sheetColumns.length} cột</span>` : ''}
+    </div>
+    <div class="md-col-header-row">
+      <span style="width:59px;flex-shrink:0;"></span>
+      <span style="flex:1;font-size:0.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;">Tên chỉ tiêu</span>
+      <span style="width:86px;flex-shrink:0;font-size:0.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;text-align:center;">Kiểu</span>
+      <span style="font-size:0.66rem;color:rgba(16,185,129,0.7);text-transform:uppercase;letter-spacing:0.3px;">Cột Excel</span>
+      <span style="width:22px;flex-shrink:0;"></span>
+    </div>`;
+
+    listEl.innerHTML = sheetBar +
+      ent.fields.map((f, i) => `
       <div class="md-col-row" data-field-id="${f.id}" data-entity-id="${entityId}">
         <span class="md-col-drag">⠿</span>
         <span class="md-col-type-badge">${icons[f.type]||'Aa'}</span>
-        <input class="md-col-name-in" value="${_mdEsc(f.name)}" placeholder="Tên cột…"
-          onchange="MasterData.cfgUpdateField('${entityId}','${f.id}','name',this.value)"
-          onblur="MasterData.cfgRenderData('${entityId}')">
+        <div class="md-col-name-wrap">
+          <input class="md-col-name-in" value="${_mdEsc(f.name)}" placeholder="Tên chỉ tiêu…"
+            onchange="MasterData.cfgUpdateField('${entityId}','${f.id}','name',this.value)"
+            onblur="MasterData.cfgRenderData('${entityId}')">
+          <input class="md-col-excol-in" value="${_mdEsc(f.excelColumn||f.name||'')}"
+            placeholder="↳ cột Excel…" list="${datalistId}"
+            title="Tên cột trong file Excel để đọc giá trị cho chỉ tiêu này"
+            onchange="MasterData.cfgUpdateField('${entityId}','${f.id}','excelColumn',this.value)">
+        </div>
         <select class="md-col-type-sel"
           onchange="MasterData.cfgUpdateField('${entityId}','${f.id}','type',this.value);MasterData.cfgRenderColumns('${entityId}')">
           ${FIELD_TYPES.map(t=>`<option value="${t.value}"${f.type===t.value?' selected':''}>${t.label}</option>`).join('')}
         </select>
-        <button class="md-col-del" onclick="MasterData.cfgRemoveField('${entityId}','${f.id}')" title="Xóa cột">✕</button>
+        <button class="md-col-del" onclick="MasterData.cfgRemoveField('${entityId}','${f.id}')" title="Xóa chỉ tiêu">✕</button>
       </div>`).join('') +
-      `<div class="md-col-add-row" onclick="MasterData.cfgAddColumn()">＋ Thêm cột mới</div>`;
+      `<datalist id="${datalistId}">${sheetColumns.map(c=>`<option value="${_mdEsc(c)}">`).join('')}</datalist>` +
+      `<div class="md-col-add-row" onclick="MasterData.cfgAddColumn()">＋ Thêm chỉ tiêu mới</div>`;
   },
 
   cfgUpdateField(entityId, fieldId, key, val) {
@@ -1575,7 +1613,7 @@ Object.assign(MasterData, {
     const entityId = MasterDataState.selectedEntity;
     const ent = MasterDataState.entities.find(e => e.id === entityId);
     if (!ent) { App.toast('Chọn Entity trước', 'warning'); return; }
-    ent.fields.push({ id: _mdId(), name: '', type: 'text' });
+    ent.fields.push({ id: _mdId(), name: '', type: 'text', excelColumn: '' });
     this.saveState();
     this.cfgRenderColumns(entityId);
     // focus last input
@@ -1701,18 +1739,96 @@ Object.assign(MasterData, {
    */
   getMappingData() {
     const result = {};
+    const extractedData = (typeof AppState !== 'undefined' && AppState.extractedData) ? AppState.extractedData : null;
     MasterDataState.entities.forEach(ent => {
       const recs = MasterDataState.records[ent.id] || [];
       const selIdx = (MasterDataState.selectedEntity === ent.id && MasterDataState.selectedRecord != null)
         ? MasterDataState.selectedRecord : 0;
       const rec = recs[selIdx];
-      if (!rec) return;
+      const sheetKey = ent.sourceSheetKey || ent.key || '';
+      const sheetData = extractedData && sheetKey ? extractedData[sheetKey] : null;
+
       (ent.fields || []).forEach(f => {
         const key = `[${ent.name}] ${f.name || f.label || f.id}`;
-        result[key] = rec[f.id] !== undefined ? rec[f.id] : '';
+        let value = rec ? (rec[f.id] !== undefined ? rec[f.id] : '') : '';
+        if ((!value || value === '') && sheetData) {
+          const col = f.excelColumn || f.name;
+          const extracted = col ? sheetData[col] : null;
+          if (extracted !== undefined && extracted !== null && String(extracted).trim() !== '') {
+            value = String(extracted);
+          }
+        }
+        result[key] = value;
       });
     });
     return result;
+  },
+
+  _getSheetOptions(selectedKey) {
+    const blank = `<option value="">-- Không liên kết --</option>`;
+    if (typeof FILE_TYPES === 'undefined') return blank;
+    return blank + Object.keys(FILE_TYPES).map(key => {
+      const cfg = FILE_TYPES[key];
+      return `<option value="${key}"${key === selectedKey ? ' selected' : ''}>${_mdEsc(cfg.label)}</option>`;
+    }).join('');
+  },
+
+  cfgSetSheetKey(entityId, sheetKey) {
+    const ent = MasterDataState.entities.find(e => e.id === entityId);
+    if (!ent) return;
+    ent.sourceSheetKey = sheetKey;
+    if (sheetKey && typeof FILE_TYPES !== 'undefined' && FILE_TYPES[sheetKey]) {
+      const cols = FILE_TYPES[sheetKey].fields || [];
+      ent.fields.forEach(f => {
+        if (!f.excelColumn) {
+          const match = cols.find(c => c.toLowerCase() === (f.name || '').toLowerCase());
+          if (match) f.excelColumn = match;
+        }
+      });
+    }
+    this.saveState();
+    this.cfgRenderColumns(entityId);
+  },
+
+  autoPopulateFromExcel(entityId) {
+    const ent = MasterDataState.entities.find(e => e.id === entityId);
+    if (!ent) return;
+    const sheetKey = ent.sourceSheetKey || ent.key || '';
+    if (!sheetKey) {
+      if (typeof App !== 'undefined') App.toast('Nhóm chỉ tiêu này chưa có sheet nguồn. Hãy chọn sheet nguồn trước.', 'warning');
+      return;
+    }
+    const extractedData = (typeof AppState !== 'undefined' && AppState.extractedData) ? AppState.extractedData : null;
+    const sheetData = extractedData ? extractedData[sheetKey] : null;
+    if (!sheetData) {
+      const sheetLabel = (typeof FILE_TYPES !== 'undefined' && FILE_TYPES[sheetKey]) ? FILE_TYPES[sheetKey].label : sheetKey;
+      if (typeof App !== 'undefined') App.toast(`Chưa upload file Excel có sheet "${sheetLabel}". Hãy upload file tại trang Tạo tài liệu trước.`, 'warning');
+      return;
+    }
+    if (!MasterDataState.records[entityId]) MasterDataState.records[entityId] = [];
+    const selIdx = MasterDataState.selectedRecord || 0;
+    if (!MasterDataState.records[entityId][selIdx]) {
+      const rec = {};
+      ent.fields.forEach(f => { rec[f.id] = ''; });
+      MasterDataState.records[entityId].push(rec);
+    }
+    const rec = MasterDataState.records[entityId][selIdx];
+    let filled = 0;
+    ent.fields.forEach(f => {
+      const col = f.excelColumn || f.name;
+      if (col && sheetData[col] !== undefined && sheetData[col] !== null && String(sheetData[col]).trim() !== '') {
+        rec[f.id] = String(sheetData[col]);
+        filled++;
+      }
+    });
+    if (filled > 0) {
+      this.saveState();
+      this.cfgRenderData(entityId);
+      const sheetLabel = (typeof FILE_TYPES !== 'undefined' && FILE_TYPES[sheetKey]) ? FILE_TYPES[sheetKey].label : sheetKey;
+      if (typeof App !== 'undefined') App.toast(`Đã điền ${filled} chỉ tiêu từ Excel (sheet: ${sheetLabel})`, 'success');
+    } else {
+      if (typeof App !== 'undefined') App.toast('Không tìm thấy dữ liệu khớp trong file Excel đã upload.', 'warning');
+    }
   },
 
   /**
