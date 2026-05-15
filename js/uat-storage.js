@@ -17,6 +17,13 @@ const UatStorage = {
   init() {
     this.loadConfig();
     this.renderStatus();
+    // Tự động kéo dữ liệu từ Supabase khi mở trang nếu đã có credentials
+    if (this.client) {
+      this.pullAll().catch(err => {
+        console.warn('Auto pull on init failed:', err);
+        this.toast('Không thể tự đồng bộ từ Supabase: ' + err.message, 'warning');
+      });
+    }
   },
 
   loadConfig() {
