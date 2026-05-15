@@ -1,5 +1,5 @@
 [build]
-  command = "printf 'window.UAT_SUPABASE_CONFIG = {\\n  url: \"%s\",\\n  key: \"%s\",\\n  scope: \"uat\",\\n  bucket: \"uat-templates\"\\n};\\n' \"$SUPABASE_URL\" \"$SUPABASE_KEY\" > js/config.js"
+  command = "printf 'window.UAT_SUPABASE_CONFIG = {\\n  url: \"%s\",\\n  key: \"%s\",\\n  scope: \"uat\",\\n  bucket: \"uat-templates\"\\n};\\n' \"$VITE_SUPABASE_URL\" \"$SUPABASE_KEY\" > js/config.js"
   publish = "."
 
 [[headers]]
