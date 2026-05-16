@@ -17,12 +17,14 @@ const UatStorage = {
   init() {
     this.loadConfig();
     this.renderStatus();
-    // Tự động kéo dữ liệu từ Supabase khi mở trang nếu đã có credentials
+    // Delay pull so all other DOMContentLoaded modules (App, MasterData, WordEditor) finish init first
     if (this.client) {
-      this.pullAll().catch(err => {
-        console.warn('Auto pull on init failed:', err);
-        this.toast('Không thể tự đồng bộ từ Supabase: ' + err.message, 'warning');
-      });
+      setTimeout(() => {
+        this.pullAll().catch(err => {
+          console.warn('Auto pull on init failed:', err);
+          this.toast('Không thể tự đồng bộ từ Supabase: ' + err.message, 'warning');
+        });
+      }, 300);
     }
   },
 
