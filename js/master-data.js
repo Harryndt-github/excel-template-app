@@ -59,14 +59,56 @@ const MasterData = {
   },
 
   saveState(shouldSync = true) {
+    const payload = {
+      entities: MasterDataState.entities,
+      connections: MasterDataState.connections,
+      records: MasterDataState.records
+    };
+    // localStorage làm cache offline — ghi ngay, không chờ network
     try {
-      localStorage.setItem('excelmapper_masterdata', JSON.stringify({
-        entities: MasterDataState.entities,
-        connections: MasterDataState.connections,
-        records: MasterDataState.records
-      }));
-    } catch (e) { console.error('MasterData save error:', e); }
-    if (shouldSync && typeof UatStorage !== 'undefined') UatStorage.queueSync('master_data');
+      localStorage.setItem('excelmapper_masterdata', JSON.stringify(payload));
+    } catch (e) { console.error('MasterData localStorage error:', e); }
+    // Backend là primary store — debounce 600 ms để gộp các thay đổi liên tiếp
+    if (shouldSync) this._schedulePush(payload);
+  },
+
+  _pushTimer: null,
+  _indicatorTimer: null,
+
+  _schedulePush(payload) {
+    clearTimeout(this._pushTimer);
+    this._pushTimer = setTimeout(() => this._pushToBackend(payload), 600);
+  },
+
+  async _pushToBackend(payload) {
+    if (typeof UatStorage === 'undefined' || !UatStorage.client) return;
+    this._setSavingIndicator('saving');
+    try {
+      await UatStorage.upsertState('master_data', payload);
+      this._setSavingIndicator('ok');
+    } catch (err) {
+      console.error('MasterData backend save error:', err);
+      this._setSavingIndicator('error');
+      const detail = err.message || (err.code ? `code=${err.code}` : JSON.stringify(err));
+      if (typeof App !== 'undefined') App.toast('Lỗi Supabase: ' + detail, 'error');
+    }
+  },
+
+  _setSavingIndicator(state) {
+    const el = document.getElementById('md-save-status');
+    if (!el) return;
+    clearTimeout(this._indicatorTimer);
+    if (state === 'saving') {
+      el.textContent = '⏳ Đang lưu…';
+      el.style.color = 'var(--text-muted, #888)';
+    } else if (state === 'ok') {
+      el.textContent = '✓ Đã lưu lên server';
+      el.style.color = '#10b981';
+      this._indicatorTimer = setTimeout(() => { if (el) el.textContent = ''; }, 2500);
+    } else {
+      el.textContent = '⚠ Lỗi lưu';
+      el.style.color = '#ef4444';
+    }
   },
 
   // ── Auto-create entities from FILE_TYPES (one-time seed) ──
@@ -92,7 +134,7 @@ const MasterData = {
         name: cfg.label,
         color: ENTITY_COLORS[idx % ENTITY_COLORS.length],
         sourceSheetKey: key,
-        fields: uniqueFields.slice(0, 20).map(f => ({
+        fields: uniqueFields.map(f => ({
           id: _mdId(),
           name: f,
           type: 'text',
