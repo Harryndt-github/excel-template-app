@@ -1288,6 +1288,11 @@ const App = {
       localStorage.setItem('excelmapper_exports', AppState.exportCount.toString());
     } catch (e) {
       console.error('Error saving state:', e);
+      // Notify user — most likely cause is localStorage quota exceeded
+      const msg = e.name === 'QuotaExceededError' || e.code === 22
+        ? 'Bộ nhớ trình duyệt đã đầy (localStorage). Template CHƯA được lưu! Hãy xóa bớt dữ liệu hoặc dùng chế độ đồng bộ cloud.'
+        : 'Lỗi lưu dữ liệu: ' + e.message;
+      if (typeof App !== 'undefined' && App.toast) App.toast(msg, 'error');
     }
     if (shouldSync && typeof UatStorage !== 'undefined') UatStorage.queueSync('excel_templates');
   },
@@ -1657,8 +1662,23 @@ const TemplateBuilder = {
         AppState.templates[idx].spreadsheetState = spreadsheetState;
         AppState.templates[idx].placeholders = placeholders;
         AppState.templates[idx].updatedAt = now;
+        App.toast('Template đã được cập nhật!', 'success');
+      } else {
+        // editingTemplateId set but template not found in array (e.g. after a Supabase pull that overwrote local state)
+        // Re-create it with the same ID so existing references stay valid
+        const template = {
+          id: AppState.editingTemplateId,
+          name,
+          content,
+          spreadsheetState,
+          placeholders,
+          createdAt: now,
+          updatedAt: now,
+        };
+        AppState.templates.push(template);
+        App.toast('Template đã được lưu lại (ID cũ được giữ nguyên)!', 'success');
+        console.warn('[TemplateBuilder.save] Template not found by editingTemplateId — re-created:', AppState.editingTemplateId);
       }
-      App.toast('Template đã được cập nhật!', 'success');
     } else {
       const template = {
         id: App.generateId(),
@@ -3303,6 +3323,23 @@ const Generator = {
   preview() {
     const tpl = AppState.templates.find(t => t.id === AppState.selectedTemplateId);
     if (!tpl) return;
+
+    // If content is missing (template saved before any cell was added, or content lost),
+    // try to regenerate from spreadsheetState as a fallback
+    if ((!tpl.content || tpl.content.trim() === '') && tpl.spreadsheetState) {
+      console.warn('[Generator.preview] tpl.content is empty — attempting to regenerate from spreadsheetState');
+      if (typeof Spreadsheet !== 'undefined') {
+        Spreadsheet.loadState(tpl.spreadsheetState);
+        tpl.content = Spreadsheet.toHTML();
+        tpl.updatedAt = new Date().toISOString();
+        App.saveState(false);
+        console.log('[Generator.preview] content regenerated from spreadsheetState');
+      }
+    }
+    if (!tpl.content || tpl.content.trim() === '') {
+      App.toast('Template không có nội dung. Hãy mở template ở Editor, thêm dữ liệu và bấm Lưu trước khi dùng.', 'error');
+      return;
+    }
 
     // Warn if no Excel data has been extracted yet
     const extractedSources = Object.keys(AppState.extractedData);

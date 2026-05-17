@@ -171,7 +171,30 @@ const UatStorage = {
         }
       }
       if (byKey.excel_templates && typeof AppState !== 'undefined') {
-        AppState.templates = byKey.excel_templates.templates || [];
+        // Merge: prefer remote for templates that exist in both, keep local-only templates
+        // This prevents a pull from silently deleting templates that were never pushed
+        const remoteTemplates = byKey.excel_templates.templates || [];
+        const remoteById = {};
+        remoteTemplates.forEach(t => { remoteById[t.id] = t; });
+
+        const merged = [];
+        (AppState.templates || []).forEach(local => {
+          if (remoteById[local.id]) {
+            // Exists in both — prefer the version with newer updatedAt (or remote if equal)
+            const remote = remoteById[local.id];
+            const localTs = new Date(local.updatedAt || 0).getTime();
+            const remoteTs = new Date(remote.updatedAt || 0).getTime();
+            merged.push(remoteTs >= localTs ? remote : local);
+            delete remoteById[local.id];
+          } else {
+            // Local-only — keep it (not yet pushed to cloud)
+            merged.push(local);
+          }
+        });
+        // Add remote-only templates (created on another machine)
+        Object.values(remoteById).forEach(t => merged.push(t));
+        AppState.templates = merged;
+
         AppState.exportCount = byKey.excel_templates.exportCount || AppState.exportCount || 0;
         if (typeof App !== 'undefined') {
           App.saveState(false);
