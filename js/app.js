@@ -2772,7 +2772,8 @@ const Generator = {
         const file = AppState.uploadedFiles[fileType];
         const data = await DataProcessor.parseFile(file, fileType);
 
-        // If extra columns were NOT accepted, filter them out
+        // If extra columns were NOT accepted, filter to expected fields only.
+        // Fallback: if filter produces zero results, use all data so mapping UI is never empty.
         const config = FILE_TYPES[fileType];
         if (config.fields && config.fields.length > 0 && !this._acceptedExtraCols[fileType]) {
           const expectedSet = new Set(config.fields);
@@ -2784,7 +2785,11 @@ const Generator = {
               filteredData[key] = data[key];
             }
           }
-          AppState.extractedData[fileType] = filteredData;
+          // If the filter discarded everything (file uses custom column names), keep all data
+          AppState.extractedData[fileType] = Object.keys(filteredData).length > 0 ? filteredData : data;
+          if (Object.keys(filteredData).length === 0 && Object.keys(data).length > 0) {
+            console.warn(`[extractAllData] Filter removed all ${Object.keys(data).length} fields for ${fileType} — using all fields as fallback`);
+          }
         } else {
           AppState.extractedData[fileType] = data;
         }
@@ -2818,6 +2823,19 @@ const Generator = {
         <div class="empty-state">
           <h3>Template không có trường dữ liệu</h3>
           <p>Hãy quay lại và chỉnh sửa template, chèn các trường dữ liệu trước</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Warn prominently when no Excel data has been extracted yet
+    const hasExtractedData = Object.keys(AppState.extractedData).some(k => Object.keys(AppState.extractedData[k] || {}).length > 0);
+    if (!hasExtractedData) {
+      const container = document.getElementById('mapping-container');
+      container.innerHTML = `
+        <div style="padding:18px 20px;border:2px solid #f59e0b;border-radius:12px;background:rgba(245,158,11,0.08);margin-bottom:16px;">
+          <p style="margin:0 0 8px;font-weight:700;color:#f59e0b;">⚠️ Chưa có dữ liệu Excel nào được trích xuất</p>
+          <p style="margin:0;font-size:0.88rem;color:var(--text-secondary);">Hãy quay lại <b>Bước 2</b>, upload file Excel và bấm <b>"Trích xuất dữ liệu"</b> trước khi mapping.</p>
         </div>
       `;
       return;
@@ -3195,37 +3213,44 @@ const Generator = {
     return data ? data[field] : undefined;
   },
 
+  // Normalize text for fuzzy matching: strip Vietnamese diacritics, convert _ to space, lowercase
+  _normalizeForMatch(str) {
+    return (str || '')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')  // strip combining diacritics (Vietnamese tones etc.)
+      .replace(/[_\-]+/g, ' ')           // underscores/hyphens → space
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, ' ');
+  },
+
+  _scoreMatch(phNorm, keyNorm) {
+    if (!phNorm || !keyNorm) return 0;
+    if (keyNorm === phNorm) return 100;
+    if (keyNorm.includes(phNorm) || phNorm.includes(keyNorm)) return 60;
+    // Word-level overlap
+    const phWords = phNorm.split(' ').filter(Boolean);
+    const keyWords = keyNorm.split(' ').filter(Boolean);
+    const overlap = phWords.filter(w => w.length > 1 && keyWords.some(kw => kw.includes(w) || w.includes(kw)));
+    if (overlap.length > 0) {
+      return Math.round((overlap.length / Math.max(phWords.length, keyWords.length)) * 50);
+    }
+    return 0;
+  },
+
   autoMap(placeholders) {
     const rateData = this._getRateTemplateData();
     placeholders.forEach(ph => {
-      const phLower = ph.toLowerCase().trim().replace(/^\[[^\]]+\]\s*/, '');
+      // Strip bracket prefix like [Source], then normalize for matching
+      const phStripped = ph.replace(/^\[[^\]]+\]\s*/, '');
+      const phNorm = this._normalizeForMatch(phStripped);
       let bestMatch = null;
       let bestScore = 0;
 
       Object.keys(AppState.extractedData).forEach(fileType => {
         const data = AppState.extractedData[fileType];
         Object.keys(data).forEach(key => {
-          const keyLower = key.toLowerCase().trim();
-          let score = 0;
-
-          // Exact match
-          if (keyLower === phLower) {
-            score = 100;
-          }
-          // Contains match
-          else if (keyLower.includes(phLower) || phLower.includes(keyLower)) {
-            score = 60;
-          }
-          // Word overlap
-          else {
-            const phWords = phLower.split(/\s+/);
-            const keyWords = keyLower.split(/\s+/);
-            const overlap = phWords.filter(w => keyWords.some(kw => kw.includes(w) || w.includes(kw)));
-            if (overlap.length > 0) {
-              score = (overlap.length / Math.max(phWords.length, keyWords.length)) * 50;
-            }
-          }
-
+          const score = this._scoreMatch(phNorm, this._normalizeForMatch(key));
           if (score > bestScore) {
             bestScore = score;
             bestMatch = `${fileType}::${key}`;
@@ -3234,19 +3259,11 @@ const Generator = {
       });
 
       Object.keys(rateData).forEach(key => {
-        const keyLower = key.toLowerCase().trim();
-        let score = 0;
-        if (keyLower === phLower) score = 100;
-        else if (keyLower.includes(phLower) || phLower.includes(keyLower)) score = 70;
-        else {
-          const phWords = phLower.split(/\s+/);
-          const keyWords = keyLower.split(/\s+/);
-          const overlap = phWords.filter(w => keyWords.some(kw => kw.includes(w) || w.includes(kw)));
-          if (overlap.length > 0) score = (overlap.length / Math.max(phWords.length, keyWords.length)) * 60;
-        }
-
-        if (score > bestScore) {
-          bestScore = score;
+        const score = this._scoreMatch(phNorm, this._normalizeForMatch(key));
+        // Slightly boost ratecenter so it doesn't lose to lower-quality extracted matches
+        const boosted = score > 0 ? Math.min(score + 10, 100) : 0;
+        if (boosted > bestScore) {
+          bestScore = boosted;
           bestMatch = `ratecenter::${key}`;
         }
       });
