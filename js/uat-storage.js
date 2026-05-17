@@ -83,15 +83,20 @@ const UatStorage = {
   // ── Loading overlay ──────────────────────────────────────────
   _showLoadingOverlay(message) {
     if (document.getElementById('uat-loading-overlay')) return;
+    if (!document.getElementById('_uat_spin_style')) {
+      const s = document.createElement('style');
+      s.id = '_uat_spin_style';
+      s.textContent = '@keyframes _uat_spin{to{transform:rotate(360deg)}}';
+      document.head.appendChild(s);
+    }
     const el = document.createElement('div');
     el.id = 'uat-loading-overlay';
     el.style.cssText = [
-      'position:fixed', 'inset:0', 'z-index:9999',
+      'position:fixed', 'top:0', 'right:0', 'bottom:0', 'left:0', 'z-index:9999',
       'background:rgba(12,12,31,0.93)',
       'display:flex', 'flex-direction:column', 'align-items:center', 'justify-content:center', 'gap:20px',
     ].join(';');
     el.innerHTML = `
-      <style>@keyframes _uat_spin{to{transform:rotate(360deg)}}</style>
       <div style="width:52px;height:52px;border:4px solid rgba(99,102,241,0.25);border-top-color:#6366f1;border-radius:50%;animation:_uat_spin 0.8s linear infinite;"></div>
       <p id="uat-loading-msg" style="color:#e2e8f0;font-size:1rem;font-family:Inter,sans-serif;margin:0;">${message || 'Đang tải…'}</p>
       <p style="color:#64748b;font-size:0.78rem;font-family:Inter,sans-serif;margin:0;">Đang đồng bộ dữ liệu từ Supabase</p>
