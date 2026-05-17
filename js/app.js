@@ -3204,6 +3204,7 @@ const Generator = {
     return (str || '')
       .normalize('NFD')
       .replace(/[̀-ͯ]/g, '')  // strip combining diacritics (Vietnamese tones etc.)
+      .replace(/[đĐ]/g, 'd')              // Đ/đ does not decompose in NFD — handle separately
       .replace(/[_\-]+/g, ' ')           // underscores/hyphens → space
       .toLowerCase()
       .trim()
