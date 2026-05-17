@@ -47,29 +47,19 @@ const MasterData = {
 
   // ── Persistence ──
   loadState() {
-    try {
-      const s = localStorage.getItem('excelmapper_masterdata');
-      if (s) {
-        const data = JSON.parse(s);
-        MasterDataState.entities = data.entities || [];
-        MasterDataState.connections = data.connections || [];
-        MasterDataState.records = data.records || {};
-      }
-    } catch (e) { console.error('MasterData load error:', e); }
+    // Supabase-only: dữ liệu được nạp qua UatStorage.pullAll() khi khởi động.
   },
 
   saveState(shouldSync = true) {
-    const payload = {
-      entities: MasterDataState.entities,
-      connections: MasterDataState.connections,
-      records: MasterDataState.records
-    };
-    // localStorage làm cache offline — ghi ngay, không chờ network
-    try {
-      localStorage.setItem('excelmapper_masterdata', JSON.stringify(payload));
-    } catch (e) { console.error('MasterData localStorage error:', e); }
-    // Backend là primary store — debounce 600 ms để gộp các thay đổi liên tiếp
-    if (shouldSync) this._schedulePush(payload);
+    // Supabase-only: không ghi localStorage, chỉ push lên Supabase.
+    if (shouldSync) {
+      const payload = {
+        entities: MasterDataState.entities,
+        connections: MasterDataState.connections,
+        records: MasterDataState.records
+      };
+      this._schedulePush(payload);
+    }
   },
 
   _pushTimer: null,

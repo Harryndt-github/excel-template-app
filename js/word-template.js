@@ -37,19 +37,11 @@ const WordEditor = {
   },
 
   loadState() {
-    try {
-      const s = localStorage.getItem('excelmapper_word_templates');
-      if (s) WordState.templates = JSON.parse(s);
-      const e = localStorage.getItem('excelmapper_word_exports');
-      if (e) WordState.exportCount = parseInt(e) || 0;
-    } catch (e) { console.error(e); }
+    // Supabase-only: dữ liệu được nạp qua UatStorage.pullAll() khi khởi động.
   },
 
   saveState(shouldSync = true) {
-    try {
-      localStorage.setItem('excelmapper_word_templates', JSON.stringify(WordState.templates));
-      localStorage.setItem('excelmapper_word_exports', WordState.exportCount.toString());
-    } catch (e) { console.error(e); }
+    // Supabase-only: không ghi localStorage.
     if (shouldSync && typeof UatStorage !== 'undefined') UatStorage.queueSync('word_templates');
   },
 

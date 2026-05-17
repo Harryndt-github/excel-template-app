@@ -536,35 +536,16 @@ const DataSources = {
     App.toast('Đã xóa nguồn dữ liệu', 'info');
   },
 
-  /* ── persist field metadata to localStorage (not the file blob) ── */
+  /* ── DataSources là session-only — file gốc không thể phục hồi từ cloud.
+        Chỉ cập nhật badge, không persist. ── */
   _persistMeta() {
-    const meta = this._sources.map(s => ({
-      id: s.id, name: s.name, filename: s.filename,
-      fileType: s.fileType || 'excel',
-      fields: s.fields,
-	      htmlContent: s.htmlContent || null,
-	      isHighFidelity: s.isHighFidelity || false,
-	      docxBase64: s.nativeDocx ? '' : (s.docxBase64 || ''),
-	      nativeDocx: !!s.nativeDocx,
-	      _docxInIDB: !!s._docxInIDB,
-	      _idbKey: s._idbKey || null
-    }));
-    try { localStorage.setItem('excelmapper_datasources', JSON.stringify(meta)); } catch (_) { }
-    // update badge
     const badge = document.getElementById('ds-file-count');
     if (badge) badge.textContent = this._sources.length;
   },
 
   loadPersistedMeta() {
-    try {
-      const raw = localStorage.getItem('excelmapper_datasources');
-      if (raw) {
-        this._sources = JSON.parse(raw);
-        this._renderList();
-        const badge = document.getElementById('ds-file-count');
-        if (badge) badge.textContent = this._sources.length;
-      }
-    } catch (_) { }
+    // Supabase-only: DataSources không persist giữa các phiên vì file gốc là local.
+    // User cần re-upload file khi bắt đầu phiên mới.
   },
 
   /* ── read column headers from Excel ── */
@@ -1272,28 +1253,13 @@ const App = {
   },
 
   loadState() {
-    try {
-      const saved = localStorage.getItem('excelmapper_templates');
-      if (saved) AppState.templates = JSON.parse(saved);
-      const exports = localStorage.getItem('excelmapper_exports');
-      if (exports) AppState.exportCount = parseInt(exports) || 0;
-    } catch (e) {
-      console.error('Error loading state:', e);
-    }
+    // Supabase-only: trạng thái được nạp qua UatStorage.pullAll() khi khởi động.
+    // Hàm này chỉ đảm bảo AppState có giá trị mặc định — không đọc localStorage.
   },
 
   saveState(shouldSync = true) {
-    try {
-      localStorage.setItem('excelmapper_templates', JSON.stringify(AppState.templates));
-      localStorage.setItem('excelmapper_exports', AppState.exportCount.toString());
-    } catch (e) {
-      console.error('Error saving state:', e);
-      // Notify user — most likely cause is localStorage quota exceeded
-      const msg = e.name === 'QuotaExceededError' || e.code === 22
-        ? 'Bộ nhớ trình duyệt đã đầy (localStorage). Template CHƯA được lưu! Hãy xóa bớt dữ liệu hoặc dùng chế độ đồng bộ cloud.'
-        : 'Lỗi lưu dữ liệu: ' + e.message;
-      if (typeof App !== 'undefined' && App.toast) App.toast(msg, 'error');
-    }
+    // Supabase-only: không ghi localStorage.
+    // Chỉ đẩy lên Supabase qua hàng đợi debounce.
     if (shouldSync && typeof UatStorage !== 'undefined') UatStorage.queueSync('excel_templates');
   },
 

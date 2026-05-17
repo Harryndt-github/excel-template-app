@@ -387,23 +387,12 @@ const RateCenter = {
   _storageKey: 'excelmapper_ratecenter_v2',
 
   load() {
-    try {
-      const raw = localStorage.getItem(this._storageKey);
-      if (raw) Object.assign(RateCenterState, JSON.parse(raw));
-    } catch(e) {}
+    // Supabase-only: dữ liệu được nạp qua UatStorage.pullAll() khi khởi động.
     if (!RateCenterState.projects) RateCenterState.projects = [];
   },
 
   save(shouldSync = true) {
-    try {
-      localStorage.setItem(this._storageKey, JSON.stringify({
-        projects: RateCenterState.projects,
-        supportPolicies: RateCenterState.supportPolicies,
-        feePolicies: RateCenterState.feePolicies,
-        selectedProject: RateCenterState.selectedProject,
-        selectedPackage: RateCenterState.selectedPackage,
-      }));
-    } catch(e) {}
+    // Supabase-only: không ghi localStorage.
     if (shouldSync && typeof UatStorage !== 'undefined') UatStorage.queueSync('rate_center');
   },
 
