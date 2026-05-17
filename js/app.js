@@ -3287,18 +3287,33 @@ const Generator = {
     const tpl = AppState.templates.find(t => t.id === AppState.selectedTemplateId);
     if (!tpl) return;
 
+    // Warn if no Excel data has been extracted yet
+    const extractedSources = Object.keys(AppState.extractedData);
+    if (extractedSources.length === 0) {
+      App.toast('Chưa có dữ liệu nào được trích xuất. Hãy upload file Excel và bấm "Trích xuất dữ liệu" ở bước 2 trước.', 'warning');
+      console.warn('[Generator.preview] AppState.extractedData is empty — no data to map');
+    }
+    console.log('[Generator.preview] extractedData keys:', extractedSources);
+    console.log('[Generator.preview] placeholders:', tpl.placeholders);
+
     // Build replacement map
     const replacements = {};
     if (tpl.placeholders) {
       tpl.placeholders.forEach(ph => {
         const selectEl = document.getElementById(`map-${this.sanitizeId(ph)}`);
-        if (selectEl && selectEl.value) {
-          const resolvedValue = this._resolveMappingValue(selectEl.value);
-          if (resolvedValue !== undefined) {
-            replacements[ph] = String(resolvedValue);
-          }
+        const selectValue = selectEl ? selectEl.value : null;
+        const resolvedValue = selectValue ? this._resolveMappingValue(selectValue) : undefined;
+        console.log(`[Generator.preview] ph="${ph}" selectValue="${selectValue}" resolved=${resolvedValue}`);
+        if (resolvedValue !== undefined) {
+          replacements[ph] = String(resolvedValue);
         }
       });
+    }
+
+    console.log('[Generator.preview] replacements built:', replacements);
+
+    if (Object.keys(replacements).length === 0 && (tpl.placeholders || []).length > 0) {
+      App.toast('Chưa mapping được trường nào. Hãy đảm bảo đã trích xuất dữ liệu ở bước 2 và chọn nguồn dữ liệu ở bước 3.', 'warning');
     }
 
     // Replace {{placeholder}} patterns in template content
