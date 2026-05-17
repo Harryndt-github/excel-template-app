@@ -3343,14 +3343,19 @@ const Generator = {
     // Highlight remaining unmapped placeholders in red
     html = html.replace(/\{\{([^}]+)\}\}/g, '<span style="color:#ef4444;font-weight:600;">{{$1}}</span>');
 
-    document.getElementById('pdf-preview').innerHTML = html;
+    const previewEl = document.getElementById('pdf-preview');
+    if (!previewEl) {
+      App.toast('Lỗi: không tìm thấy vùng preview', 'error');
+      return;
+    }
+    previewEl.innerHTML = html;
     this.goToStep(4);
     App.toast('Xem trước đã sẵn sàng!', 'success');
   },
 
   exportPDF() {
     const preview = document.getElementById('pdf-preview');
-    if (!preview.innerHTML.trim()) {
+    if (!preview || !preview.innerHTML.trim()) {
       App.toast('Không có nội dung để xuất', 'warning');
       return;
     }
