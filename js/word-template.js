@@ -1459,10 +1459,16 @@ const WordGenerator = {
     const previewEl = document.getElementById('word-preview');
 
     if (tpl.nativeDocx) {
+      const directReplacements = this._collectDirectReplacements(tpl);
+      const totalReplacements = Object.keys(replacements).length + directReplacements.length;
+      console.log('[Preview] replacements:', replacements, 'directReplacements:', directReplacements);
+      if (totalReplacements === 0) {
+        App.toast('Chưa có mapping nào. Quay lại bước 3 và chọn dữ liệu cho các chỉ tiêu.', 'warning');
+        return;
+      }
       previewEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);"><div style="font-size:2rem;margin-bottom:12px;">&#128196;</div><div>Đang render bản xem trước DOCX...</div></div>`;
       this.goToStep(4);
       try {
-        const directReplacements = this._collectDirectReplacements(tpl);
         const blob = await DocxEngine.exportDocx(tpl.id, replacements, {}, directReplacements);
         if (!blob) throw new Error('Không thể tạo file DOCX preview');
         if (typeof docx !== 'undefined' && typeof docx.renderAsync === 'function') {
@@ -1673,6 +1679,13 @@ const WordGenerator = {
       // Merge: {{placeholder}} từ bảng chỉ tiêu (placeholder mode) vào replacements chính
       const baseReplacements = this._collectReplacements(tpl);
       const replacements = this._buildNativeReplacementsFromManual(tpl, baseReplacements);
+      const directReplacements = this._collectDirectReplacements(tpl);
+      const totalReplacements = Object.keys(replacements).length + directReplacements.length;
+      console.log('[ExportDOCX] replacements:', replacements, 'directReplacements:', directReplacements);
+      if (totalReplacements === 0) {
+        App.toast('Chưa có dữ liệu nào được mapping. Hãy chọn giá trị cho các chỉ tiêu ở bước 3 trước khi xuất.', 'warning');
+        return;
+      }
       try {
         const hasOriginal = await DocxEngine.hasOriginalDocx(tpl.id);
         if (!hasOriginal) {
@@ -1680,8 +1693,6 @@ const WordGenerator = {
           return;
         }
         App.toast('Đang xuất Word từ file .docx gốc...', 'info');
-        // directReplacements: fallback mode — thay đoạn text tùy ý (khi DOCX không có {{placeholder}})
-        const directReplacements = this._collectDirectReplacements(tpl);
         const blob = await DocxEngine.exportDocx(tpl.id, replacements, {}, directReplacements);
         const fileName = (tpl.name || 'word-template').replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() || 'document';
         const url = URL.createObjectURL(blob);
