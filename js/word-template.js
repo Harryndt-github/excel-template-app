@@ -22,7 +22,10 @@ function _wEsc(text) {
   return d.innerHTML;
 }
 function _wSanId(str) {
-  return str.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9]/g, '_');
+  return String(str || '').replace(/[^a-zA-Z0-9_\u00C0-\u1EF9]/g, '_');
+}
+function _wUid(prefix) {
+  return `${prefix || 'id'}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 function _wNorm(str) {
   return String(str || '')
@@ -349,12 +352,23 @@ const WordEditor = {
     return Array.from(new Set(tpl.placeholders || []));
   },
 
+  _normalizeManualFields(fields) {
+    return (fields || []).map((field, idx) => ({
+      id: field.id || _wUid(`wmf_${idx + 1}`),
+      name: field.name || '',
+      placeholder: field.placeholder || '',
+      targetText: field.targetText || '',
+      description: field.description || ''
+    }));
+  },
+
   /* ── Render panel "Bảng chỉ tiêu" — redesigned ── */
   _renderManualFieldsPanel(tpl) {
-    const fields = tpl.manualFields || [];
+    const fields = this._normalizeManualFields(tpl.manualFields || []);
+    tpl.manualFields = fields;
     const docxPhs = this._getDocxPlaceholders(tpl);  // {{...}} đã có sẵn trong DOCX
     const allKeys = this._getAllFieldKeys();           // tất cả field keys từ master data
-    const rows = fields.length ? fields : [{ name: '', placeholder: '', description: '' }];
+    const rows = fields.length ? fields : [{ id: _wUid('wmf'), name: '', placeholder: '', targetText: '', description: '' }];
 
     // datalist ID cho combo-box tên chỉ tiêu
     const dlId = 'native-field-datalist';
@@ -431,7 +445,7 @@ const WordEditor = {
     const currentVal = field.placeholder || field.targetText || '';
 
     return `
-      <tr data-manual-field-row>
+      <tr data-manual-field-row data-field-id="${_wEsc(field.id || _wUid(`wmf_${idx + 1}`))}">
         <td>
           <div style="position:relative;">
             <input list="${dlId}" class="mapping-select native-field-name"
@@ -508,7 +522,13 @@ const WordEditor = {
     if (!body) return;
     const tpl = WordState.editingId ? WordState.templates.find(t => t.id === WordState.editingId) : null;
     const docxPhs = tpl ? this._getDocxPlaceholders(tpl) : [];
-    body.insertAdjacentHTML('beforeend', this._manualFieldRowHtml({}, body.querySelectorAll('tr').length, docxPhs));
+    body.insertAdjacentHTML('beforeend', this._manualFieldRowHtml({
+      id: _wUid('wmf'),
+      name: '',
+      placeholder: '',
+      targetText: '',
+      description: ''
+    }, body.querySelectorAll('tr').length, docxPhs));
   },
 
   removeManualFieldRow(button) {
@@ -521,13 +541,14 @@ const WordEditor = {
       const nameInput  = row.querySelector('.native-field-name');
       const targetEl   = row.querySelector('.native-field-target'); // may be <select> or <input>
       const descInput  = row.querySelector('.native-field-desc');
+      const id          = row.getAttribute('data-field-id') || _wUid('wmf');
       const name        = (nameInput?.value  || '').trim();
       const targetRaw   = (targetEl?.value   || '').trim();
       const description = (descInput?.value  || '').trim();
       const isPlaceholder = /^\{\{[^}]+\}\}$/.test(targetRaw);
       const placeholder = isPlaceholder ? targetRaw.replace(/^\{\{|\}\}$/g,'').trim() : '';
       const targetText  = isPlaceholder ? '' : targetRaw;
-      return { name, placeholder, targetText, description };
+      return { id, name, placeholder, targetText, description };
     }).filter(field => field.name || field.placeholder || field.targetText);
   },
 
@@ -542,16 +563,13 @@ const WordEditor = {
     const editor = document.getElementById('word-editor-area');
     const existingTpl = WordState.editingId ? WordState.templates.find(t => t.id === WordState.editingId) : null;
     const isNativeDocx = !!(existingTpl && existingTpl.nativeDocx);
-    const manualFields = isNativeDocx ? this.collectManualFields() : [];
+    const manualFields = isNativeDocx ? this._normalizeManualFields(this.collectManualFields()) : [];
     const content = isNativeDocx ? existingTpl.content : (editor ? editor.innerHTML : '');
+    const manualNames = new Set(manualFields.map(f => f.name).filter(Boolean));
+    const manualDirectTargets = new Set(manualFields.map(f => f.targetText).filter(Boolean));
     const placeholders = isNativeDocx
-      ? Array.from(new Set([
-          ...(existingTpl.placeholders || []),
-          // placeholder mode: mã chỉ tiêu ánh xạ vào {{placeholder}}
-          ...manualFields.map(f => f.placeholder).filter(Boolean),
-          // fallback mode: vẫn giữ name để backward compat
-          ...manualFields.map(f => f.name).filter(Boolean)
-        ]))
+      ? Array.from(new Set(existingTpl.docxPlaceholders || existingTpl.placeholders || []))
+          .filter(ph => !manualNames.has(ph) && !manualDirectTargets.has(ph))
       : this.getPlaceholders();
     const originalDocxBase64 = WordState.currentOriginalDocxBase64 || '';
     const now = new Date().toISOString();
@@ -560,7 +578,7 @@ const WordEditor = {
       const idx = WordState.templates.findIndex(t => t.id === WordState.editingId);
       if (idx !== -1) {
         const patch = isNativeDocx
-          ? { name, content, placeholders, manualFields, updatedAt: now }
+          ? { name, content, placeholders, docxPlaceholders: placeholders, manualFields, updatedAt: now }
           : { name, content, placeholders, originalDocxBase64, updatedAt: now };
         // Giữ _idbKey và _docxInIDB để không bị mất liên kết với IndexedDB
         if (isNativeDocx && WordState.templates[idx]._idbKey) {
@@ -963,12 +981,13 @@ const WordGenerator = {
 
   buildMappingUI() {
     const tpl = WordState.templates.find(t => t.id === WordState.selectedTemplateId);
-    if (!tpl || !tpl.placeholders || tpl.placeholders.length === 0) {
+    const mappingItems = this._getMappingItems(tpl);
+    if (!tpl || mappingItems.length === 0) {
       document.getElementById('word-mapping-container').innerHTML = '<div class="empty-state"><h3>Template không có trường dữ liệu</h3></div>';
       return;
     }
     this._syncRateSelection();
-    const currentMappings = this._collectCurrentMappings(tpl.placeholders);
+    const currentMappings = this._collectCurrentMappings(mappingItems);
     const options = this._buildMappingOptions();
     const projects = (typeof RateCenter !== 'undefined' && typeof RateCenter.getProjects === 'function')
       ? RateCenter.getProjects()
@@ -1109,34 +1128,68 @@ const WordGenerator = {
       <table class="mapping-table"><thead><tr>
         <th style="width:30%">Trường Template</th><th style="width:40%">Dữ liệu Excel / Master Data</th><th style="width:30%">Giá trị</th>
       </tr></thead><tbody>
-      ${tpl.placeholders.map(ph => `<tr>
-        <td class="mapping-placeholder-name">{{${_wEsc(ph)}}}</td>
-        <td>
-          <select class="mapping-select" id="wmap-${_wSanId(ph)}" onchange="WordGenerator.onMappingChange('${ph.replace(/'/g,"\\'")}',this.value)">${options.replace(/__FIELD__/g, _wEsc(ph))}</select>
-          <input class="mapping-select" id="wmanual-${_wSanId(ph)}" placeholder="Nhập trực tiếp giá trị cho chỉ tiêu này"
-            style="display:none;margin-top:6px;"
-            oninput="WordGenerator.onMappingChange('${ph.replace(/'/g,"\\'")}', 'manual::${ph.replace(/'/g,"\\'")}')">
+      ${mappingItems.map(item => `<tr>
+        <td class="mapping-placeholder-name">
+          ${item.type === 'manual' ? _wEsc(item.label) : `{{${_wEsc(item.label)}}}`}
+          ${item.targetText ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">Vị trí ${item.occurrence || 1}: <code>${_wEsc(item.targetText)}</code></div>` : ''}
         </td>
-        <td class="mapping-value-preview" id="wprev-${_wSanId(ph)}">—</td>
+        <td>
+          <select class="mapping-select" id="wmap-${_wSanId(item.key)}" onchange="WordGenerator.onMappingChange('${item.key.replace(/'/g,"\\'")}',this.value)">${options.replace(/__FIELD__/g, _wEsc(item.key))}</select>
+          <input class="mapping-select" id="wmanual-${_wSanId(item.key)}" placeholder="Nhập trực tiếp giá trị cho chỉ tiêu này"
+            style="display:none;margin-top:6px;"
+            oninput="WordGenerator.onMappingChange('${item.key.replace(/'/g,"\\'")}', 'manual::${item.key.replace(/'/g,"\\'")}')">
+        </td>
+        <td class="mapping-value-preview" id="wprev-${_wSanId(item.key)}">—</td>
       </tr>`).join('')}
       </tbody></table>`;
-    tpl.placeholders.forEach(ph => {
-      const selectEl = document.getElementById(`wmap-${_wSanId(ph)}`);
-      const currentValue = currentMappings[ph];
+    mappingItems.forEach(item => {
+      const selectEl = document.getElementById(`wmap-${_wSanId(item.key)}`);
+      const currentValue = currentMappings[item.key];
       const hasCurrentValue = selectEl && Array.from(selectEl.options).some(option => option.value === currentValue);
       if (selectEl && currentValue && hasCurrentValue) {
         selectEl.value = currentValue;
-        this.onMappingChange(ph, currentValue);
+        this.onMappingChange(item.key, currentValue);
       }
     });
-    this.autoMap(tpl.placeholders);
+    this.autoMap(mappingItems);
   },
 
-  _collectCurrentMappings(placeholders) {
+  _getManualFieldKey(field, idx) {
+    if (!field.id) field.id = _wUid(`wmf_${idx + 1}`);
+    return `manualfield::${field.id}`;
+  },
+
+  _getMappingItems(tpl) {
+    if (!tpl) return [];
+    if (tpl.nativeDocx && Array.isArray(tpl.manualFields) && tpl.manualFields.length) {
+      const targetCounts = {};
+      return tpl.manualFields
+        .map((field, idx) => {
+          const key = this._getManualFieldKey(field, idx);
+          const targetText = (field.targetText || this._legacyPlaceholderAsDirectTarget(field.placeholder))
+            ? (field.targetText || field.placeholder || '')
+            : '';
+          if (targetText) targetCounts[targetText] = (targetCounts[targetText] || 0) + 1;
+          return {
+            key,
+            label: field.name || field.placeholder || field.targetText || `Dòng mapping ${idx + 1}`,
+            field,
+            targetText,
+            occurrence: targetText ? targetCounts[targetText] : 0,
+            type: 'manual'
+          };
+        })
+        .filter(item => item.label || item.targetText || item.field.placeholder);
+    }
+    return (tpl.placeholders || []).map(ph => ({ key: ph, label: ph, type: 'placeholder' }));
+  },
+
+  _collectCurrentMappings(items) {
     const mappings = {};
-    placeholders.forEach(ph => {
-      const selectEl = document.getElementById(`wmap-${_wSanId(ph)}`);
-      if (selectEl && selectEl.value) mappings[ph] = selectEl.value;
+    (items || []).forEach(item => {
+      const key = item.key || item;
+      const selectEl = document.getElementById(`wmap-${_wSanId(key)}`);
+      if (selectEl && selectEl.value) mappings[key] = selectEl.value;
     });
     return mappings;
   },
@@ -1419,9 +1472,11 @@ const WordGenerator = {
     if (typeof App !== 'undefined') App.toast('Rule Engine đã chạy, mapping được cập nhật', 'success');
   },
 
-  autoMap(placeholders) {
+  autoMap(items) {
     const rateData = this._getRateTemplateData();
-    placeholders.forEach(ph => {
+    (items || []).forEach(item => {
+      const key = item.key || item;
+      const ph = item.label || item;
       const sourceHintMatch = String(ph).match(/^\[([^\]]+)\]\s*/);
       const sourceHint = sourceHintMatch ? _wNorm(sourceHintMatch[1]) : '';
       const phL = _wNorm(ph.replace(/^\[[^\]]+\]\s*/, ''));
@@ -1459,8 +1514,8 @@ const WordGenerator = {
         if (s > bestS) { bestS = s; best = `ratecenter::${k}`; }
       });
       if (best && bestS >= 65) {
-        const sel = document.getElementById(`wmap-${_wSanId(ph)}`);
-        if (sel && !sel.value) { sel.value = best; this.onMappingChange(ph, best); }
+        const sel = document.getElementById(`wmap-${_wSanId(key)}`);
+        if (sel && !sel.value) { sel.value = best; this.onMappingChange(key, best); }
       }
     });
   },
@@ -1512,8 +1567,10 @@ const WordGenerator = {
           App.toast('Xem trước DOCX đã sẵn sàng — bấm Xuất Word để tải file', 'success');
         } else {
           const url = URL.createObjectURL(blob);
-          const rows = (tpl.manualFields || []).map(field => {
-            const val = replacements[field.placeholder] || replacements[field.name] || '';
+          const rows = (tpl.manualFields || []).map((field, idx) => {
+            const mapKey = this._getManualFieldKey(field, idx);
+            const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
+            const val = sel && sel.value ? (this._resolveMappingValue(sel.value) || '') : (replacements[field.placeholder] || '');
             const status = val ? `<span style="color:#10b981;font-weight:600;">✓</span>` : `<span style="color:#ef4444;">✗ Chưa có</span>`;
             return `<tr><td><b>${_wEsc(field.name||'')}</b></td><td>${_wEsc(val)} ${status}</td></tr>`;
           }).join('');
@@ -1590,30 +1647,33 @@ const WordGenerator = {
     const fields = tpl.manualFields || [];
     const results = [];
     const targetCounts = {};
-    fields.forEach(field => {
+    fields.forEach((field, idx) => {
       if (!field.name) return;
+      const legacyDirectTarget = this._legacyPlaceholderAsDirectTarget(field.placeholder);
+      const targetText = (field.targetText || legacyDirectTarget) ? (field.targetText || field.placeholder) : '';
+      const occurrence = targetText
+        ? (targetCounts[targetText] = (targetCounts[targetText] || 0) + 1)
+        : 0;
       // Resolve giá trị từ mapping UI
-      const sel = document.getElementById(`wmap-${_wSanId(field.name)}`);
+      const mapKey = this._getManualFieldKey(field, idx);
+      const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
       if (!sel || !sel.value) return;
       const resolvedValue = this._resolveMappingValue(sel.value);
       if (resolvedValue === undefined) return;
       const val = String(resolvedValue);
 
-      const legacyDirectTarget = this._legacyPlaceholderAsDirectTarget(field.placeholder);
       if (field.placeholder && !legacyDirectTarget) {
         // Mode 1: placeholder mode — {{placeholder}} đã có sẵn trong DOCX
         // DocxEngine.replacePlaceholdersInXml xử lý via `replacements` object, không cần directReplacements
         // (không push vào results, đã được hòa tan vào replacements qua buildNativeReplacementsFromManual)
-      } else if (field.targetText || legacyDirectTarget) {
+      } else if (targetText) {
         // Mode 2: fallback — thay trực tiếp đoạn text trong DOCX
-        const targetText = field.targetText || field.placeholder;
-        targetCounts[targetText] = (targetCounts[targetText] || 0) + 1;
         results.push({
           field: field.name,
           targetText,
           value: val,
           mode: 'append',
-          occurrence: targetCounts[targetText]
+          occurrence
         });
       }
     });
@@ -1624,10 +1684,11 @@ const WordGenerator = {
   _buildNativeReplacementsFromManual(tpl, baseReplacements) {
     const merged = Object.assign({}, baseReplacements);
     const fields = tpl.manualFields || [];
-    fields.forEach(field => {
+    fields.forEach((field, idx) => {
       if (!field.placeholder || !field.name) return;
       if (this._legacyPlaceholderAsDirectTarget(field.placeholder)) return;
-      const sel = document.getElementById(`wmap-${_wSanId(field.name)}`);
+      const mapKey = this._getManualFieldKey(field, idx);
+      const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
       if (!sel || !sel.value) return;
       const resolvedValue = this._resolveMappingValue(sel.value);
       if (resolvedValue === undefined) return;

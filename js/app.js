@@ -1061,6 +1061,7 @@ const DataSources = {
       name: source.name,
       content,
       placeholders,
+      docxPlaceholders: placeholders,
       manualFields: [],
       originalDocxBase64: '',
       nativeDocx: true,
