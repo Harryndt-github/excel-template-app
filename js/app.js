@@ -2060,16 +2060,20 @@ const DataProcessor = {
     // Column A = keys, Column B = values
     const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
     const result = {};
+    const keyOccurrences = {};
 
     for (let row = range.s.r; row <= range.e.r; row++) {
       const cellA = sheet[XLSX.utils.encode_cell({ r: row, c: 0 })];
       const cellB = sheet[XLSX.utils.encode_cell({ r: row, c: 1 })];
 
-      const key = cellA ? this.formatValue(cellA) : '';
+      const rawKey = cellA ? this.formatValue(cellA) : '';
       const value = cellB ? this.formatValue(cellB) : '';
 
-      if (key && key.trim()) {
-        result[key.trim()] = value;
+      if (rawKey && rawKey.trim()) {
+        const baseKey = rawKey.trim();
+        keyOccurrences[baseKey] = (keyOccurrences[baseKey] || 0) + 1;
+        const finalKey = keyOccurrences[baseKey] === 1 ? baseKey : `${baseKey} (${keyOccurrences[baseKey]})`;
+        result[finalKey] = value;
       }
     }
 
@@ -2089,6 +2093,8 @@ const DataProcessor = {
     }
 
     // Get values from subsequent rows
+    // keyOccurrences tracks duplicates across all row offsets so each column gets a unique key
+    const keyOccurrences = {};
     for (let rowOffset = 0; rowOffset < valueRows; rowOffset++) {
       const rowIdx = 1 + rowOffset; // Start from row 2 (index 1)
       if (rowIdx > range.e.r) break;
@@ -2101,11 +2107,16 @@ const DataProcessor = {
         const value = cell ? this.formatValue(cell) : '';
 
         if (valueRows > 1) {
-          // Multiple value rows - add row indicator
-          const key = `${header.trim()} (Dòng ${rowOffset + 1})`;
-          result[key] = value;
+          // Multiple value rows: base key includes row indicator, then dedup if same header+row appears again
+          const baseKey = `${header.trim()} (Dòng ${rowOffset + 1})`;
+          keyOccurrences[baseKey] = (keyOccurrences[baseKey] || 0) + 1;
+          const finalKey = keyOccurrences[baseKey] === 1 ? baseKey : `${baseKey} (${keyOccurrences[baseKey]})`;
+          result[finalKey] = value;
         } else {
-          result[header.trim()] = value;
+          const baseKey = header.trim();
+          keyOccurrences[baseKey] = (keyOccurrences[baseKey] || 0) + 1;
+          const finalKey = keyOccurrences[baseKey] === 1 ? baseKey : `${baseKey} (${keyOccurrences[baseKey]})`;
+          result[finalKey] = value;
         }
       }
     }
@@ -2766,8 +2777,11 @@ const Generator = {
           const expectedSet = new Set(config.fields);
           const filteredData = {};
           for (const key in data) {
-            // For multi-row files, strip "(Dòng X)" suffix for matching
-            const baseKey = key.replace(/\s*\(Dòng \d+\)$/, '');
+            // Strip dedup suffix "(N)" and/or row suffix "(Dòng X)" to get the original field name
+            const baseKey = key
+              .replace(/\s*\(Dòng \d+\)/, '')
+              .replace(/\s*\(\d+\)/g, '')
+              .trim();
             if (expectedSet.has(baseKey) || expectedSet.has(key)) {
               filteredData[key] = data[key];
             }
