@@ -945,7 +945,7 @@ const WordGenerator = {
     WordState.extractedData = {};
     try {
       for (const ft of fileKeys) {
-        const data = await DataProcessor.parseFile(WordState.uploadedFiles[ft], ft);
+        const data = await this._parseExcelByLabel(WordState.uploadedFiles[ft], ft);
 
         // If extra columns were NOT accepted, filter them out.
         // Fallback mirrors the Excel template flow: never drop all parsed data,
@@ -956,7 +956,9 @@ const WordGenerator = {
           const filteredData = {};
           for (const key in data) {
             const baseKey = key.replace(/\s*\(Dòng \d+\)$/, '');
-            if (expectedSet.has(baseKey) || expectedSet.has(key)) {
+            const unprefixedKey = key.replace(/^\[[^\]]+\]\s*/, '').replace(/\s*\(Dòng \d+\)$/, '');
+            const isSheetScoped = /^\[[^\]]+\]\s*/.test(key);
+            if (expectedSet.has(baseKey) || expectedSet.has(key) || expectedSet.has(unprefixedKey) || isSheetScoped) {
               filteredData[key] = data[key];
             }
           }
@@ -977,6 +979,103 @@ const WordGenerator = {
       console.error(err);
       App.toast('Lỗi khi đọc file: ' + err.message, 'error');
     } finally { btn.innerHTML = orig; btn.disabled = false; }
+  },
+
+  async _parseExcelByLabel(file, fileType) {
+    if (typeof XLSX === 'undefined') return DataProcessor.parseFile(file, fileType);
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(new Uint8Array(buffer), {
+      type: 'array',
+      cellDates: true,
+      raw: false,
+      dateNF: 'dd/mm/yyyy'
+    });
+    const config = FILE_TYPES[fileType] || {};
+    const selectedSheetName = this._findBestSheetName(workbook.SheetNames || [], config.label || fileType);
+    const selectedSheet = selectedSheetName ? workbook.Sheets[selectedSheetName] : workbook.Sheets[workbook.SheetNames[0]];
+    const result = {};
+    const meta = {
+      fileName: file.name,
+      selectedSheet: selectedSheetName || workbook.SheetNames[0] || '',
+      sheets: {}
+    };
+
+    const addValue = (key, value, sheetName, scopedOnly = false) => {
+      const cleanKey = String(key || '').trim();
+      if (!cleanKey) return;
+      const cleanValue = value == null ? '' : String(value);
+      const scopedKey = `[${sheetName}] ${cleanKey}`;
+      if (!scopedOnly && !Object.prototype.hasOwnProperty.call(result, cleanKey)) result[cleanKey] = cleanValue;
+      if (!Object.prototype.hasOwnProperty.call(result, scopedKey)) result[scopedKey] = cleanValue;
+    };
+
+    workbook.SheetNames.forEach(sheetName => {
+      const sheet = workbook.Sheets[sheetName];
+      const parsed = config.structure === 'vertical'
+        ? this._parseVerticalLabelSheet(sheet)
+        : this._parseHorizontalLabelSheet(sheet, config.valueRows || 1);
+      meta.sheets[sheetName] = Object.keys(parsed).length;
+      const isSelected = sheetName === (selectedSheetName || workbook.SheetNames[0]);
+      Object.entries(parsed).forEach(([key, value]) => addValue(key, value, sheetName, !isSelected));
+    });
+
+    // Fallback to the legacy parser if the workbook shape is not label-based.
+    if (Object.keys(result).length === 0 && selectedSheet) {
+      return DataProcessor.parseFile(file, fileType);
+    }
+    Object.defineProperty(result, '__sheetMeta', { value: meta, enumerable: false });
+    return result;
+  },
+
+  _findBestSheetName(sheetNames, wantedName) {
+    if (!sheetNames || !sheetNames.length) return '';
+    const wanted = _wNorm(wantedName);
+    return sheetNames.find(name => _wNorm(name) === wanted)
+      || sheetNames.find(name => _wNorm(name).includes(wanted) || wanted.includes(_wNorm(name)))
+      || sheetNames[0];
+  },
+
+  _parseVerticalLabelSheet(sheet) {
+    const range = XLSX.utils.decode_range(sheet && sheet['!ref'] ? sheet['!ref'] : 'A1');
+    const result = {};
+    const seen = {};
+    for (let row = range.s.r; row <= range.e.r; row++) {
+      const keyCell = sheet[XLSX.utils.encode_cell({ r: row, c: 0 })];
+      const valueCell = sheet[XLSX.utils.encode_cell({ r: row, c: 1 })];
+      const rawKey = keyCell ? DataProcessor.formatValue(keyCell).trim() : '';
+      if (!rawKey) continue;
+      const value = valueCell ? DataProcessor.formatValue(valueCell) : '';
+      seen[rawKey] = (seen[rawKey] || 0) + 1;
+      const finalKey = seen[rawKey] === 1 ? rawKey : `${rawKey} (${seen[rawKey]})`;
+      result[finalKey] = value;
+    }
+    return result;
+  },
+
+  _parseHorizontalLabelSheet(sheet, valueRows = 1) {
+    const range = XLSX.utils.decode_range(sheet && sheet['!ref'] ? sheet['!ref'] : 'A1');
+    const result = {};
+    const headers = [];
+    const seen = {};
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cell = sheet[XLSX.utils.encode_cell({ r: range.s.r, c: col })];
+      headers[col - range.s.c] = cell ? DataProcessor.formatValue(cell).trim() : '';
+    }
+    for (let rowOffset = 0; rowOffset < valueRows; rowOffset++) {
+      const row = range.s.r + 1 + rowOffset;
+      if (row > range.e.r) break;
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const header = headers[col - range.s.c];
+        if (!header) continue;
+        const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
+        const value = cell ? DataProcessor.formatValue(cell) : '';
+        const rawKey = valueRows > 1 ? `${header} (Dòng ${rowOffset + 1})` : header;
+        seen[rawKey] = (seen[rawKey] || 0) + 1;
+        const finalKey = seen[rawKey] === 1 ? rawKey : `${rawKey} (${seen[rawKey]})`;
+        result[finalKey] = value;
+      }
+    }
+    return result;
   },
 
   buildMappingUI() {
@@ -1552,12 +1651,15 @@ const WordGenerator = {
       previewEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);"><div style="font-size:2rem;margin-bottom:12px;">&#128196;</div><div>Đang render bản xem trước DOCX...</div></div>`;
       this.goToStep(4);
       try {
+        const mappingDiagnostics = this._collectMappingDiagnostics(tpl);
         const blob = await DocxEngine.exportDocx(tpl.id, replacements, {}, directReplacements);
+        const mergeReport = this._combineMergeReport(DocxEngine.lastReport || null, mappingDiagnostics);
         if (!blob) throw new Error('Không thể tạo file DOCX preview');
         if (typeof docx !== 'undefined' && typeof docx.renderAsync === 'function') {
           const container = document.createElement('div');
           container.style.cssText = 'width:100%;min-height:400px;';
           previewEl.innerHTML = '';
+          previewEl.insertAdjacentHTML('beforeend', this._renderMergeReport(mergeReport));
           previewEl.appendChild(container);
           await docx.renderAsync(blob, container, null, {
             inWrapper: false, ignoreWidth: false, ignoreHeight: false,
@@ -1581,6 +1683,7 @@ const WordGenerator = {
                 style="padding:6px 16px;border-radius:7px;background:#6366f1;color:#fff;text-decoration:none;font-size:0.82rem;font-weight:700;"
                 onclick="setTimeout(()=>URL.revokeObjectURL(this.href),5000)">⬇ Tải DOCX xem trước</a>
             </div>
+            ${this._renderMergeReport(mergeReport)}
             <table><thead><tr><th>Mã chỉ tiêu</th><th>Giá trị sẽ điền</th></tr></thead>
             <tbody>${rows||'<tr><td colspan="2">Chưa có chỉ tiêu</td></tr>'}</tbody></table>`;
           App.toast('Bấm "Tải DOCX xem trước" để mở file đã điền', 'info');
@@ -1798,7 +1901,9 @@ const WordGenerator = {
           return;
         }
         App.toast('Đang xuất Word từ file .docx gốc...', 'info');
+        const mappingDiagnostics = this._collectMappingDiagnostics(tpl);
         const blob = await DocxEngine.exportDocx(tpl.id, replacements, {}, directReplacements);
+        const mergeReport = this._combineMergeReport(DocxEngine.lastReport || null, mappingDiagnostics);
         const fileName = (tpl.name || 'word-template').replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() || 'document';
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1810,7 +1915,7 @@ const WordGenerator = {
         URL.revokeObjectURL(url);
         WordState.exportCount++;
         WordEditor.saveState();
-        App.toast('Đã xuất Word từ DOCX gốc, giữ nguyên định dạng', 'success');
+        this._toastMergeReport(mergeReport, 'Đã xuất Word từ DOCX gốc, giữ nguyên định dạng');
       } catch (err) {
         console.error('Native DOCX export error:', err);
         App.toast(`Lỗi xuất Word: ${err.message}`, 'error');
@@ -1861,6 +1966,79 @@ const WordGenerator = {
       console.error('DOCX export error:', err);
       App.toast(`Lỗi xuất Word: ${err.message}`, 'error');
     }
+  },
+
+  _renderMergeReport(report) {
+    if (!report) return '';
+    const applied = report.applied || [];
+    const notFound = report.notFound || [];
+    const skipped = report.skipped || [];
+    const hasWarning = notFound.length || skipped.length;
+    const color = hasWarning ? '#f59e0b' : '#10b981';
+    const bg = hasWarning ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.08)';
+    const border = hasWarning ? 'rgba(245,158,11,0.28)' : 'rgba(16,185,129,0.25)';
+    const missingRows = notFound.slice(0, 8).map(item => `
+      <div style="font-size:0.78rem;color:var(--text-secondary);padding:3px 0;">
+        Không tìm thấy <code>${_wEsc(item.searched || item.target || '')}</code>
+        ${item.occurrence ? ` tại vị trí #${_wEsc(item.occurrence)}` : ''}
+        ${item.field ? ` cho <b>${_wEsc(item.field)}</b>` : ''}
+      </div>`).join('');
+    const skippedRows = skipped.slice(0, 8).map(item => `
+      <div style="font-size:0.78rem;color:var(--text-secondary);padding:3px 0;">
+        Nguồn dữ liệu rỗng cho <b>${_wEsc(item.field || '')}</b>
+        ${item.source ? ` từ <code>${_wEsc(item.source)}</code>` : ''}
+      </div>`).join('');
+    return `
+      <div style="margin:0 0 14px;padding:12px 14px;border-radius:12px;background:${bg};border:1px solid ${border};">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <b style="color:${color};font-size:0.86rem;">Báo cáo ghép DOCX</b>
+          <span style="font-size:0.78rem;color:var(--text-secondary);">Đã điền: <b>${applied.length}</b></span>
+          <span style="font-size:0.78rem;color:var(--text-secondary);">Không tìm thấy: <b>${notFound.length}</b></span>
+          <span style="font-size:0.78rem;color:var(--text-secondary);">Dữ liệu rỗng: <b>${skipped.length}</b></span>
+        </div>
+        ${missingRows || skippedRows ? `<div style="margin-top:8px;border-top:1px solid ${border};padding-top:8px;">${missingRows}${skippedRows}${notFound.length + skipped.length > 8 ? `<div style="font-size:0.76rem;color:var(--text-muted);">... và ${notFound.length + skipped.length - 8} mục khác</div>` : ''}</div>` : ''}
+      </div>`;
+  },
+
+  _toastMergeReport(report, successMessage) {
+    if (!report) {
+      App.toast(successMessage, 'success');
+      return;
+    }
+    const missing = (report.notFound || []).length;
+    const skipped = (report.skipped || []).length;
+    const applied = (report.applied || []).length;
+    if (missing > 0 || skipped > 0) {
+      App.toast(`Đã xuất file: điền ${applied} mục, ${missing} mục không tìm thấy, ${skipped} mục dữ liệu rỗng`, 'warning');
+    } else {
+      App.toast(`${successMessage} (${applied} mục đã điền)`, 'success');
+    }
+  },
+
+  _collectMappingDiagnostics(tpl) {
+    const skipped = [];
+    this._getMappingItems(tpl).forEach(item => {
+      const selectEl = document.getElementById(`wmap-${_wSanId(item.key)}`);
+      if (!selectEl || !selectEl.value) return;
+      const resolvedValue = this._resolveMappingValue(selectEl.value);
+      if (resolvedValue === undefined || String(resolvedValue).trim() === '') {
+        skipped.push({
+          field: item.label || item.key,
+          source: selectEl.options[selectEl.selectedIndex]?.textContent || selectEl.value,
+          reason: resolvedValue === undefined ? 'missing' : 'empty'
+        });
+      }
+    });
+    return { skipped };
+  },
+
+  _combineMergeReport(report, diagnostics) {
+    const merged = report || { applied: [], notFound: [], skipped: [], errors: [] };
+    merged.skipped = [
+      ...(merged.skipped || []),
+      ...((diagnostics && diagnostics.skipped) || [])
+    ];
+    return merged;
   },
 
   async exportPDF() {

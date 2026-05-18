@@ -67,6 +67,8 @@ const DocxStore = {
 };
 
 const DocxEngine = {
+  lastReport: null,
+
   async importDocx(file, templateId) {
     if (typeof JSZip === 'undefined') {
       throw new Error('JSZip chưa được tải');
@@ -92,6 +94,8 @@ const DocxEngine = {
     }
 
     const zip = await JSZip.loadAsync(arrayBuffer);
+    const report = this.createMergeReport(replacements, directReplacements);
+    const directCounters = {};
     const xmlFiles = Object.keys(zip.files).filter(name =>
       name.startsWith('word/') &&
       name.endsWith('.xml') &&
@@ -103,10 +107,16 @@ const DocxEngine = {
       if (!file) continue;
       let xml = await file.async('string');
       xml = this.processRepeatBlocks(xml, repeatBlocks);
-      xml = this.replacePlaceholdersInXml(xml, replacements);
-      xml = this.replaceDirectTextInXml(xml, directReplacements);
+      xml = this.replacePlaceholdersInXml(xml, replacements, report, fileName);
+      // Target-text/occurrence mapping follows the prototype engine and is scoped
+      // to the document body so header/footer text does not shift occurrence order.
+      if (fileName === 'word/document.xml') {
+        xml = this.replaceDirectTextInXml(xml, directReplacements, report, fileName, directCounters);
+      }
       zip.file(fileName, xml);
     }
+    this.finalizeMergeReport(report);
+    this.lastReport = report;
 
     return zip.generateAsync({
       type: 'blob',
@@ -114,6 +124,80 @@ const DocxEngine = {
       compression: 'DEFLATE',
       compressionOptions: { level: 6 }
     });
+  },
+
+  createMergeReport(replacements = {}, directReplacements = []) {
+    return {
+      applied: [],
+      notFound: [],
+      skipped: [],
+      errors: [],
+      placeholderRules: Object.keys(replacements || {}).map(key => ({
+        key,
+        value: String(replacements[key] ?? ''),
+        applied: 0,
+        parts: []
+      })),
+      directRules: (directReplacements || [])
+        .filter(item => item && item.targetText)
+        .map((item, idx) => ({
+          idx,
+          field: item.field || '',
+          targetText: String(item.targetText || ''),
+          value: String(item.value ?? ''),
+          mode: item.mode || 'replace',
+          occurrence: Number(item.occurrence) || 0,
+          applied: 0,
+          foundCount: 0,
+          parts: []
+        }))
+    };
+  },
+
+  finalizeMergeReport(report) {
+    if (!report) return report;
+    report.placeholderRules.forEach(rule => {
+      if (rule.applied > 0) {
+        report.applied.push({
+          type: 'placeholder',
+          field: rule.key,
+          target: `{{${rule.key}}}`,
+          value: rule.value,
+          count: rule.applied,
+          parts: rule.parts
+        });
+      } else {
+        report.notFound.push({
+          type: 'placeholder',
+          field: rule.key,
+          searched: `{{${rule.key}}}`,
+          value: rule.value
+        });
+      }
+    });
+    report.directRules.forEach(rule => {
+      if (rule.applied > 0) {
+        report.applied.push({
+          type: 'target',
+          field: rule.field,
+          target: rule.targetText,
+          occurrence: rule.occurrence || 'all',
+          value: rule.value,
+          count: rule.applied,
+          parts: rule.parts
+        });
+      } else {
+        report.notFound.push({
+          type: 'target',
+          field: rule.field,
+          searched: rule.targetText,
+          occurrence: rule.occurrence || 'all',
+          totalFound: rule.foundCount,
+          value: rule.value
+        });
+      }
+    });
+    return report;
   },
 
   async scanPlaceholders(zip) {
@@ -155,7 +239,7 @@ const DocxEngine = {
       .join('');
   },
 
-  replacePlaceholdersInXml(xmlText, replacements) {
+  replacePlaceholdersInXml(xmlText, replacements, report = null, partName = '') {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlText, 'application/xml');
     if (doc.getElementsByTagName('parsererror').length) return xmlText;
@@ -165,20 +249,26 @@ const DocxEngine = {
     let changed = false;
     paragraphs.forEach(paragraph => {
       const textNodes = Array.from(paragraph.getElementsByTagNameNS(wordNs, 't'));
-      if (this.replaceInTextNodes(textNodes, replacements)) changed = true;
+      const applied = this.replaceInTextNodes(textNodes, replacements);
+      if (applied.length) {
+        changed = true;
+        if (report) this.recordPlaceholderApplications(report, applied, partName);
+      }
     });
 
     return changed ? new XMLSerializer().serializeToString(doc) : xmlText;
   },
 
-  replaceDirectTextInXml(xmlText, directReplacements) {
+  replaceDirectTextInXml(xmlText, directReplacements, report = null, partName = '', counters = {}) {
     const pairs = (directReplacements || [])
       .filter(item => item && item.targetText && item.value !== undefined && item.value !== null)
-      .map(item => ({
+      .map((item, idx) => ({
+        idx,
         target: String(item.targetText),
         value: String(item.value),
         mode: item.mode || 'replace',
-        occurrence: Number(item.occurrence) || 0
+        occurrence: Number(item.occurrence) || 0,
+        field: item.field || ''
       }));
     if (!pairs.length) return xmlText;
 
@@ -188,17 +278,19 @@ const DocxEngine = {
 
     const wordNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
     const paragraphs = Array.from(doc.getElementsByTagNameNS(wordNs, 'p'));
-    const counters = {};
     let changed = false;
     paragraphs.forEach(paragraph => {
       const textNodes = Array.from(paragraph.getElementsByTagNameNS(wordNs, 't'));
-      if (this.replaceTextPairsInNodes(textNodes, pairs, counters)) changed = true;
+      const result = this.replaceTextPairsInNodes(textNodes, pairs, counters);
+      if (result.changed) changed = true;
+      if (report) this.recordDirectApplications(report, result, partName);
     });
     return changed ? new XMLSerializer().serializeToString(doc) : xmlText;
   },
 
   replaceTextPairsInNodes(textNodes, pairs, counters = {}) {
-    if (!textNodes.length || !pairs.length) return false;
+    const result = { changed: false, applied: [], found: [] };
+    if (!textNodes.length || !pairs.length) return result;
     let fullText = textNodes.map(node => node.textContent || '').join('');
     const jobs = [];
 
@@ -208,6 +300,7 @@ const DocxEngine = {
       while (index !== -1) {
         counters[target] = (counters[target] || 0) + 1;
         const occurrence = counters[target];
+        result.found.push({ target, occurrence });
         const matchingPair = pairs.find(pair =>
           pair.target === target &&
           (!pair.occurrence || pair.occurrence === occurrence)
@@ -217,11 +310,18 @@ const DocxEngine = {
             ? target + ' ' + matchingPair.value
             : matchingPair.value;
           jobs.push({ start: index, end: index + target.length, value: replacement });
+          result.applied.push({
+            idx: matchingPair.idx,
+            field: matchingPair.field,
+            target,
+            occurrence,
+            value: matchingPair.value
+          });
         }
         index = fullText.indexOf(target, index + target.length);
       }
     });
-    if (!jobs.length) return false;
+    if (!jobs.length) return result;
 
     const ranges = [];
     let cursor = 0;
@@ -252,23 +352,26 @@ const DocxEngine = {
       startInfo.node.setAttribute('xml:space', 'preserve');
     });
 
-    return true;
+    result.changed = true;
+    return result;
   },
 
   replaceInTextNodes(textNodes, replacements) {
-    if (!textNodes.length || !Object.keys(replacements).length) return false;
+    if (!textNodes.length || !Object.keys(replacements).length) return [];
     let fullText = textNodes.map(node => node.textContent || '').join('');
     const jobs = [];
+    const applied = [];
 
     Object.entries(replacements).forEach(([key, value]) => {
       const token = `{{${key}}}`;
       let index = fullText.indexOf(token);
       while (index !== -1) {
         jobs.push({ start: index, end: index + token.length, value: String(value ?? '') });
+        applied.push({ key, token, value: String(value ?? '') });
         index = fullText.indexOf(token, index + token.length);
       }
     });
-    if (!jobs.length) return false;
+    if (!jobs.length) return [];
 
     const ranges = [];
     let cursor = 0;
@@ -301,7 +404,30 @@ const DocxEngine = {
       startInfo.node.setAttribute('xml:space', 'preserve');
     });
 
-    return true;
+    return applied;
+  },
+
+  recordPlaceholderApplications(report, applied, partName) {
+    (applied || []).forEach(item => {
+      const rule = report.placeholderRules.find(r => r.key === item.key);
+      if (!rule) return;
+      rule.applied += 1;
+      if (partName && !rule.parts.includes(partName)) rule.parts.push(partName);
+    });
+  },
+
+  recordDirectApplications(report, result, partName) {
+    (result.found || []).forEach(item => {
+      report.directRules
+        .filter(rule => rule.targetText === item.target)
+        .forEach(rule => { rule.foundCount += 1; });
+    });
+    (result.applied || []).forEach(item => {
+      const rule = report.directRules[item.idx];
+      if (!rule) return;
+      rule.applied += 1;
+      if (partName && !rule.parts.includes(partName)) rule.parts.push(partName);
+    });
   },
 
   processRepeatBlocks(xmlText, repeatBlocks) {

@@ -95,25 +95,3 @@ const outPath = path.join(__dirname, '..', 'data', 'master-wards-2025.js');
 fs.writeFileSync(outPath, jsOutput, 'utf8');
 console.log(`✅ Written to: ${outPath}`);
 console.log(`   File size: ${(fs.statSync(outPath).size / 1024).toFixed(1)} KB`);
-
-// Also generate a lookup-friendly version for quick fuzzy matching
-// This creates a normalized index: "phuong ben nghe" → "Phường Bến Nghé"
-const removeDiacritics = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
-
-let lookupOutput = `/* Ward Lookup Index — diacritics-free keys for fuzzy matching */\nconst WARD_LOOKUP_INDEX = {\n`;
-let lookupCount = 0;
-
-for (const [provName, provData] of Object.entries(masterData)) {
-  for (const ward of provData.wards) {
-    const key = removeDiacritics(ward).toLowerCase();
-    lookupOutput += `  '${key}': { w: '${ward.replace(/'/g, "\\'")}', p: '${provName}' },\n`;
-    lookupCount++;
-  }
-}
-
-lookupOutput += `};\nif (typeof module !== 'undefined') module.exports = WARD_LOOKUP_INDEX;\n`;
-
-const lookupPath = path.join(__dirname, '..', 'data', 'ward-lookup-index.js');
-fs.writeFileSync(lookupPath, lookupOutput, 'utf8');
-console.log(`✅ Lookup index: ${lookupPath}`);
-console.log(`   ${lookupCount} entries, ${(fs.statSync(lookupPath).size / 1024).toFixed(1)} KB`);
