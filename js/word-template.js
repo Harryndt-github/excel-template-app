@@ -1589,6 +1589,7 @@ const WordGenerator = {
   _collectDirectReplacements(tpl) {
     const fields = tpl.manualFields || [];
     const results = [];
+    const targetCounts = {};
     fields.forEach(field => {
       if (!field.name) return;
       // Resolve giá trị từ mapping UI
@@ -1605,11 +1606,14 @@ const WordGenerator = {
         // (không push vào results, đã được hòa tan vào replacements qua buildNativeReplacementsFromManual)
       } else if (field.targetText || legacyDirectTarget) {
         // Mode 2: fallback — thay trực tiếp đoạn text trong DOCX
+        const targetText = field.targetText || field.placeholder;
+        targetCounts[targetText] = (targetCounts[targetText] || 0) + 1;
         results.push({
           field: field.name,
-          targetText: field.targetText || field.placeholder,
+          targetText,
           value: val,
-          mode: 'append'
+          mode: 'append',
+          occurrence: targetCounts[targetText]
         });
       }
     });

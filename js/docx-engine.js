@@ -177,7 +177,8 @@ const DocxEngine = {
       .map(item => ({
         target: String(item.targetText),
         value: String(item.value),
-        mode: item.mode || 'replace'
+        mode: item.mode || 'replace',
+        occurrence: Number(item.occurrence) || 0
       }));
     if (!pairs.length) return xmlText;
 
@@ -187,27 +188,37 @@ const DocxEngine = {
 
     const wordNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
     const paragraphs = Array.from(doc.getElementsByTagNameNS(wordNs, 'p'));
+    const counters = {};
     let changed = false;
     paragraphs.forEach(paragraph => {
       const textNodes = Array.from(paragraph.getElementsByTagNameNS(wordNs, 't'));
-      if (this.replaceTextPairsInNodes(textNodes, pairs)) changed = true;
+      if (this.replaceTextPairsInNodes(textNodes, pairs, counters)) changed = true;
     });
     return changed ? new XMLSerializer().serializeToString(doc) : xmlText;
   },
 
-  replaceTextPairsInNodes(textNodes, pairs) {
+  replaceTextPairsInNodes(textNodes, pairs, counters = {}) {
     if (!textNodes.length || !pairs.length) return false;
     let fullText = textNodes.map(node => node.textContent || '').join('');
     const jobs = [];
 
-    pairs.forEach(pair => {
-      let index = fullText.indexOf(pair.target);
+    const targets = Array.from(new Set(pairs.map(pair => pair.target)));
+    targets.forEach(target => {
+      let index = fullText.indexOf(target);
       while (index !== -1) {
-        const replacement = pair.mode === 'append'
-          ? pair.target + ' ' + pair.value
-          : pair.value;
-        jobs.push({ start: index, end: index + pair.target.length, value: replacement });
-        index = fullText.indexOf(pair.target, index + pair.target.length);
+        counters[target] = (counters[target] || 0) + 1;
+        const occurrence = counters[target];
+        const matchingPair = pairs.find(pair =>
+          pair.target === target &&
+          (!pair.occurrence || pair.occurrence === occurrence)
+        );
+        if (matchingPair) {
+          const replacement = matchingPair.mode === 'append'
+            ? target + ' ' + matchingPair.value
+            : matchingPair.value;
+          jobs.push({ start: index, end: index + target.length, value: replacement });
+        }
+        index = fullText.indexOf(target, index + target.length);
       }
     });
     if (!jobs.length) return false;
