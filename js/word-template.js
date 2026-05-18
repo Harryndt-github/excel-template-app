@@ -24,6 +24,15 @@ function _wEsc(text) {
 function _wSanId(str) {
   return str.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9]/g, '_');
 }
+function _wNorm(str) {
+  return String(str || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[đ]/g, 'd')
+    .replace(/[\[\]{}()/:;.,\-_/\\]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 /* ─────────────────────────────────────────────
    WORD EDITOR
@@ -515,11 +524,9 @@ const WordEditor = {
       const name        = (nameInput?.value  || '').trim();
       const targetRaw   = (targetEl?.value   || '').trim();
       const description = (descInput?.value  || '').trim();
-      // Normalize: nếu chứa {{...}} giữ nguyên, nếu không thêm vào để tạo placeholder token
-      const placeholder = targetRaw.startsWith('{{') ? targetRaw.replace(/^\{\{|\}\}$/g,'') : targetRaw;
-      // Để tương thích ngược với DocxEngine.replaceDirectTextInXml, targetText = "{{placeholder}}"
-      // Khi placeholder rỗng (fallback mode) → targetText = chuỗi text gốc người dùng nhập
-      const targetText  = placeholder ? '' : targetRaw; // '' = dùng placeholder mode
+      const isPlaceholder = /^\{\{[^}]+\}\}$/.test(targetRaw);
+      const placeholder = isPlaceholder ? targetRaw.replace(/^\{\{|\}\}$/g,'').trim() : '';
+      const targetText  = isPlaceholder ? '' : targetRaw;
       return { name, placeholder, targetText, description };
     }).filter(field => field.name || field.placeholder || field.targetText);
   },
@@ -922,7 +929,9 @@ const WordGenerator = {
       for (const ft of fileKeys) {
         const data = await DataProcessor.parseFile(WordState.uploadedFiles[ft], ft);
 
-        // If extra columns were NOT accepted, filter them out
+        // If extra columns were NOT accepted, filter them out.
+        // Fallback mirrors the Excel template flow: never drop all parsed data,
+        // because UAT files often have slightly different labels/diacritics.
         const config = FILE_TYPES[ft];
         if (config.fields && config.fields.length > 0 && !this._wAcceptedExtraCols[ft]) {
           const expectedSet = new Set(config.fields);
@@ -933,7 +942,10 @@ const WordGenerator = {
               filteredData[key] = data[key];
             }
           }
-          WordState.extractedData[ft] = filteredData;
+          WordState.extractedData[ft] = Object.keys(filteredData).length > 0 ? filteredData : data;
+          if (Object.keys(filteredData).length === 0 && Object.keys(data).length > 0) {
+            console.warn(`[word extractAllData] Filter removed all ${Object.keys(data).length} fields for ${ft}; using all parsed fields as fallback`);
+          }
         } else {
           WordState.extractedData[ft] = data;
         }
@@ -1318,7 +1330,23 @@ const WordGenerator = {
       return (this._runtimeDerivedData || {})[field];
     }
     const data = WordState.extractedData[source];
-    return data ? data[field] : undefined;
+    return data ? this._resolveDataField(data, field) : undefined;
+  },
+
+  _resolveDataField(data, field) {
+    if (!data) return undefined;
+    if (Object.prototype.hasOwnProperty.call(data, field)) return data[field];
+    const wanted = _wNorm(field);
+    const wantedBase = _wNorm(String(field).replace(/\s*\(Dòng \d+\)$/, ''));
+    const keys = Object.keys(data);
+    let found = keys.find(key => _wNorm(key) === wanted || _wNorm(key) === wantedBase);
+    if (found) return data[found];
+
+    found = keys.find(key => {
+      const nk = _wNorm(key.replace(/\s*\(Dòng \d+\)$/, ''));
+      return nk && wantedBase && (nk.includes(wantedBase) || wantedBase.includes(nk));
+    });
+    return found ? data[found] : undefined;
   },
 
   // [P2-2] Build contract data for adjustments
@@ -1394,35 +1422,43 @@ const WordGenerator = {
   autoMap(placeholders) {
     const rateData = this._getRateTemplateData();
     placeholders.forEach(ph => {
-      const phL = ph.toLowerCase().trim().replace(/^\[[^\]]+\]\s*/, '');
+      const sourceHintMatch = String(ph).match(/^\[([^\]]+)\]\s*/);
+      const sourceHint = sourceHintMatch ? _wNorm(sourceHintMatch[1]) : '';
+      const phL = _wNorm(ph.replace(/^\[[^\]]+\]\s*/, ''));
       let best = null, bestS = 0;
       Object.keys(WordState.extractedData).forEach(ft => {
+        const cfg = FILE_TYPES[ft] || {};
+        const sourceLabel = _wNorm(cfg.label || ft);
+        const sourceBoost = sourceHint && (sourceLabel === sourceHint || sourceLabel.includes(sourceHint) || sourceHint.includes(sourceLabel)) ? 25 : 0;
         Object.keys(WordState.extractedData[ft]).forEach(k => {
-          const kL = k.toLowerCase().trim();
+          const value = this._resolveDataField(WordState.extractedData[ft], k);
+          const kL = _wNorm(k);
           let s = 0;
           if (kL === phL) s = 100;
           else if (kL.includes(phL) || phL.includes(kL)) s = 60;
           else {
             const pw = phL.split(/\s+/), kw = kL.split(/\s+/);
-            const ov = pw.filter(w => kw.some(x => x.includes(w) || w.includes(x)));
-            if (ov.length > 0) s = (ov.length / Math.max(pw.length, kw.length)) * 50;
+            const ov = pw.filter(w => w.length > 1 && kw.some(x => x.includes(w) || w.includes(x)));
+            if (ov.length > 0) s = (ov.length / Math.max(pw.length, kw.length)) * 55;
           }
+          if (s > 0) s += sourceBoost;
+          if (value === undefined || String(value).trim() === '') s -= 30;
           if (s > bestS) { bestS = s; best = `${ft}::${k}`; }
         });
       });
       Object.keys(rateData).forEach(k => {
-        const kL = k.toLowerCase().trim();
+        const kL = _wNorm(k);
         let s = 0;
         if (kL === phL) s = 100;
         else if (kL.includes(phL) || phL.includes(kL)) s = 70;
         else {
           const pw = phL.split(/\s+/), kw = kL.split(/\s+/);
-          const ov = pw.filter(w => kw.some(x => x.includes(w) || w.includes(x)));
+          const ov = pw.filter(w => w.length > 1 && kw.some(x => x.includes(w) || w.includes(x)));
           if (ov.length > 0) s = (ov.length / Math.max(pw.length, kw.length)) * 60;
         }
         if (s > bestS) { bestS = s; best = `ratecenter::${k}`; }
       });
-      if (best && bestS >= 50) {
+      if (best && bestS >= 65) {
         const sel = document.getElementById(`wmap-${_wSanId(ph)}`);
         if (sel && !sel.value) { sel.value = best; this.onMappingChange(ph, best); }
       }
@@ -1562,16 +1598,18 @@ const WordGenerator = {
       if (resolvedValue === undefined) return;
       const val = String(resolvedValue);
 
-      if (field.placeholder) {
+      const legacyDirectTarget = this._legacyPlaceholderAsDirectTarget(field.placeholder);
+      if (field.placeholder && !legacyDirectTarget) {
         // Mode 1: placeholder mode — {{placeholder}} đã có sẵn trong DOCX
         // DocxEngine.replacePlaceholdersInXml xử lý via `replacements` object, không cần directReplacements
         // (không push vào results, đã được hòa tan vào replacements qua buildNativeReplacementsFromManual)
-      } else if (field.targetText) {
+      } else if (field.targetText || legacyDirectTarget) {
         // Mode 2: fallback — thay trực tiếp đoạn text trong DOCX
         results.push({
           field: field.name,
-          targetText: field.targetText,
-          value: val
+          targetText: field.targetText || field.placeholder,
+          value: val,
+          mode: 'append'
         });
       }
     });
@@ -1584,6 +1622,7 @@ const WordGenerator = {
     const fields = tpl.manualFields || [];
     fields.forEach(field => {
       if (!field.placeholder || !field.name) return;
+      if (this._legacyPlaceholderAsDirectTarget(field.placeholder)) return;
       const sel = document.getElementById(`wmap-${_wSanId(field.name)}`);
       if (!sel || !sel.value) return;
       const resolvedValue = this._resolveMappingValue(sel.value);
@@ -1592,6 +1631,15 @@ const WordGenerator = {
       merged[field.placeholder] = String(resolvedValue);
     });
     return merged;
+  },
+
+  _legacyPlaceholderAsDirectTarget(placeholder) {
+    const raw = String(placeholder || '').trim();
+    if (!raw) return false;
+    if (/^\{\{[^}]+\}\}$/.test(raw)) return false;
+    if (/[:：]\s*$/.test(raw)) return true;
+    if (/^\d+(\.\d+)*\.?\s+/.test(raw)) return true;
+    return /\s/.test(raw) && !/^[A-Za-z0-9_.-]+$/.test(raw);
   },
 
   _base64ToArrayBuffer(base64) {

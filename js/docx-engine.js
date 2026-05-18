@@ -174,7 +174,11 @@ const DocxEngine = {
   replaceDirectTextInXml(xmlText, directReplacements) {
     const pairs = (directReplacements || [])
       .filter(item => item && item.targetText && item.value !== undefined && item.value !== null)
-      .map(item => ({ target: String(item.targetText), value: String(item.value) }));
+      .map(item => ({
+        target: String(item.targetText),
+        value: String(item.value),
+        mode: item.mode || 'replace'
+      }));
     if (!pairs.length) return xmlText;
 
     const parser = new DOMParser();
@@ -199,7 +203,10 @@ const DocxEngine = {
     pairs.forEach(pair => {
       let index = fullText.indexOf(pair.target);
       while (index !== -1) {
-        jobs.push({ start: index, end: index + pair.target.length, value: pair.value });
+        const replacement = pair.mode === 'append'
+          ? pair.target + ' ' + pair.value
+          : pair.value;
+        jobs.push({ start: index, end: index + pair.target.length, value: replacement });
         index = fullText.indexOf(pair.target, index + pair.target.length);
       }
     });
