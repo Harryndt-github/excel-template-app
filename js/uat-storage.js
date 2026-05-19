@@ -33,7 +33,8 @@ const UatStorage = {
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem(this.configKey) || '{}'); } catch (_) {}
     // localStorage override chỉ khi có giá trị thực — tránh empty string ghi đè config.js
-    this.url    = (stored.url    || '').trim() || fromWindow.url    || fromWindow.supabaseUrl  || '';
+    const projectId = (stored.projectId || stored.project_id || fromWindow.projectId || fromWindow.project_id || '').trim();
+    this.url    = (stored.url    || '').trim() || fromWindow.url    || fromWindow.supabaseUrl || (projectId ? `https://${projectId}.supabase.co` : '');
     this.key    = (stored.key    || stored.anonKey || stored.publishableKey || '').trim()
                   || fromWindow.key || fromWindow.anonKey || fromWindow.publishableKey || '';
     this.scope  = (stored.scope  || '').trim() || fromWindow.scope  || 'default';
