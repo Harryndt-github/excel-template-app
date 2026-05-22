@@ -499,10 +499,14 @@ const UatStorage = {
       });
     }
 
+    this._throwIfErr(
+      await this.client.from('document_templates').delete().eq('scope', this.scope),
+      'clear document_templates'
+    );
     if (rows.length) {
       this._throwIfErr(
-        await this.client.from('document_templates').upsert(rows, { onConflict: 'scope,template_id' }),
-        'push document_templates'
+        await this.client.from('document_templates').insert(rows),
+        'insert document_templates'
       );
     }
   },
