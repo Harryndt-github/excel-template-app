@@ -191,10 +191,10 @@ const UatStorage = {
       await this._pushTemplates();
       this.lastStatus = `Synced ${new Date().toLocaleTimeString('vi-VN')}`;
       if (reason !== 'auto') this.toast('Đã đẩy dữ liệu lên Supabase', 'success');
-      this.renderStatus();
       return true;
     } finally {
       this.isSyncing = false;
+      this.renderStatus();
     }
   },
 
@@ -240,8 +240,10 @@ const UatStorage = {
       }
     }
 
+    const currentEntityIds = new Set(entities.map(e => e.id));
     const recordRows = [];
     for (const [entityId, entityRecords] of Object.entries(records)) {
+      if (!currentEntityIds.has(entityId)) continue;
       (entityRecords || []).forEach(rec => {
         const rid = rec._dbId || (entityId + '_' + Math.random().toString(36).slice(2, 9));
         rec._dbId = rid;
@@ -526,7 +528,7 @@ const UatStorage = {
       ]);
       this._restoreMasterData(mdData);
       this._restoreRateCenter(rcData);
-      this._restoreTemplates(tplData);
+      await this._restoreTemplates(tplData);
       this.renderStatus();
       return true;
     } finally {
@@ -549,6 +551,7 @@ const UatStorage = {
   },
 
   _restoreMasterData({ entities, fields, records, connections }) {
+    if (typeof MasterDataState === 'undefined') return;
     const fieldsByEntity = {};
     for (const f of fields) {
       (fieldsByEntity[f.entity_id] = fieldsByEntity[f.entity_id] || []).push({
@@ -608,7 +611,7 @@ const UatStorage = {
   },
 
   _restoreRateCenter({ projects, policies, buckets, feeRules, graceRules, exceptions, adjustments, conditions, supportPolicies, feePolicies }) {
-
+    if (typeof RateCenterState === 'undefined') return;
     const bktByPolicy = {}, feeByPolicy = {}, grByPolicy = {}, exByPolicy = {}, adjByPolicy = {}, condByAdj = {};
     for (const b of buckets)     { (bktByPolicy[b.policy_id]   = bktByPolicy[b.policy_id]   || []).push(b); }
     for (const f of feeRules)    { (feeByPolicy[f.policy_id]   = feeByPolicy[f.policy_id]   || []).push(f); }
@@ -706,7 +709,7 @@ const UatStorage = {
     return res.data || [];
   },
 
-  _restoreTemplates(templates) {
+  async _restoreTemplates(templates) {
     const wordTpls  = templates.filter(t => t.template_type === 'docx');
     const excelTpls = templates.filter(t => t.template_type === 'excel');
 
@@ -716,7 +719,7 @@ const UatStorage = {
         name: t.template_name, storagePath: t.storage_path,
         placeholders: t.placeholders || [], manualFields: t.manual_fields || [],
       }));
-      this.restoreNativeDocxTemplates(WordState.templates);
+      await this.restoreNativeDocxTemplates(WordState.templates);
       if (typeof WordEditor !== 'undefined') WordEditor.renderTemplatesList();
     }
 
