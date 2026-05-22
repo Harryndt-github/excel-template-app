@@ -205,16 +205,23 @@ const UatStorage = {
     const connections = MasterDataState.connections || [];
     const now = new Date().toISOString();
 
+    // Delete all entities for this scope first — cascades to md_fields, md_records,
+    // md_connections — to avoid unique(scope,entity_name) violations on rename or
+    // delete-then-recreate with the same name.
+    this._throwIfErr(
+      await this.client.from('md_entities').delete().eq('scope', this.scope),
+      'clear md_entities'
+    );
+
     if (entities.length) {
       this._throwIfErr(
-        await this.client.from('md_entities').upsert(
+        await this.client.from('md_entities').insert(
           entities.map((e, i) => ({
             scope: this.scope, entity_id: e.id, entity_name: e.name,
             color: e.color || null, canvas_x: e.x ?? null, canvas_y: e.y ?? null,
             sort_order: i, updated_at: now,
-          })),
-          { onConflict: 'scope,entity_id' }
-        ), 'push md_entities'
+          }))
+        ), 'insert md_entities'
       );
 
       const fieldRows = [];
@@ -227,8 +234,8 @@ const UatStorage = {
       });
       if (fieldRows.length) {
         this._throwIfErr(
-          await this.client.from('md_fields').upsert(fieldRows, { onConflict: 'scope,entity_id,field_id' }),
-          'push md_fields'
+          await this.client.from('md_fields').insert(fieldRows),
+          'insert md_fields'
         );
       }
     }
@@ -244,22 +251,21 @@ const UatStorage = {
     }
     if (recordRows.length) {
       this._throwIfErr(
-        await this.client.from('md_records').upsert(recordRows, { onConflict: 'scope,entity_id,record_id' }),
-        'push md_records'
+        await this.client.from('md_records').insert(recordRows),
+        'insert md_records'
       );
     }
 
     if (connections.length) {
       this._throwIfErr(
-        await this.client.from('md_connections').upsert(
+        await this.client.from('md_connections').insert(
           connections.map(c => ({
             scope: this.scope, connection_id: c.id,
             from_entity_id: c.fromEntity, to_entity_id: c.toEntity,
             from_field_id: c.fromField, to_field_id: c.toField,
             label: c.label || null, updated_at: now,
-          })),
-          { onConflict: 'scope,connection_id' }
-        ), 'push md_connections'
+          }))
+        ), 'insert md_connections'
       );
     }
   },
