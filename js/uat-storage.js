@@ -782,7 +782,10 @@ const UatStorage = {
       const hasLocal = await DocxStore.has(tpl._idbKey || tpl.id);
       if (hasLocal) continue;
       const { data, error } = await this.client.storage.from(this.bucket).download(tpl.storagePath);
-      if (error) throw error;
+      if (error) {
+        console.warn('[UatStorage] Storage download warning (non-fatal):', tpl.storagePath, error);
+        continue;
+      }
       const arrayBuffer = await data.arrayBuffer();
       await DocxStore.save(tpl.id, arrayBuffer);
       tpl._idbKey    = tpl.id;
