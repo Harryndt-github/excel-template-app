@@ -105,7 +105,8 @@ const DocxEngine = {
     for (const fileName of xmlFiles) {
       const file = zip.file(fileName);
       if (!file) continue;
-      let xml = await file.async('string');
+      const original = await file.async('string');
+      let xml = original;
       xml = this.processRepeatBlocks(xml, repeatBlocks);
       xml = this.replacePlaceholdersInXml(xml, replacements, report, fileName);
       // Target-text/occurrence mapping follows the prototype engine and is scoped
@@ -113,7 +114,13 @@ const DocxEngine = {
       if (fileName === 'word/document.xml') {
         xml = this.replaceDirectTextInXml(xml, directReplacements, report, fileName, directCounters);
       }
-      zip.file(fileName, xml);
+      // Only overwrite ZIP entry when content actually changed.
+      // Skipping unchanged files (especially word/numbering.xml, word/styles.xml)
+      // preserves their original binary representation and avoids namespace/encoding
+      // issues that can corrupt automatic heading numbering in Word.
+      if (xml !== original) {
+        zip.file(fileName, xml);
+      }
     }
     this.finalizeMergeReport(report);
     this.lastReport = report;
@@ -256,7 +263,7 @@ const DocxEngine = {
       }
     });
 
-    return changed ? new XMLSerializer().serializeToString(doc) : xmlText;
+    return changed ? this._serializeDocxXml(doc, xmlText) : xmlText;
   },
 
   replaceDirectTextInXml(xmlText, directReplacements, report = null, partName = '', counters = {}) {
@@ -285,7 +292,7 @@ const DocxEngine = {
       if (result.changed) changed = true;
       if (report) this.recordDirectApplications(report, result, partName);
     });
-    return changed ? new XMLSerializer().serializeToString(doc) : xmlText;
+    return changed ? this._serializeDocxXml(doc, xmlText) : xmlText;
   },
 
   replaceTextPairsInNodes(textNodes, pairs, counters = {}) {
@@ -354,6 +361,64 @@ const DocxEngine = {
 
     result.changed = true;
     return result;
+  },
+
+  // Serialize a modified DOCX XML document while preserving the original's
+  // XML declaration and root-element namespace declarations.
+  // XMLSerializer drops the <?xml?> header and may alter namespace prefixes
+  // (e.g. w: → ns0:) which breaks Word's heading-numbering lookup.
+  _serializeDocxXml(doc, originalXml) {
+    let serialized = new XMLSerializer().serializeToString(doc);
+
+    // 1. Restore <?xml …?> declaration that XMLSerializer omits
+    const xmlDeclMatch = originalXml.match(/^<\?xml[^?]*\?>/);
+    if (xmlDeclMatch && !serialized.startsWith('<?xml')) {
+      serialized = xmlDeclMatch[0] + serialized;
+    }
+
+    // 2. Replace the serialized root element opening tag with the original one.
+    //    This preserves all xmlns: namespace bindings (w:, r:, mc:, w14:, …)
+    //    and the mc:Ignorable attribute exactly as Word created them.
+    //    Safe because we never add new namespaced elements — only modify <w:t> text.
+    const origRoot = this._extractRootOpenTag(originalXml);
+    const serRoot  = this._extractRootOpenTag(serialized);
+    if (origRoot && serRoot && origRoot !== serRoot) {
+      const idx = serialized.indexOf(serRoot);
+      if (idx !== -1) {
+        serialized = serialized.slice(0, idx) + origRoot + serialized.slice(idx + serRoot.length);
+      }
+    }
+
+    return serialized;
+  },
+
+  // Extract the first element opening tag (<tagName …>) handling quoted attr values.
+  _extractRootOpenTag(xml) {
+    // Skip past any <?xml?> or <!-- --> preamble
+    let i = 0;
+    while (i < xml.length && xml[i] !== '<') i++;
+    if (i >= xml.length) return null;
+    // Skip processing instructions / comments
+    while (i < xml.length && (xml.slice(i, i+2) === '<?' || xml.slice(i, i+4) === '<!--')) {
+      if (xml.slice(i, i+2) === '<?') {
+        i = xml.indexOf('?>', i) + 2;
+      } else {
+        i = xml.indexOf('-->', i) + 3;
+      }
+      while (i < xml.length && xml[i] !== '<') i++;
+    }
+    if (i >= xml.length) return null;
+    const start = i;
+    i++; // skip '<'
+    let inQuote = false, qc = '';
+    while (i < xml.length) {
+      const ch = xml[i];
+      if (inQuote) { if (ch === qc) inQuote = false; }
+      else if (ch === '"' || ch === "'") { inQuote = true; qc = ch; }
+      else if (ch === '>') { return xml.slice(start, i + 1); }
+      i++;
+    }
+    return null;
   },
 
   replaceInTextNodes(textNodes, replacements) {
