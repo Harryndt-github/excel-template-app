@@ -139,17 +139,19 @@ const UatStorage = {
   queueSync(reason) {
     if (!this.client || this.isSyncing) return;
     clearTimeout(this.syncTimer);
-    this.syncTimer = setTimeout(() => this.pushAll(reason || 'auto').catch(err => {
-      console.warn('[UatStorage] Auto sync failed:', err);
-      this.toast('Đồng bộ Supabase thất bại: ' + err.message, 'warning');
-    }), 1200);
+    this.syncTimer = setTimeout(() => this.pushAll(reason || 'auto'), 1200);
   },
 
   // ── Helpers ──────────────────────────────────────────────────
   _throwIfErr(res, label) {
     if (res && res.error) {
-      console.error(`[UatStorage] ${label}:`, res.error);
-      throw res.error;
+      const err = res.error;
+      console.error(`[UatStorage] ${label}:`, err);
+      // Gắn label vào message để toast hiển thị rõ thao tác nào thất bại
+      const baseMsg = err.message || err.details || err.hint || JSON.stringify(err);
+      const labeled = new Error(`[${label}] ${baseMsg}`);
+      labeled.original = err;
+      throw labeled;
     }
   },
 
@@ -192,6 +194,11 @@ const UatStorage = {
       this.lastStatus = `Synced ${new Date().toLocaleTimeString('vi-VN')}`;
       if (reason !== 'auto') this.toast('Đã đẩy dữ liệu lên Supabase', 'success');
       return true;
+    } catch (err) {
+      console.error('[UatStorage] pushAll failed:', err);
+      this.lastStatus = 'Lỗi đồng bộ';
+      this.toast('Đồng bộ Supabase thất bại: ' + (err.message || String(err)), 'error');
+      return false;
     } finally {
       this.isSyncing = false;
       this.renderStatus();
