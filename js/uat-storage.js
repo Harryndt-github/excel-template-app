@@ -169,6 +169,12 @@ const UatStorage = {
     return s || null;
   },
 
+  // ── Incremental upsert (called by individual modules on save) ──
+  async upsertState(key, _payload) {
+    if (!this.client) return;
+    if (key === 'master_data') await this._pushMasterData();
+  },
+
   // ── Push ─────────────────────────────────────────────────────
   async pushAll(reason) {
     if (!this.client && !this.connect()) {
