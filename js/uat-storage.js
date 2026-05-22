@@ -277,9 +277,25 @@ const UatStorage = {
     const feePols     = RateCenterState.feePolicies    || [];
     const now = new Date().toISOString();
 
+    // Delete-then-insert for all rate center tables to avoid unique constraint
+    // violations on code/name columns when rows are renamed or deleted+recreated.
+    // real_estate_projects cascades to sales_policies and all sub-tables.
+    this._throwIfErr(
+      await this.client.from('interest_support_policies').delete().eq('scope', this.scope),
+      'clear interest_support_policies'
+    );
+    this._throwIfErr(
+      await this.client.from('fee_policies').delete().eq('scope', this.scope),
+      'clear fee_policies'
+    );
+    this._throwIfErr(
+      await this.client.from('real_estate_projects').delete().eq('scope', this.scope),
+      'clear real_estate_projects'
+    );
+
     if (supportPols.length) {
       this._throwIfErr(
-        await this.client.from('interest_support_policies').upsert(
+        await this.client.from('interest_support_policies').insert(
           supportPols.map(sp => ({
             scope: this.scope, support_policy_id: sp.id,
             support_policy_code: this._strOrNull(sp.code),
@@ -288,37 +304,34 @@ const UatStorage = {
             support_end_date: this._strOrNull(sp.supportEndDate),
             note: this._strOrNull(sp.note),
             metadata: sp.metadata || {}, updated_at: now,
-          })),
-          { onConflict: 'scope,support_policy_id' }
-        ), 'push interest_support_policies'
+          }))
+        ), 'insert interest_support_policies'
       );
     }
 
     if (feePols.length) {
       this._throwIfErr(
-        await this.client.from('fee_policies').upsert(
+        await this.client.from('fee_policies').insert(
           feePols.map(fp => ({
             scope: this.scope, fee_policy_id: fp.id,
             fee_policy_code: this._strOrNull(fp.code),
             fee_policy_name: fp.name || 'Chính sách phí',
             note: this._strOrNull(fp.note),
             metadata: fp.metadata || {}, updated_at: now,
-          })),
-          { onConflict: 'scope,fee_policy_id' }
-        ), 'push fee_policies'
+          }))
+        ), 'insert fee_policies'
       );
     }
 
     if (!projects.length) return;
 
     this._throwIfErr(
-      await this.client.from('real_estate_projects').upsert(
+      await this.client.from('real_estate_projects').insert(
         projects.map(pr => ({
           scope: this.scope, project_id: pr.id, project_name: pr.name,
           metadata: { color: pr.color, icon: pr.icon }, updated_at: now,
-        })),
-        { onConflict: 'scope,project_id' }
-      ), 'push real_estate_projects'
+        }))
+      ), 'insert real_estate_projects'
     );
 
     for (const pr of projects) {
@@ -326,7 +339,7 @@ const UatStorage = {
       if (!pkgs.length) continue;
 
       this._throwIfErr(
-        await this.client.from('sales_policies').upsert(
+        await this.client.from('sales_policies').insert(
           pkgs.map(pkg => ({
             scope: this.scope, policy_id: pkg.id, project_id: pr.id,
             policy_name: pkg.name,
@@ -348,15 +361,14 @@ const UatStorage = {
               customFields: pkg.customFields || [],
             },
             updated_at: now,
-          })),
-          { onConflict: 'scope,policy_id' }
-        ), 'push sales_policies'
+          }))
+        ), 'insert sales_policies'
       );
 
       for (const pkg of pkgs) {
         if ((pkg.rateBuckets || []).length) {
           this._throwIfErr(
-            await this.client.from('interest_rate_buckets').upsert(
+            await this.client.from('interest_rate_buckets').insert(
               pkg.rateBuckets.map((b, i) => ({
                 scope: this.scope, bucket_id: b.id, policy_id: pkg.id,
                 max_months: Number(b.maxMonths) || 0,
@@ -365,31 +377,29 @@ const UatStorage = {
                 margin: this._numOrNull(b.margin),
                 note: this._strOrNull(b.note),
                 sort_order: i, updated_at: now,
-              })),
-              { onConflict: 'scope,bucket_id' }
-            ), 'push interest_rate_buckets'
+              }))
+            ), 'insert interest_rate_buckets'
           );
         }
 
         if ((pkg.feeRules || []).length) {
           this._throwIfErr(
-            await this.client.from('fee_policy_rules').upsert(
+            await this.client.from('fee_policy_rules').insert(
               pkg.feeRules.map((f, i) => ({
                 scope: this.scope, rule_id: f.id, policy_id: pkg.id,
                 phase: f.phase, phase_label: f.label || null,
                 fee_percent: this._numOrNull(f.fee),
                 cutoff_month: pkg.feeCutoffMonth || 60,
                 sort_order: i, updated_at: now,
-              })),
-              { onConflict: 'scope,rule_id' }
-            ), 'push fee_policy_rules'
+              }))
+            ), 'insert fee_policy_rules'
           );
         }
 
         if (pkg.graceRules) {
           const gr = pkg.graceRules;
           this._throwIfErr(
-            await this.client.from('grace_rules').upsert([{
+            await this.client.from('grace_rules').insert([{
               scope: this.scope, policy_id: pkg.id,
               base_months: gr.baseMonths || 0,
               with_htls: gr.withHTLS !== false,
@@ -400,28 +410,26 @@ const UatStorage = {
               max_group_default: this._numOrNull((gr.maxByGroup || {}).default),
               note: this._strOrNull(gr.note),
               metadata: { maxByGroup: gr.maxByGroup || {} },
-            }], { onConflict: 'scope,policy_id' }),
-            'push grace_rules'
+            }]), 'insert grace_rules'
           );
         }
 
         if ((pkg.projectExceptions || []).length) {
           this._throwIfErr(
-            await this.client.from('project_policy_exceptions').upsert(
+            await this.client.from('project_policy_exceptions').insert(
               pkg.projectExceptions.map(e => ({
                 scope: this.scope, exception_id: e.id, policy_id: pkg.id,
                 project_name_match: e.projectName || '',
                 max_grace_months: this._numOrNull(e.maxGrace),
                 note: this._strOrNull(e.note), updated_at: now,
-              })),
-              { onConflict: 'scope,exception_id' }
-            ), 'push project_policy_exceptions'
+              }))
+            ), 'insert project_policy_exceptions'
           );
         }
 
         if ((pkg.rateAdjustments || []).length) {
           this._throwIfErr(
-            await this.client.from('rate_adjustment_rules').upsert(
+            await this.client.from('rate_adjustment_rules').insert(
               pkg.rateAdjustments.map((a, i) => ({
                 scope: this.scope, adjustment_id: a.id, policy_id: pkg.id,
                 rule_name: a.name || 'Điều chỉnh',
@@ -429,15 +437,14 @@ const UatStorage = {
                 note: this._strOrNull(a.note),
                 is_active: a.isActive !== false,
                 sort_order: i, updated_at: now,
-              })),
-              { onConflict: 'scope,adjustment_id' }
-            ), 'push rate_adjustment_rules'
+              }))
+            ), 'insert rate_adjustment_rules'
           );
 
           for (const a of pkg.rateAdjustments) {
             if (!(a.conditions || []).length) continue;
             this._throwIfErr(
-              await this.client.from('rate_adjustment_conditions').upsert(
+              await this.client.from('rate_adjustment_conditions').insert(
                 a.conditions.map((c, i) => ({
                   scope: this.scope,
                   condition_id: c.id || (a.id + '_c' + i),
@@ -446,9 +453,8 @@ const UatStorage = {
                   operator: c.operator || 'equals',
                   expected_value: c.expectedValue != null ? String(c.expectedValue) : null,
                   sort_order: i,
-                })),
-                { onConflict: 'scope,condition_id' }
-              ), 'push rate_adjustment_conditions'
+                }))
+              ), 'insert rate_adjustment_conditions'
             );
           }
         }
