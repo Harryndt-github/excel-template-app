@@ -549,8 +549,6 @@ const UatStorage = {
   },
 
   _restoreMasterData({ entities, fields, records, connections }) {
-    if (!entities.length && !connections.length) return;
-
     const fieldsByEntity = {};
     for (const f of fields) {
       (fieldsByEntity[f.entity_id] = fieldsByEntity[f.entity_id] || []).push({
@@ -610,7 +608,6 @@ const UatStorage = {
   },
 
   _restoreRateCenter({ projects, policies, buckets, feeRules, graceRules, exceptions, adjustments, conditions, supportPolicies, feePolicies }) {
-    if (!projects.length && !policies.length && !supportPolicies.length && !feePolicies.length) return;
 
     const bktByPolicy = {}, feeByPolicy = {}, grByPolicy = {}, exByPolicy = {}, adjByPolicy = {}, condByAdj = {};
     for (const b of buckets)     { (bktByPolicy[b.policy_id]   = bktByPolicy[b.policy_id]   || []).push(b); }
@@ -710,12 +707,10 @@ const UatStorage = {
   },
 
   _restoreTemplates(templates) {
-    if (!templates.length) return;
-
     const wordTpls  = templates.filter(t => t.template_type === 'docx');
     const excelTpls = templates.filter(t => t.template_type === 'excel');
 
-    if (wordTpls.length && typeof WordState !== 'undefined') {
+    if (typeof WordState !== 'undefined') {
       WordState.templates = wordTpls.map(t => ({
         ...(t.metadata || {}), id: t.template_id,
         name: t.template_name, storagePath: t.storage_path,
@@ -725,23 +720,11 @@ const UatStorage = {
       if (typeof WordEditor !== 'undefined') WordEditor.renderTemplatesList();
     }
 
-    if (excelTpls.length && typeof AppState !== 'undefined') {
-      const remoteById = {};
-      excelTpls.forEach(t => {
-        remoteById[t.template_id] = { ...(t.metadata || {}), id: t.template_id, name: t.template_name, updatedAt: t.updated_at };
-      });
-
-      const merged = [];
-      (AppState.templates || []).forEach(local => {
-        if (remoteById[local.id]) {
-          merged.push(new Date(remoteById[local.id].updatedAt || 0) >= new Date(local.updatedAt || 0) ? remoteById[local.id] : local);
-          delete remoteById[local.id];
-        } else {
-          merged.push(local);
-        }
-      });
-      Object.values(remoteById).forEach(t => merged.push(t));
-      AppState.templates = merged;
+    if (typeof AppState !== 'undefined') {
+      AppState.templates = excelTpls.map(t => ({
+        ...(t.metadata || {}), id: t.template_id,
+        name: t.template_name, updatedAt: t.updated_at,
+      }));
       if (typeof App !== 'undefined') App.updateDashboard();
     }
   },
