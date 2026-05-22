@@ -358,7 +358,8 @@ const WordEditor = {
       name: field.name || '',
       placeholder: field.placeholder || '',
       targetText: field.targetText || '',
-      description: field.description || ''
+      description: field.description || '',
+      occurrence: field.occurrence || 0
     }));
   },
 
@@ -419,7 +420,11 @@ const WordEditor = {
                 Placeholder trong DOCX
                 <div style="font-size:0.72rem;font-weight:400;color:var(--text-muted);margin-top:2px;">{{...}} trong file Word gốc</div>
               </th>
-              <th style="width:28%;">Ghi chú / Giá trị mặc định</th>
+              <th style="width:22%;">Ghi chú / Giá trị mặc định</th>
+              <th style="width:10%;">
+                Lần thứ
+                <div style="font-size:0.72rem;font-weight:400;color:var(--text-muted);margin-top:2px;">Để trống = tự động</div>
+              </th>
               <th style="width:8%;"></th>
             </tr></thead>
             <tbody id="native-manual-fields-body">
@@ -472,6 +477,13 @@ const WordEditor = {
           <input class="mapping-select native-field-desc"
             value="${_wEsc(field.description || '')}"
             placeholder="Mô tả ngắn...">
+        </td>
+        <td>
+          <input class="mapping-select native-field-occurrence" type="number" min="1" step="1"
+            value="${field.occurrence > 0 ? field.occurrence : ''}"
+            placeholder="Auto"
+            title="Lần xuất hiện thứ mấy trong DOCX (để trống = tự động theo thứ tự dòng)"
+            style="width:100%;text-align:center;">
         </td>
         <td>
           <button type="button" class="btn btn-outline"
@@ -527,7 +539,8 @@ const WordEditor = {
       name: '',
       placeholder: '',
       targetText: '',
-      description: ''
+      description: '',
+      occurrence: 0
     }, body.querySelectorAll('tr').length, docxPhs));
   },
 
@@ -541,14 +554,16 @@ const WordEditor = {
       const nameInput  = row.querySelector('.native-field-name');
       const targetEl   = row.querySelector('.native-field-target'); // may be <select> or <input>
       const descInput  = row.querySelector('.native-field-desc');
+      const occurrenceInput = row.querySelector('.native-field-occurrence');
       const id          = row.getAttribute('data-field-id') || _wUid('wmf');
       const name        = (nameInput?.value  || '').trim();
       const targetRaw   = (targetEl?.value   || '').trim();
       const description = (descInput?.value  || '').trim();
+      const occurrence  = parseInt(occurrenceInput?.value || '0', 10) || 0;
       const isPlaceholder = /^\{\{[^}]+\}\}$/.test(targetRaw);
       const placeholder = isPlaceholder ? targetRaw.replace(/^\{\{|\}\}$/g,'').trim() : '';
       const targetText  = isPlaceholder ? '' : targetRaw;
-      return { id, name, placeholder, targetText, description };
+      return { id, name, placeholder, targetText, description, occurrence };
     }).filter(field => field.name || field.placeholder || field.targetText);
   },
 
@@ -1268,13 +1283,19 @@ const WordGenerator = {
           const targetText = (field.targetText || this._legacyPlaceholderAsDirectTarget(field.placeholder))
             ? (field.targetText || field.placeholder || '')
             : '';
-          if (targetText) targetCounts[targetText] = (targetCounts[targetText] || 0) + 1;
+          let occurrence = 0;
+          if (field.occurrence > 0) {
+            occurrence = field.occurrence;
+          } else if (targetText) {
+            targetCounts[targetText] = (targetCounts[targetText] || 0) + 1;
+            occurrence = targetCounts[targetText];
+          }
           return {
             key,
             label: field.name || field.placeholder || field.targetText || `Dòng mapping ${idx + 1}`,
             field,
             targetText,
-            occurrence: targetText ? targetCounts[targetText] : 0,
+            occurrence,
             type: 'manual'
           };
         })
@@ -1754,9 +1775,9 @@ const WordGenerator = {
       if (!field.name) return;
       const legacyDirectTarget = this._legacyPlaceholderAsDirectTarget(field.placeholder);
       const targetText = (field.targetText || legacyDirectTarget) ? (field.targetText || field.placeholder) : '';
-      const occurrence = targetText
-        ? (targetCounts[targetText] = (targetCounts[targetText] || 0) + 1)
-        : 0;
+      const occurrence = (field.occurrence > 0)
+        ? field.occurrence
+        : (targetText ? (targetCounts[targetText] = (targetCounts[targetText] || 0) + 1) : 0);
       // Resolve giá trị từ mapping UI
       const mapKey = this._getManualFieldKey(field, idx);
       const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
