@@ -760,16 +760,18 @@ const UatStorage = {
       const arrayBuffer = await DocxStore.load(tpl._idbKey || tpl.id);
       if (!arrayBuffer) continue;
       const storagePath = tpl.storagePath || `templates/${this.scope}/${tpl.id}.docx`;
-      this._throwIfErr(
-        await this.client.storage.from(this.bucket).upload(
-          storagePath,
-          new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }),
-          { contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', upsert: true }
-        ), 'upload docx ' + storagePath
+      const res = await this.client.storage.from(this.bucket).upload(
+        storagePath,
+        new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }),
+        { contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', upsert: true }
       );
-      tpl.storagePath = storagePath;
-      tpl._idbKey    = tpl.id;
-      tpl._docxInIDB = true;
+      if (res.error) {
+        console.warn('[UatStorage] Storage upload warning (non-fatal):', res.error);
+      } else {
+        tpl.storagePath = storagePath;
+        tpl._idbKey    = tpl.id;
+        tpl._docxInIDB = true;
+      }
     }
   },
 
