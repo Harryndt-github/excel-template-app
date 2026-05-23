@@ -1894,7 +1894,10 @@ const WordGenerator = {
       const textNodes = Array.from(paragraph.getElementsByTagNameNS(wordNs, 't'));
       if (this._replaceInTextNodes(textNodes, replacements)) changed = true;
     });
-    return changed ? new XMLSerializer().serializeToString(doc) : xmlText;
+    if (!changed) return xmlText;
+    return typeof DocxEngine !== 'undefined'
+      ? DocxEngine._serializeDocxXml(doc, xmlText)
+      : new XMLSerializer().serializeToString(doc);
   },
 
   async exportDOCX() {
@@ -1964,8 +1967,13 @@ const WordGenerator = {
       for (const fileName of xmlFiles) {
         const file = zip.file(fileName);
         if (!file) continue;
-        const xml = await file.async('string');
-        zip.file(fileName, this._replacePlaceholdersInXml(xml, replacements));
+        const original = await file.async('string');
+        const processed = this._replacePlaceholdersInXml(original, replacements);
+        // Only overwrite when content actually changed — preserves word/numbering.xml
+        // and word/styles.xml byte-for-byte, preventing heading numbering corruption.
+        if (processed !== original) {
+          zip.file(fileName, processed);
+        }
       }
       const blob = await zip.generateAsync({
         type: 'blob',
