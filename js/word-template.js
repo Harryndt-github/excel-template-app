@@ -1687,6 +1687,7 @@ const WordGenerator = {
             breakPages: true, useBase64URL: true,
             renderHeaders: true, renderFooters: true,
           });
+          this._fixDocxPreviewCounters(container);
           App.toast('Xem trước DOCX đã sẵn sàng — bấm Xuất Word để tải file', 'success');
         } else {
           const url = URL.createObjectURL(blob);
@@ -1995,6 +1996,79 @@ const WordGenerator = {
       console.error('DOCX export error:', err);
       App.toast(`Lỗi xuất Word: ${err.message}`, 'error');
     }
+  },
+
+  // Fix CSS counter display for multi-level heading numbering after docx.renderAsync.
+  // docx-preview assigns class "docx-num-X-Y" to paragraphs with explicit <w:numPr>.
+  // If numPr is inherited from the paragraph style (not on the paragraph itself),
+  // docx-preview may omit the class, leaving the Level 0 counter at 0 and showing "0.1".
+  // This method scans the live CSS rules, finds heading selectors whose ::before uses the
+  // missing counter, and adds counter-increment as inline style to restore correct numbering.
+  _fixDocxPreviewCounters(container) {
+    if (!container) return;
+
+    // Find all docx-num-X-Y classes present in the container
+    const presentClasses = new Set();
+    container.querySelectorAll('[class]').forEach(el => {
+      el.classList.forEach(c => { if (/^docx-num-\d+-\d+$/.test(c)) presentClasses.add(c); });
+    });
+    if (!presentClasses.size) return;
+
+    // Group by numId: map numId → Set of ilvl numbers present
+    const numIdMap = {};
+    presentClasses.forEach(cls => {
+      const m = cls.match(/^docx-num-(\d+)-(\d+)$/);
+      if (!m) return;
+      if (!numIdMap[m[1]]) numIdMap[m[1]] = new Set();
+      numIdMap[m[1]].add(parseInt(m[2]));
+    });
+
+    // Find numIds where ilvl=0 is absent but ilvl=1 is present (broken counter chain)
+    const brokenNumIds = Object.entries(numIdMap)
+      .filter(([, ilvls]) => !ilvls.has(0) && ilvls.has(1))
+      .map(([numId]) => numId);
+    if (!brokenNumIds.length) return;
+
+    // For each broken numId, find which non-docx-num heading selector uses that counter
+    // in its ::before content rule, then inject counter-increment on matching elements.
+    brokenNumIds.forEach(numId => {
+      const lvl0Counter = `docx-num-${numId}-0`;
+      const lvl1Counter = `docx-num-${numId}-1`;
+      let headingSelector = null;
+
+      try {
+        for (const sheet of Array.from(document.styleSheets)) {
+          if (headingSelector) break;
+          try {
+            for (const rule of Array.from(sheet.cssRules || [])) {
+              if (!rule.selectorText || !rule.selectorText.endsWith('::before')) continue;
+              const content = (rule.style && rule.style.content) || '';
+              if (!content.includes(lvl0Counter)) continue;
+              const base = rule.selectorText.replace(/::before$/, '').trim();
+              // Use only single-class selectors that are NOT the docx-num class itself
+              if (/^\.[a-zA-Z][a-zA-Z0-9_-]*$/.test(base) && !base.includes('docx-num-')) {
+                headingSelector = base;
+                break;
+              }
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+
+      if (!headingSelector) return;
+
+      try {
+        container.querySelectorAll(headingSelector).forEach(el => {
+          const ci = el.style.counterIncrement || '';
+          if (ci.includes(lvl0Counter)) return; // already fixed
+          el.style.counterIncrement = ci ? `${ci} ${lvl0Counter}` : lvl0Counter;
+          const cr = el.style.counterReset || '';
+          if (!cr.includes(lvl1Counter)) {
+            el.style.counterReset = cr ? `${cr} ${lvl1Counter}` : lvl1Counter;
+          }
+        });
+      } catch (_) {}
+    });
   },
 
   _renderMergeReport(report) {

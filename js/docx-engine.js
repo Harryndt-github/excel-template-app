@@ -370,16 +370,39 @@ const DocxEngine = {
   _serializeDocxXml(doc, originalXml) {
     let serialized = new XMLSerializer().serializeToString(doc);
 
-    // 1. Restore <?xml …?> declaration that XMLSerializer omits
+    // 1. Remap any namespace prefix changes made by XMLSerializer (e.g. w: → ns0:).
+    //    Firefox and some Chromium versions rename prefixes. Replacing only the root tag
+    //    (step 3) would leave child elements with undeclared prefixes, causing docx-preview
+    //    to miss <w:numPr> elements and break multi-level heading counter display.
+    const origNs = this._extractNamespaceMap(originalXml); // uri → original prefix
+    const serNs  = this._extractNamespaceMap(serialized);  // uri → serialized prefix
+    const remap  = {};
+    for (const [uri, origPrefix] of Object.entries(origNs)) {
+      const serPrefix = serNs[uri];
+      if (serPrefix && serPrefix !== origPrefix) remap[serPrefix] = origPrefix;
+    }
+    if (Object.keys(remap).length > 0) {
+      // Sort longest-first so "ns10:" is remapped before "ns1:" (prevents partial matches)
+      const pairs = Object.entries(remap).sort((a, b) => b[0].length - a[0].length);
+      for (const [from, to] of pairs) {
+        serialized = serialized.split(`<${from}:`).join(`<${to}:`);
+        serialized = serialized.split(`</${from}:`).join(`</${to}:`);
+        serialized = serialized.split(` ${from}:`).join(` ${to}:`);
+        serialized = serialized.split(`\t${from}:`).join(`\t${to}:`);
+        serialized = serialized.split(`\n${from}:`).join(`\n${to}:`);
+        serialized = serialized.split(`xmlns:${from}=`).join(`xmlns:${to}=`);
+      }
+    }
+
+    // 2. Restore <?xml …?> declaration that XMLSerializer omits
     const xmlDeclMatch = originalXml.match(/^<\?xml[^?]*\?>/);
     if (xmlDeclMatch && !serialized.startsWith('<?xml')) {
       serialized = xmlDeclMatch[0] + serialized;
     }
 
-    // 2. Replace the serialized root element opening tag with the original one.
+    // 3. Replace the serialized root element opening tag with the original one.
     //    This preserves all xmlns: namespace bindings (w:, r:, mc:, w14:, …)
     //    and the mc:Ignorable attribute exactly as Word created them.
-    //    Safe because we never add new namespaced elements — only modify <w:t> text.
     const origRoot = this._extractRootOpenTag(originalXml);
     const serRoot  = this._extractRootOpenTag(serialized);
     if (origRoot && serRoot && origRoot !== serRoot) {
@@ -390,6 +413,19 @@ const DocxEngine = {
     }
 
     return serialized;
+  },
+
+  // Parse xmlns:prefix="uri" declarations from a root tag → returns {uri: prefix}.
+  _extractNamespaceMap(xml) {
+    const rootTag = this._extractRootOpenTag(xml);
+    if (!rootTag) return {};
+    const map = {};
+    const re = /xmlns:([a-zA-Z0-9_-]+)="([^"]+)"/g;
+    let m;
+    while ((m = re.exec(rootTag)) !== null) {
+      map[m[2]] = m[1]; // uri → prefix
+    }
+    return map;
   },
 
   // Extract the first element opening tag (<tagName …>) handling quoted attr values.
