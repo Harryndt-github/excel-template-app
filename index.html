@@ -731,10 +731,17 @@
           <h2 class="page-title">Word Templates</h2>
           <p class="page-subtitle">Quản lý các template Word đã tạo</p>
         </div>
-        <button class="btn btn-primary" onclick="App.navigateTo('word-editor')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          Tạo mới
-        </button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <label class="btn btn-outline" title="Nhập template bundle (.bundle.json) từ máy khác" style="cursor:pointer;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Nhập bundle
+            <input type="file" accept=".json" hidden onchange="WordEditor.importTemplateBundle(this.files[0]).then(()=>this.value='')">
+          </label>
+          <button class="btn btn-primary" onclick="App.navigateTo('word-editor')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Tạo mới
+          </button>
+        </div>
       </div>
       <div id="word-templates-list" class="templates-grid"></div>
       <div id="word-no-templates" class="empty-state" style="display:none;">

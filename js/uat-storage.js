@@ -747,7 +747,15 @@ const UatStorage = {
         copy.originalDocxBase64 = '';
         copy._docxInIDB  = true;
         copy._idbKey     = copy.id;
-        copy.storagePath = copy.storagePath || `templates/${this.scope}/${copy.id}.docx`;
+        // Do NOT generate a default storagePath for files never uploaded — that phantom
+        // path would cause 404 errors on other devices trying to download it.
+        // If Storage is available (storagePath set by a successful upload), strip the
+        // base64 fallback to avoid bloating the DB row.
+        if (copy.storagePath) {
+          copy.docxBase64Fallback = '';
+        }
+        // docxBase64Fallback is kept when present so other devices can restore the
+        // DOCX without Supabase Storage access.
       }
       return copy;
     });
@@ -767,10 +775,16 @@ const UatStorage = {
       );
       if (res.error) {
         console.warn('[UatStorage] Storage upload warning (non-fatal):', res.error);
+        // Storage unavailable — embed DOCX as base64 in template metadata so other
+        // devices can restore it without Supabase Storage access.
+        if (!tpl.docxBase64Fallback) {
+          tpl.docxBase64Fallback = this._arrayBufferToBase64(arrayBuffer);
+        }
       } else {
-        tpl.storagePath = storagePath;
-        tpl._idbKey    = tpl.id;
-        tpl._docxInIDB = true;
+        tpl.storagePath        = storagePath;
+        tpl._idbKey            = tpl.id;
+        tpl._docxInIDB         = true;
+        tpl.docxBase64Fallback = ''; // Storage works; clear the base64 fallback
       }
     }
   },
@@ -778,19 +792,54 @@ const UatStorage = {
   async restoreNativeDocxTemplates(templates) {
     if (typeof DocxStore === 'undefined') return;
     for (const tpl of (templates || [])) {
-      if (!tpl.nativeDocx || !tpl.storagePath) continue;
+      if (!tpl.nativeDocx) continue;
       const hasLocal = await DocxStore.has(tpl._idbKey || tpl.id);
       if (hasLocal) continue;
-      const { data, error } = await this.client.storage.from(this.bucket).download(tpl.storagePath);
-      if (error) {
+
+      // 1. Try Supabase Storage (preferred — keeps DB rows small)
+      if (tpl.storagePath && this.client) {
+        const { data, error } = await this.client.storage.from(this.bucket).download(tpl.storagePath);
+        if (!error) {
+          const arrayBuffer = await data.arrayBuffer();
+          await DocxStore.save(tpl.id, arrayBuffer);
+          tpl._idbKey    = tpl.id;
+          tpl._docxInIDB = true;
+          continue;
+        }
         console.warn('[UatStorage] Storage download warning (non-fatal):', tpl.storagePath, error);
-        continue;
       }
-      const arrayBuffer = await data.arrayBuffer();
-      await DocxStore.save(tpl.id, arrayBuffer);
-      tpl._idbKey    = tpl.id;
-      tpl._docxInIDB = true;
+
+      // 2. Fallback: restore from base64 embedded in template metadata.
+      //    This handles: Storage not configured, bucket missing, cross-device use
+      //    without Supabase, or Storage upload previously failed.
+      if (tpl.docxBase64Fallback) {
+        try {
+          const arrayBuffer = this._base64ToArrayBuffer(tpl.docxBase64Fallback);
+          await DocxStore.save(tpl.id, arrayBuffer);
+          tpl._idbKey    = tpl.id;
+          tpl._docxInIDB = true;
+        } catch (e) {
+          console.warn('[UatStorage] base64 fallback restore failed:', e);
+        }
+      }
     }
+  },
+
+  _arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  },
+
+  _base64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
   },
 };
 

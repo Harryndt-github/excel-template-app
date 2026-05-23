@@ -690,6 +690,10 @@ const WordEditor = {
       const tmp = document.createElement('div');
       tmp.innerHTML = tpl.content;
       const preview = tmp.textContent.substring(0, 200);
+      const exportBtn = tpl.nativeDocx
+        ? `<button class="action-btn" onclick="WordEditor.exportTemplateBundle('${tpl.id}')" title="Xuất bundle để chia sẻ sang máy khác">
+             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+           </button>` : '';
       return `
         <div class="template-row" onclick="WordEditor.editTemplate('${tpl.id}')">
           <div class="t-col-name">
@@ -709,6 +713,7 @@ const WordEditor = {
           <div class="t-col-status"><span class="t-status-badge">Active</span></div>
           <div class="t-col-date">${dateStr}</div>
           <div class="t-col-actions" onclick="event.stopPropagation();">
+            ${exportBtn}
             <button class="action-btn" onclick="WordEditor.duplicateTemplate('${tpl.id}')" title="Nhân bản">
                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
@@ -719,7 +724,73 @@ const WordEditor = {
         </div>
       `;
     }).join('');
-  }
+  },
+
+  // Export a native DOCX template as a portable .bundle.json file.
+  // The bundle contains the template metadata + DOCX bytes (base64) so it can be
+  // imported on any device without needing Supabase Storage or the original .docx file.
+  async exportTemplateBundle(id) {
+    const tpl = WordState.templates.find(t => t.id === id);
+    if (!tpl || !tpl.nativeDocx) { App.toast('Chỉ hỗ trợ xuất template DOCX native', 'warning'); return; }
+
+    let docxBase64 = tpl.docxBase64Fallback || '';
+    if (!docxBase64 && typeof DocxStore !== 'undefined') {
+      const ab = await DocxStore.load(tpl._idbKey || tpl.id);
+      if (ab) {
+        const bytes = new Uint8Array(ab);
+        let bin = '';
+        const ch = 0x8000;
+        for (let i = 0; i < bytes.length; i += ch) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + ch));
+        docxBase64 = btoa(bin);
+      }
+    }
+    if (!docxBase64) {
+      App.toast('Không tìm thấy file DOCX gốc trong bộ nhớ — hãy upload lại file .docx trước', 'warning');
+      return;
+    }
+
+    const bundle = { version: 1, exportedAt: new Date().toISOString(), template: { ...tpl, docxBase64Fallback: '' }, docxBase64 };
+    const blob = new Blob([JSON.stringify(bundle)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${(tpl.name || 'template').replace(/[^a-zA-Z0-9_À-ỹ\s-]/g, '')}.bundle.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    App.toast(`Đã xuất bundle "${tpl.name}" — gửi file này cho người dùng khác để nhập vào`, 'success');
+  },
+
+  // Import a template bundle exported by exportTemplateBundle.
+  // Restores template metadata + DOCX bytes to this device without re-uploading.
+  async importTemplateBundle(file) {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const bundle = JSON.parse(text);
+      if (!bundle || !bundle.template || !bundle.template.id) throw new Error('File bundle không hợp lệ');
+      const tpl = bundle.template;
+      tpl.nativeDocx = true;
+
+      // Restore DOCX bytes to IndexedDB
+      if (bundle.docxBase64 && typeof DocxStore !== 'undefined') {
+        const binary = atob(bundle.docxBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        await DocxStore.save(tpl.id, bytes.buffer);
+        tpl._idbKey = tpl.id; tpl._docxInIDB = true;
+      }
+
+      // Merge into WordState (overwrite if same id, append if new)
+      const idx = WordState.templates.findIndex(t => t.id === tpl.id);
+      if (idx >= 0) WordState.templates[idx] = tpl;
+      else WordState.templates.push(tpl);
+
+      this.renderTemplatesList();
+      this.saveState();
+      App.toast(`Đã nhập template "${_wEsc(tpl.name)}" thành công`, 'success');
+    } catch (err) {
+      App.toast('Lỗi nhập bundle: ' + (err.message || String(err)), 'error');
+    }
+  },
 };
 
 /* ─────────────────────────────────────────────
