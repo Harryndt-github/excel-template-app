@@ -770,11 +770,15 @@ const UatStorage = {
         copy._idbKey     = copy.id;
         // Do NOT generate a default storagePath for files never uploaded — that phantom
         // path would cause 404 errors on other devices trying to download it.
-        // If Storage is available (storagePath set by a successful upload), strip the
-        // base64 fallback to avoid bloating the DB row.
-        if (copy.storagePath) {
+        // Only strip the base64 fallback when Storage upload was CONFIRMED this
+        // session (_storageUploaded flag). A truthy storagePath alone is not
+        // sufficient — old code wrote phantom paths for files never uploaded, and
+        // using that as the signal would wipe the fallback before the DB write,
+        // leaving other devices with nothing to restore from.
+        if (copy._storageUploaded) {
           copy.docxBase64Fallback = '';
         }
+        copy._storageUploaded = undefined; // transient flag — never persist
         // docxBase64Fallback is kept when present so other devices can restore the
         // DOCX without Supabase Storage access.
       }
@@ -805,6 +809,7 @@ const UatStorage = {
         tpl.storagePath        = storagePath;
         tpl._idbKey            = tpl.id;
         tpl._docxInIDB         = true;
+        tpl._storageUploaded   = true; // signal cleanWordTemplates to strip base64 fallback
         tpl.docxBase64Fallback = ''; // Storage works; clear the base64 fallback
       }
     }
