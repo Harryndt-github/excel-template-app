@@ -537,9 +537,30 @@ const UatStorage = {
       this._restoreRateCenter(rcData);
       await this._restoreTemplates(tplData);
       this.renderStatus();
+      // After restoring, if this device has DOCX bytes locally but the DB record
+      // has no docxBase64Fallback yet (e.g. templates pushed before the fallback fix),
+      // silently push so other devices can pull the bytes without needing the .docx file.
+      this._autoUploadMissingDocxFallbacks();
       return true;
     } finally {
       this.isSyncing = false;
+    }
+  },
+
+  // Detects native DOCX templates that exist in local IndexedDB but whose Supabase
+  // metadata row has no docxBase64Fallback. Triggers a silent push to upload the
+  // fallback so other devices (e.g. macOS) can restore the DOCX without re-uploading.
+  async _autoUploadMissingDocxFallbacks() {
+    if (typeof WordState === 'undefined' || typeof DocxStore === 'undefined') return;
+    const missing = [];
+    for (const tpl of (WordState.templates || [])) {
+      if (!tpl.nativeDocx || tpl.docxBase64Fallback) continue;
+      const hasLocal = await DocxStore.has(tpl._idbKey || tpl.id);
+      if (hasLocal) missing.push(tpl.name || tpl.id);
+    }
+    if (missing.length > 0) {
+      console.log('[UatStorage] Auto-push: uploading docxBase64Fallback for', missing);
+      await this.pushAll('auto');
     }
   },
 
