@@ -770,17 +770,13 @@ const UatStorage = {
         copy._idbKey     = copy.id;
         // Do NOT generate a default storagePath for files never uploaded — that phantom
         // path would cause 404 errors on other devices trying to download it.
-        // Only strip the base64 fallback when Storage upload was CONFIRMED this
-        // session (_storageUploaded flag). A truthy storagePath alone is not
-        // sufficient — old code wrote phantom paths for files never uploaded, and
-        // using that as the signal would wipe the fallback before the DB write,
-        // leaving other devices with nothing to restore from.
-        if (copy._storageUploaded) {
-          copy.docxBase64Fallback = '';
-        }
+        // NEVER clear docxBase64Fallback here — it is the primary cross-device
+        // sync mechanism. Storage is an optional optimisation; clearing the
+        // fallback when Storage "succeeds" on the upload side is dangerous
+        // because the download side may still fail (bucket permissions, missing
+        // object, network). Always keeping the fallback guarantees other devices
+        // can restore the DOCX regardless of Storage state.
         copy._storageUploaded = undefined; // transient flag — never persist
-        // docxBase64Fallback is kept when present so other devices can restore the
-        // DOCX without Supabase Storage access.
       }
       return copy;
     });
@@ -798,19 +794,20 @@ const UatStorage = {
         new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }),
         { contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', upsert: true }
       );
+      // Always embed DOCX as base64 fallback — this is the primary cross-device
+      // sync path. Storage upload is an optimisation (faster download) but is
+      // unreliable (bucket permissions, missing objects, network). Without the
+      // fallback, other devices get "file not found" whenever Storage is down.
+      if (!tpl.docxBase64Fallback) {
+        tpl.docxBase64Fallback = this._arrayBufferToBase64(arrayBuffer);
+      }
       if (res.error) {
         console.warn('[UatStorage] Storage upload warning (non-fatal):', res.error);
-        // Storage unavailable — embed DOCX as base64 in template metadata so other
-        // devices can restore it without Supabase Storage access.
-        if (!tpl.docxBase64Fallback) {
-          tpl.docxBase64Fallback = this._arrayBufferToBase64(arrayBuffer);
-        }
       } else {
-        tpl.storagePath        = storagePath;
-        tpl._idbKey            = tpl.id;
-        tpl._docxInIDB         = true;
-        tpl._storageUploaded   = true; // signal cleanWordTemplates to strip base64 fallback
-        tpl.docxBase64Fallback = ''; // Storage works; clear the base64 fallback
+        tpl.storagePath  = storagePath;
+        tpl._idbKey      = tpl.id;
+        tpl._docxInIDB   = true;
+        tpl._storageUploaded = true;
       }
     }
   },
