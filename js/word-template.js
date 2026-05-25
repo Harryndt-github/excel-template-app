@@ -1323,9 +1323,9 @@ const WordGenerator = {
         <td>
           <div style="display:flex;align-items:center;gap:4px;">
             <select class="mapping-select" id="wmap-${_wSanId(item.key)}" style="flex:1;" onchange="WordGenerator.onMappingChange('${ek}',this.value)">${options.replace(/__FIELD__/g, _wEsc(item.key))}</select>
-            ${item.type !== 'manual' ? `<button id="wcompbtn-${_wSanId(item.key)}"
+            <button id="wcompbtn-${_wSanId(item.key)}"
               style="padding:3px 8px;border:1px solid rgba(99,102,241,0.3);border-radius:6px;background:transparent;color:#6366f1;cursor:pointer;font-size:0.78rem;white-space:nowrap;flex-shrink:0;font-family:inherit;"
-              onclick="WordGenerator.toggleComposite('${ek}')" title="Ghép nhiều trường thành 1 giá trị">⊕ Ghép</button>` : ''}
+              onclick="WordGenerator.toggleComposite('${ek}')" title="Ghép nhiều trường thành 1 giá trị">⊕ Ghép</button>
           </div>
           <div id="wcomp-${_wSanId(item.key)}" style="display:none;"></div>
           <input class="mapping-select" id="wmanual-${_wSanId(item.key)}" placeholder="Nhập trực tiếp giá trị cho chỉ tiêu này"
@@ -1971,11 +1971,16 @@ const WordGenerator = {
       const occurrence = (field.occurrence > 0)
         ? field.occurrence
         : (targetText ? (targetCounts[targetText] = (targetCounts[targetText] || 0) + 1) : 0);
-      // Resolve giá trị từ mapping UI
+      // Resolve giá trị từ mapping UI (composite hoặc single)
       const mapKey = this._getManualFieldKey(field, idx);
-      const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
-      if (!sel || !sel.value) return;
-      const resolvedValue = this._resolveMappingValue(sel.value);
+      let resolvedValue;
+      if (this._compositeMappings[mapKey] && this._compositeMappings[mapKey].length) {
+        resolvedValue = this._resolveComposite(mapKey);
+      } else {
+        const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
+        if (!sel || !sel.value) return;
+        resolvedValue = this._resolveMappingValue(sel.value);
+      }
       if (resolvedValue === undefined) return;
       const val = String(resolvedValue);
 
@@ -2005,11 +2010,15 @@ const WordGenerator = {
       if (!field.placeholder || !field.name) return;
       if (this._legacyPlaceholderAsDirectTarget(field.placeholder)) return;
       const mapKey = this._getManualFieldKey(field, idx);
-      const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
-      if (!sel || !sel.value) return;
-      const resolvedValue = this._resolveMappingValue(sel.value);
+      let resolvedValue;
+      if (this._compositeMappings[mapKey] && this._compositeMappings[mapKey].length) {
+        resolvedValue = this._resolveComposite(mapKey);
+      } else {
+        const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
+        if (!sel || !sel.value) return;
+        resolvedValue = this._resolveMappingValue(sel.value);
+      }
       if (resolvedValue === undefined) return;
-      // Map: {{placeholder}} -> resolved value
       merged[field.placeholder] = String(resolvedValue);
     });
     return merged;
