@@ -1346,13 +1346,7 @@ const WordGenerator = {
           ${item.afterLabel ? `<div style="font-size:0.72rem;color:#10b981;margin-top:3px;">${item.isAnchoredValue ? 'Ghép sau giá trị của' : 'Sau'}: ${_wEsc(item.afterLabel)}</div>` : ''}
         </td>
         <td>
-          <div style="display:flex;align-items:center;gap:4px;">
-            <select class="mapping-select" id="wmap-${_wSanId(item.key)}" style="flex:1;" onchange="WordGenerator.onMappingChange('${ek}',this.value)">${options.replace(/__FIELD__/g, _wEsc(item.key))}</select>
-            <button id="wcompbtn-${_wSanId(item.key)}"
-              style="padding:3px 8px;border:1px solid rgba(99,102,241,0.3);border-radius:6px;background:transparent;color:#6366f1;cursor:pointer;font-size:0.78rem;white-space:nowrap;flex-shrink:0;font-family:inherit;"
-              onclick="WordGenerator.toggleComposite('${ek}')" title="Ghép nhiều trường thành 1 giá trị">⊕ Ghép</button>
-          </div>
-          <div id="wcomp-${_wSanId(item.key)}" style="display:none;"></div>
+          <select class="mapping-select" id="wmap-${_wSanId(item.key)}" onchange="WordGenerator.onMappingChange('${ek}',this.value)">${options.replace(/__FIELD__/g, _wEsc(item.key))}</select>
           <input class="mapping-select" id="wmanual-${_wSanId(item.key)}" placeholder="Nhập trực tiếp giá trị cho chỉ tiêu này"
             style="display:none;margin-top:6px;"
             oninput="WordGenerator.onMappingChange('${ek}', 'manual::${ek}')">
@@ -1360,12 +1354,6 @@ const WordGenerator = {
         <td class="mapping-value-preview" id="wprev-${_wSanId(item.key)}">—</td>
       </tr>`;}).join('')}
       </tbody></table>`;
-    // Reset composite state when template changes
-    const tplId = WordState.selectedTemplateId;
-    if (this._compositesTplId !== tplId) {
-      this._compositeMappings = {};
-      this._compositesTplId = tplId;
-    }
     mappingItems.forEach(item => {
       const selectEl = document.getElementById(`wmap-${_wSanId(item.key)}`);
       const currentValue = currentMappings[item.key];
@@ -1373,11 +1361,6 @@ const WordGenerator = {
       if (selectEl && currentValue && hasCurrentValue) {
         selectEl.value = currentValue;
         this.onMappingChange(item.key, currentValue);
-      }
-      // Restore composite UI if state exists for this placeholder
-      if (this._compositeMappings[item.key] && this._compositeMappings[item.key].length) {
-        this._renderCompositeParts(item.key);
-        this._updateCompositePreview(item.key);
       }
     });
     this.autoMap(mappingItems);
@@ -1835,108 +1818,12 @@ const WordGenerator = {
       manualInput.style.display = value && value.startsWith('manual::') ? 'block' : 'none';
     }
     if (!el) return;
-    if (this._compositeMappings[ph] && this._compositeMappings[ph].length) {
-      this._updateCompositePreview(ph); return;
-    }
     if (!value) { el.textContent = '—'; el.title = ''; return; }
     const resolvedValue = this._resolveMappingValue(value);
     if (resolvedValue !== undefined) {
       el.textContent = String(resolvedValue).substring(0, 80) || '(trống)';
       el.title = String(resolvedValue);
     } else { el.textContent = '—'; el.title = ''; }
-  },
-
-  // ── Composite (multi-field) mapping ─────────────────────────────
-  _compositeMappings: {},
-  _compositesTplId: null,
-
-  toggleComposite(ph) {
-    if (this._compositeMappings[ph] && this._compositeMappings[ph].length) {
-      delete this._compositeMappings[ph];
-    } else {
-      this._compositeMappings[ph] = [{ sep: ', ', value: '' }];
-    }
-    this._renderCompositeParts(ph);
-    this._updateCompositePreview(ph);
-  },
-
-  addCompositePart(ph) {
-    if (!this._compositeMappings[ph]) this._compositeMappings[ph] = [];
-    this._compositeMappings[ph].push({ sep: ', ', value: '' });
-    this._renderCompositeParts(ph);
-  },
-
-  removeCompositePart(ph, idx) {
-    if (!this._compositeMappings[ph]) return;
-    this._compositeMappings[ph].splice(idx, 1);
-    if (!this._compositeMappings[ph].length) delete this._compositeMappings[ph];
-    this._renderCompositeParts(ph);
-    this._updateCompositePreview(ph);
-  },
-
-  onCompositeChange(ph, idx, field, val) {
-    if (!this._compositeMappings[ph] || !this._compositeMappings[ph][idx]) return;
-    this._compositeMappings[ph][idx][field] = val;
-    this._updateCompositePreview(ph);
-  },
-
-  _updateCompositePreview(ph) {
-    const el = document.getElementById(`wprev-${_wSanId(ph)}`);
-    if (!el) return;
-    const resolved = this._resolveComposite(ph);
-    el.textContent = (resolved !== undefined && resolved !== '') ? String(resolved).substring(0, 80) : '—';
-    el.title = resolved !== undefined ? String(resolved) : '';
-  },
-
-  _resolveComposite(ph) {
-    const mainSel = document.getElementById(`wmap-${_wSanId(ph)}`);
-    const mainValue = mainSel ? mainSel.value : '';
-    const extras = this._compositeMappings[ph] || [];
-    const allParts = [{ sep: '', value: mainValue }, ...extras];
-    let result = '';
-    let hasAny = false;
-    allParts.forEach(part => {
-      if (!part.value) return;
-      const resolved = this._resolveMappingValue(part.value);
-      if (resolved === undefined || String(resolved).trim() === '') return;
-      result += hasAny ? (part.sep !== undefined ? part.sep : ', ') + String(resolved) : String(resolved);
-      hasAny = true;
-    });
-    return hasAny ? result : undefined;
-  },
-
-  _renderCompositeParts(ph) {
-    const container = document.getElementById(`wcomp-${_wSanId(ph)}`);
-    const btn = document.getElementById(`wcompbtn-${_wSanId(ph)}`);
-    if (!container) return;
-    const extras = this._compositeMappings[ph];
-    if (!extras || !extras.length) {
-      container.style.display = 'none';
-      if (btn) { btn.style.background = ''; btn.style.color = '#6366f1'; btn.title = 'Ghép nhiều trường'; }
-      return;
-    }
-    container.style.display = 'block';
-    if (btn) { btn.style.background = '#6366f1'; btn.style.color = '#fff'; btn.title = 'Đang ghép — bấm để bỏ'; }
-    const options = this._buildMappingOptions();
-    const phEsc = ph.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    container.innerHTML = extras.map((part, idx) => `
-      <div style="display:flex;align-items:center;gap:4px;margin-top:4px;">
-        <input type="text" value="${_wEsc(part.sep !== undefined ? part.sep : ', ')}"
-          placeholder="khoảng cách"
-          style="width:56px;padding:3px 5px;border:1px solid rgba(99,102,241,0.3);border-radius:6px;font-size:0.77rem;text-align:center;background:var(--bg-secondary);"
-          title="Ký tự nối (vd: ', ' hoặc ' - ')"
-          oninput="WordGenerator.onCompositeChange('${phEsc}',${idx},'sep',this.value)">
-        <select class="mapping-select" style="flex:1;font-size:0.82rem;"
-          onchange="WordGenerator.onCompositeChange('${phEsc}',${idx},'value',this.value)">${options.replace(/__FIELD__/g, '')}</select>
-        <button style="padding:2px 8px;border:none;border-radius:6px;background:rgba(239,68,68,0.1);color:#ef4444;cursor:pointer;font-size:0.9rem;line-height:1.4;"
-          onclick="WordGenerator.removeCompositePart('${phEsc}',${idx})" title="Xoá trường này">×</button>
-      </div>`).join('') + `
-      <button style="margin-top:5px;padding:3px 10px;border:1px dashed rgba(99,102,241,0.4);border-radius:6px;background:transparent;color:#6366f1;cursor:pointer;font-size:0.78rem;"
-        onclick="WordGenerator.addCompositePart('${phEsc}')">+ Thêm trường nối</button>`;
-    extras.forEach((part, idx) => {
-      const sel = container.querySelectorAll('select')[idx];
-      if (sel && part.value) sel.value = part.value;
-    });
   },
 
   async preview() {
@@ -2044,11 +1931,6 @@ const WordGenerator = {
   _collectReplacements(tpl) {
     const replacements = {};
     (tpl.placeholders || []).forEach(ph => {
-      if (this._compositeMappings[ph] && this._compositeMappings[ph].length) {
-        const resolved = this._resolveComposite(ph);
-        if (resolved !== undefined) replacements[ph] = String(resolved);
-        return;
-      }
       const sel = document.getElementById(`wmap-${_wSanId(ph)}`);
       if (sel && sel.value) {
         const resolvedValue = this._resolveMappingValue(sel.value);
@@ -2068,16 +1950,11 @@ const WordGenerator = {
       const fieldPlan = plan[field.id] || {};
       const targetText = fieldPlan.targetText || this._getManualFieldTargetText(field);
       const occurrence = fieldPlan.occurrence || 0;
-      // Resolve giá trị từ mapping UI (composite hoặc single)
+      // Resolve giá trị từ mapping UI
       const mapKey = this._getManualFieldKey(field, idx);
-      let resolvedValue;
-      if (this._compositeMappings[mapKey] && this._compositeMappings[mapKey].length) {
-        resolvedValue = this._resolveComposite(mapKey);
-      } else {
-        const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
-        if (!sel || !sel.value) return;
-        resolvedValue = this._resolveMappingValue(sel.value);
-      }
+      const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
+      if (!sel || !sel.value) return;
+      const resolvedValue = this._resolveMappingValue(sel.value);
       if (resolvedValue === undefined) return;
       const val = String(resolvedValue);
 
@@ -2116,14 +1993,9 @@ const WordGenerator = {
       if (!field.placeholder || !field.name) return;
       if (this._legacyPlaceholderAsDirectTarget(field.placeholder)) return;
       const mapKey = this._getManualFieldKey(field, idx);
-      let resolvedValue;
-      if (this._compositeMappings[mapKey] && this._compositeMappings[mapKey].length) {
-        resolvedValue = this._resolveComposite(mapKey);
-      } else {
-        const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
-        if (!sel || !sel.value) return;
-        resolvedValue = this._resolveMappingValue(sel.value);
-      }
+      const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
+      if (!sel || !sel.value) return;
+      const resolvedValue = this._resolveMappingValue(sel.value);
       if (resolvedValue === undefined) return;
       merged[field.placeholder] = String(resolvedValue);
     });
