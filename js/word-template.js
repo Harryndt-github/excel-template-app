@@ -1343,7 +1343,7 @@ const WordGenerator = {
         <td class="mapping-placeholder-name">
           ${item.type === 'manual' ? _wEsc(item.label) : `{{${_wEsc(item.label)}}}`}
           ${item.targetText ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">Vị trí ${item.occurrence || 1}: <code>${_wEsc(item.targetText)}</code></div>` : ''}
-          ${item.afterLabel ? `<div style="font-size:0.72rem;color:#10b981;margin-top:3px;">Sau: ${_wEsc(item.afterLabel)}</div>` : ''}
+          ${item.afterLabel ? `<div style="font-size:0.72rem;color:#10b981;margin-top:3px;">${item.isAnchoredValue ? 'Ghép sau giá trị của' : 'Sau'}: ${_wEsc(item.afterLabel)}</div>` : ''}
         </td>
         <td>
           <div style="display:flex;align-items:center;gap:4px;">
@@ -1393,46 +1393,88 @@ const WordGenerator = {
     return (field.targetText || legacyDirectTarget) ? (field.targetText || field.placeholder || '') : '';
   },
 
-  _resolveManualFieldOccurrences(fields) {
-    const result = {};
-    const targetById = {};
-    const usedByTarget = {};
+  _normalizeManualFieldRef(value) {
+    return String(value || '')
+      .trim()
+      .replace(/^manualfield::/i, '')
+      .replace(/^\{\{|\}\}$/g, '')
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  },
 
-    (fields || []).forEach((field, idx) => {
+  _findManualAnchorField(fields, field) {
+    const rawTarget = this._getManualFieldTargetText(field);
+    const normalizedTarget = this._normalizeManualFieldRef(rawTarget);
+    const afterField = field.afterFieldId ? fields.find(f => f.id === field.afterFieldId) : null;
+
+    if (afterField && (!rawTarget || normalizedTarget === this._normalizeManualFieldRef(afterField.name) || normalizedTarget === this._normalizeManualFieldRef(afterField.id))) {
+      return afterField;
+    }
+
+    if (!normalizedTarget) return afterField || null;
+    return fields.find(candidate => {
+      if (!candidate || candidate.id === field.id) return false;
+      return normalizedTarget === this._normalizeManualFieldRef(candidate.id)
+        || normalizedTarget === this._normalizeManualFieldRef(candidate.name);
+    }) || null;
+  },
+
+  _resolveManualFieldPlan(fields) {
+    const plan = {};
+    const usedByTarget = {};
+    const list = fields || [];
+
+    list.forEach((field, idx) => {
       if (!field.id) field.id = _wUid(`wmf_${idx + 1}`);
-      const targetText = this._getManualFieldTargetText(field);
+      const rawTarget = this._getManualFieldTargetText(field);
+      const anchorField = this._findManualAnchorField(list, field);
+      const anchorPlan = anchorField ? plan[anchorField.id] : null;
+      const targetText = anchorPlan?.targetText || (!anchorField ? rawTarget : this._getManualFieldTargetText(anchorField));
       if (!targetText) return;
 
       let occurrence = Number(field.occurrence) || 0;
-      const afterFieldId = field.afterFieldId || '';
-      const afterOccurrence = afterFieldId ? result[afterFieldId] : 0;
-      const afterTarget = afterFieldId ? targetById[afterFieldId] : '';
+      if (!occurrence && anchorPlan) {
+        occurrence = anchorPlan.occurrence;
+      }
 
-      if (!occurrence && afterOccurrence && afterTarget === targetText) {
-        occurrence = afterOccurrence + 1;
+      const afterFieldId = field.afterFieldId || '';
+      const afterPlan = afterFieldId ? plan[afterFieldId] : null;
+      if (!occurrence && afterPlan && afterPlan.targetText === targetText) {
+        occurrence = afterPlan.occurrence + 1;
       }
       if (!occurrence) {
         occurrence = (usedByTarget[targetText] || 0) + 1;
       }
 
-      result[field.id] = occurrence;
-      targetById[field.id] = targetText;
+      plan[field.id] = {
+        targetText,
+        occurrence,
+        anchorFieldId: anchorField?.id || '',
+        anchorLabel: anchorField ? (anchorField.name || anchorField.placeholder || anchorField.targetText || '') : '',
+        isAnchoredValue: !!anchorPlan
+      };
       usedByTarget[targetText] = Math.max(usedByTarget[targetText] || 0, occurrence);
     });
 
-    return result;
+    return plan;
+  },
+
+  _resolveManualFieldOccurrences(fields) {
+    const plan = this._resolveManualFieldPlan(fields);
+    return Object.fromEntries(Object.entries(plan).map(([id, item]) => [id, item.occurrence]));
   },
 
   _getMappingItems(tpl) {
     if (!tpl) return [];
     if (tpl.nativeDocx && Array.isArray(tpl.manualFields) && tpl.manualFields.length) {
-      const occurrences = this._resolveManualFieldOccurrences(tpl.manualFields);
+      const plan = this._resolveManualFieldPlan(tpl.manualFields);
       const fieldById = Object.fromEntries(tpl.manualFields.map(f => [f.id, f]));
       return tpl.manualFields
         .map((field, idx) => {
           const key = this._getManualFieldKey(field, idx);
-          const targetText = this._getManualFieldTargetText(field);
-          const occurrence = occurrences[field.id] || 0;
+          const itemPlan = plan[field.id] || {};
+          const targetText = itemPlan.targetText || this._getManualFieldTargetText(field);
+          const occurrence = itemPlan.occurrence || 0;
           const afterField = field.afterFieldId ? fieldById[field.afterFieldId] : null;
           return {
             key,
@@ -1440,7 +1482,8 @@ const WordGenerator = {
             field,
             targetText,
             occurrence,
-            afterLabel: afterField ? (afterField.name || afterField.placeholder || afterField.targetText || '') : '',
+            afterLabel: itemPlan.anchorLabel || (afterField ? (afterField.name || afterField.placeholder || afterField.targetText || '') : ''),
+            isAnchoredValue: !!itemPlan.isAnchoredValue,
             type: 'manual'
           };
         })
@@ -2017,13 +2060,14 @@ const WordGenerator = {
 
   _collectDirectReplacements(tpl) {
     const fields = tpl.manualFields || [];
-    const results = [];
-    const occurrences = this._resolveManualFieldOccurrences(fields);
+    const grouped = new Map();
+    const plan = this._resolveManualFieldPlan(fields);
     fields.forEach((field, idx) => {
       if (!field.name) return;
       const legacyDirectTarget = this._legacyPlaceholderAsDirectTarget(field.placeholder);
-      const targetText = this._getManualFieldTargetText(field);
-      const occurrence = occurrences[field.id] || 0;
+      const fieldPlan = plan[field.id] || {};
+      const targetText = fieldPlan.targetText || this._getManualFieldTargetText(field);
+      const occurrence = fieldPlan.occurrence || 0;
       // Resolve giá trị từ mapping UI (composite hoặc single)
       const mapKey = this._getManualFieldKey(field, idx);
       let resolvedValue;
@@ -2043,16 +2087,25 @@ const WordGenerator = {
         // (không push vào results, đã được hòa tan vào replacements qua buildNativeReplacementsFromManual)
       } else if (targetText) {
         // Mode 2: fallback — thay trực tiếp đoạn text trong DOCX
-        results.push({
+        const groupKey = `${targetText}::${occurrence || 0}`;
+        const existing = grouped.get(groupKey) || {
           field: field.name,
           targetText,
-          value: val,
+          values: [],
           mode: 'append',
           occurrence
-        });
+        };
+        existing.values.push(val);
+        grouped.set(groupKey, existing);
       }
     });
-    return results;
+    return Array.from(grouped.values()).map(item => ({
+      field: item.field,
+      targetText: item.targetText,
+      value: item.values.join(', '),
+      mode: item.mode,
+      occurrence: item.occurrence
+    }));
   },
 
   /* Build replacements object từ manualFields placeholder mode để merge vào replacements chính */
