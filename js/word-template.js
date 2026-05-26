@@ -359,6 +359,7 @@ const WordEditor = {
       placeholder: field.placeholder || '',
       targetText: field.targetText || '',
       description: field.description || '',
+      afterFieldId: field.afterFieldId || '',
       occurrence: field.occurrence || 0
     }));
   },
@@ -412,23 +413,27 @@ const WordEditor = {
         <div style="overflow:auto;">
           <table class="mapping-table" style="margin:0;">
             <thead><tr>
-              <th style="width:30%;">
+              <th style="width:24%;">
                 Mã chỉ tiêu
                 <div style="font-size:0.72rem;font-weight:400;color:var(--text-muted);margin-top:2px;">Gõ hoặc chọn từ Master Data</div>
               </th>
-              <th style="width:34%;">
+              <th style="width:28%;">
                 Placeholder trong DOCX
                 <div style="font-size:0.72rem;font-weight:400;color:var(--text-muted);margin-top:2px;">{{...}} trong file Word gốc</div>
               </th>
-              <th style="width:22%;">Ghi chú / Giá trị mặc định</th>
-              <th style="width:10%;">
+              <th style="width:16%;">
+                Sau dòng
+                <div style="font-size:0.72rem;font-weight:400;color:var(--text-muted);margin-top:2px;">Dùng khi nhãn bị trùng</div>
+              </th>
+              <th style="width:16%;">Ghi chú / Giá trị mặc định</th>
+              <th style="width:8%;">
                 Lần thứ
                 <div style="font-size:0.72rem;font-weight:400;color:var(--text-muted);margin-top:2px;">Để trống = tự động</div>
               </th>
-              <th style="width:8%;"></th>
+              <th style="width:6%;"></th>
             </tr></thead>
             <tbody id="native-manual-fields-body">
-              ${rows.map((field, idx) => this._manualFieldRowHtml(field, idx, docxPhs, dlId)).join('')}
+              ${rows.map((field, idx) => this._manualFieldRowHtml(field, idx, docxPhs, dlId, rows)).join('')}
             </tbody>
           </table>
         </div>
@@ -441,13 +446,20 @@ const WordEditor = {
       </div>`;
   },
 
-  _manualFieldRowHtml(field, idx, docxPhs, dlId) {
+  _manualFieldRowHtml(field, idx, docxPhs, dlId, allFields) {
     docxPhs = docxPhs || [];
     dlId = dlId || 'native-field-datalist';
+    allFields = allFields || [];
 
     // Datalist riêng cho cột placeholder — chứa các {{ph}} đã scan từ DOCX
     const phDlId = 'native-ph-datalist';
     const currentVal = field.placeholder || field.targetText || '';
+    const previousFields = allFields.slice(0, idx).filter(f => f && f.id);
+    const afterOptions = previousFields.map((f, i) => {
+      const label = f.name || f.placeholder || f.targetText || `Dòng ${i + 1}`;
+      const selected = field.afterFieldId === f.id ? 'selected' : '';
+      return `<option value="${_wEsc(f.id)}" ${selected}>Sau: ${_wEsc(label)}</option>`;
+    }).join('');
 
     return `
       <tr data-manual-field-row data-field-id="${_wEsc(field.id || _wUid(`wmf_${idx + 1}`))}">
@@ -472,6 +484,13 @@ const WordEditor = {
               title="Nhập {{placeholder}} có trong DOCX, hoặc paste đoạn text gốc cần thay">
             <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:0.75rem;color:var(--text-muted);pointer-events:none;">▾</span>
           </div>
+        </td>
+        <td>
+          <select class="mapping-select native-field-after"
+            title="Nếu nhiều vị trí có cùng nhãn, chọn dòng đứng trước để hệ thống lấy đúng occurrence tiếp theo.">
+            <option value="">Tự động theo thứ tự</option>
+            ${afterOptions}
+          </select>
         </td>
         <td>
           <input class="mapping-select native-field-desc"
@@ -534,14 +553,17 @@ const WordEditor = {
     if (!body) return;
     const tpl = WordState.editingId ? WordState.templates.find(t => t.id === WordState.editingId) : null;
     const docxPhs = tpl ? this._getDocxPlaceholders(tpl) : [];
-    body.insertAdjacentHTML('beforeend', this._manualFieldRowHtml({
+    const rows = this.collectManualFields();
+    rows.push({
       id: _wUid('wmf'),
       name: '',
       placeholder: '',
       targetText: '',
       description: '',
+      afterFieldId: '',
       occurrence: 0
-    }, body.querySelectorAll('tr').length, docxPhs));
+    });
+    body.innerHTML = rows.map((field, idx) => this._manualFieldRowHtml(field, idx, docxPhs, undefined, rows)).join('');
   },
 
   removeManualFieldRow(button) {
@@ -554,16 +576,18 @@ const WordEditor = {
       const nameInput  = row.querySelector('.native-field-name');
       const targetEl   = row.querySelector('.native-field-target'); // may be <select> or <input>
       const descInput  = row.querySelector('.native-field-desc');
+      const afterSelect = row.querySelector('.native-field-after');
       const occurrenceInput = row.querySelector('.native-field-occurrence');
       const id          = row.getAttribute('data-field-id') || _wUid('wmf');
       const name        = (nameInput?.value  || '').trim();
       const targetRaw   = (targetEl?.value   || '').trim();
       const description = (descInput?.value  || '').trim();
+      const afterFieldId = (afterSelect?.value || '').trim();
       const occurrence  = parseInt(occurrenceInput?.value || '0', 10) || 0;
       const isPlaceholder = /^\{\{[^}]+\}\}$/.test(targetRaw);
       const placeholder = isPlaceholder ? targetRaw.replace(/^\{\{|\}\}$/g,'').trim() : '';
       const targetText  = isPlaceholder ? '' : targetRaw;
-      return { id, name, placeholder, targetText, description, occurrence };
+      return { id, name, placeholder, targetText, description, afterFieldId, occurrence };
     }).filter(field => field.name || field.placeholder || field.targetText);
   },
 
@@ -1319,6 +1343,7 @@ const WordGenerator = {
         <td class="mapping-placeholder-name">
           ${item.type === 'manual' ? _wEsc(item.label) : `{{${_wEsc(item.label)}}}`}
           ${item.targetText ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">Vị trí ${item.occurrence || 1}: <code>${_wEsc(item.targetText)}</code></div>` : ''}
+          ${item.afterLabel ? `<div style="font-size:0.72rem;color:#10b981;margin-top:3px;">Sau: ${_wEsc(item.afterLabel)}</div>` : ''}
         </td>
         <td>
           <div style="display:flex;align-items:center;gap:4px;">
@@ -1363,29 +1388,59 @@ const WordGenerator = {
     return `manualfield::${field.id}`;
   },
 
+  _getManualFieldTargetText(field) {
+    const legacyDirectTarget = this._legacyPlaceholderAsDirectTarget(field.placeholder);
+    return (field.targetText || legacyDirectTarget) ? (field.targetText || field.placeholder || '') : '';
+  },
+
+  _resolveManualFieldOccurrences(fields) {
+    const result = {};
+    const targetById = {};
+    const usedByTarget = {};
+
+    (fields || []).forEach((field, idx) => {
+      if (!field.id) field.id = _wUid(`wmf_${idx + 1}`);
+      const targetText = this._getManualFieldTargetText(field);
+      if (!targetText) return;
+
+      let occurrence = Number(field.occurrence) || 0;
+      const afterFieldId = field.afterFieldId || '';
+      const afterOccurrence = afterFieldId ? result[afterFieldId] : 0;
+      const afterTarget = afterFieldId ? targetById[afterFieldId] : '';
+
+      if (!occurrence && afterOccurrence && afterTarget === targetText) {
+        occurrence = afterOccurrence + 1;
+      }
+      if (!occurrence) {
+        occurrence = (usedByTarget[targetText] || 0) + 1;
+      }
+
+      result[field.id] = occurrence;
+      targetById[field.id] = targetText;
+      usedByTarget[targetText] = Math.max(usedByTarget[targetText] || 0, occurrence);
+    });
+
+    return result;
+  },
+
   _getMappingItems(tpl) {
     if (!tpl) return [];
     if (tpl.nativeDocx && Array.isArray(tpl.manualFields) && tpl.manualFields.length) {
-      const targetCounts = {};
+      const occurrences = this._resolveManualFieldOccurrences(tpl.manualFields);
+      const fieldById = Object.fromEntries(tpl.manualFields.map(f => [f.id, f]));
       return tpl.manualFields
         .map((field, idx) => {
           const key = this._getManualFieldKey(field, idx);
-          const targetText = (field.targetText || this._legacyPlaceholderAsDirectTarget(field.placeholder))
-            ? (field.targetText || field.placeholder || '')
-            : '';
-          let occurrence = 0;
-          if (field.occurrence > 0) {
-            occurrence = field.occurrence;
-          } else if (targetText) {
-            targetCounts[targetText] = (targetCounts[targetText] || 0) + 1;
-            occurrence = targetCounts[targetText];
-          }
+          const targetText = this._getManualFieldTargetText(field);
+          const occurrence = occurrences[field.id] || 0;
+          const afterField = field.afterFieldId ? fieldById[field.afterFieldId] : null;
           return {
             key,
             label: field.name || field.placeholder || field.targetText || `Dòng mapping ${idx + 1}`,
             field,
             targetText,
             occurrence,
+            afterLabel: afterField ? (afterField.name || afterField.placeholder || afterField.targetText || '') : '',
             type: 'manual'
           };
         })
@@ -1963,14 +2018,12 @@ const WordGenerator = {
   _collectDirectReplacements(tpl) {
     const fields = tpl.manualFields || [];
     const results = [];
-    const targetCounts = {};
+    const occurrences = this._resolveManualFieldOccurrences(fields);
     fields.forEach((field, idx) => {
       if (!field.name) return;
       const legacyDirectTarget = this._legacyPlaceholderAsDirectTarget(field.placeholder);
-      const targetText = (field.targetText || legacyDirectTarget) ? (field.targetText || field.placeholder) : '';
-      const occurrence = (field.occurrence > 0)
-        ? field.occurrence
-        : (targetText ? (targetCounts[targetText] = (targetCounts[targetText] || 0) + 1) : 0);
+      const targetText = this._getManualFieldTargetText(field);
+      const occurrence = occurrences[field.id] || 0;
       // Resolve giá trị từ mapping UI (composite hoặc single)
       const mapKey = this._getManualFieldKey(field, idx);
       let resolvedValue;
