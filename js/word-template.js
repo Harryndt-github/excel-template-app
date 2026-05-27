@@ -1653,6 +1653,21 @@ const WordGenerator = {
     if (!mappingValue) return undefined;
     const [source, ...rest] = mappingValue.split('::');
     const field = rest.join('::');
+
+    // Hỗ trợ _bangchu suffix: nếu field kết thúc bằng _bangchu,
+    // tự động lấy giá trị field gốc và chuyển thành chữ tiếng Việt
+    if (field.endsWith('_bangchu') && typeof NumberToWords !== 'undefined') {
+      const baseField = field.slice(0, -'_bangchu'.length);
+      const baseValue = this._resolveMappingValue(`${source}::${baseField}`);
+      if (baseValue !== undefined) {
+        const num = NumberToWords.parse(String(baseValue));
+        if (num !== null && isFinite(num) && num >= 0) {
+          return NumberToWords.convert(num);
+        }
+      }
+      return undefined;
+    }
+
     if (source === 'loanresult') {
       return (WordState.currentCalcResult || {})[field];
     }
