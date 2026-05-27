@@ -1577,13 +1577,23 @@ const WordGenerator = {
 
   _buildMappingOptions() {
     let options = '<option value="">-- Không mapping --</option><option value="manual::__FIELD__">[Nhập trực tiếp] Giá trị cố định</option>';
+    const appendBangChuOption = (source, label, key, val) => {
+      if (typeof NumberToWords === 'undefined') return;
+      if (!this._looksLikeMoneyField(key, val)) return;
+      const parsed = NumberToWords.parse(val);
+      if (parsed === null || !isFinite(parsed) || parsed < 0) return;
+      options += `<option value="${source}::${_wEsc(key)}_bangchu" title="${_wEsc(NumberToWords.convert(parsed))}">[${label} bằng chữ] ${_wEsc(key)}</option>`;
+    };
     Object.keys(WordState.extractedData).forEach(ft => {
       const cfg = FILE_TYPES[ft];
       const data = WordState.extractedData[ft];
       const keys = Object.keys(data);
       if (keys.length > 0) {
         options += `<optgroup label="${cfg.label}">`;
-        keys.forEach(k => { options += `<option value="${ft}::${k}" title="${String(data[k]).substring(0,50)}">[${cfg.label}] ${k}</option>`; });
+        keys.forEach(k => {
+          options += `<option value="${ft}::${k}" title="${String(data[k]).substring(0,50)}">[${cfg.label}] ${k}</option>`;
+          appendBangChuOption(ft, cfg.label, k, data[k]);
+        });
         options += '</optgroup>';
       }
     });
@@ -1593,6 +1603,7 @@ const WordGenerator = {
       options += '<optgroup label="Master Data lãi suất">';
       rateKeys.forEach(key => {
         options += `<option value="ratecenter::${key}" title="${String(rateData[key] || '').substring(0,50)}">[Lãi suất] ${_wEsc(key)}</option>`;
+        appendBangChuOption('ratecenter', 'Lãi suất', key, rateData[key]);
       });
       options += '</optgroup>';
     }
@@ -1605,6 +1616,7 @@ const WordGenerator = {
         mdKeys.forEach(key => {
           const val = mdData[key];
           options += `<option value="masterdata::${key}" title="${String(val||'').substring(0,50)}">[MD] ${_wEsc(key)}</option>`;
+          appendBangChuOption('masterdata', 'MD', key, val);
         });
         options += '</optgroup>';
       }
@@ -1618,6 +1630,7 @@ const WordGenerator = {
         const val = derived[key];
         const disp = String(val || '').substring(0, 50);
         options += `<option value="derived::${key}" title="${disp}">[Rule] ${_wEsc(key)} = ${disp}</option>`;
+        appendBangChuOption('derived', 'Rule', key, val);
       });
       options += '</optgroup>';
     }
@@ -1629,10 +1642,20 @@ const WordGenerator = {
         const val = calcResult[key];
         const disp = String(val || '').substring(0, 50);
         options += `<option value="loanresult::${_wEsc(key)}" title="${_wEsc(disp)}">[Loan] ${_wEsc(key)} = ${_wEsc(disp)}</option>`;
+        appendBangChuOption('loanresult', 'Loan', key, val);
       });
       options += '</optgroup>';
     }
     return options;
+  },
+
+  _looksLikeMoneyField(key, value) {
+    const name = _wNorm(key);
+    const raw = String(value ?? '').trim();
+    if (!raw || !/\d/.test(raw)) return false;
+    if (/(phone|dien thoai|điện thoại|cmnd|cccd|passport|email|ngay|date|thang|ky han|kỳ hạn)/i.test(name)) return false;
+    if (/(tien|tiền|amount|gia tri|giá trị|vay|han muc|hạn mức|giai ngan|giải ngân|phi|phí|tsbd|tai san|tài sản)/i.test(name)) return true;
+    return /^[\d.,\s₫đĐVNDvnd]+$/.test(raw) && raw.replace(/\D/g, '').length >= 6;
   },
 
   onRateProjectChange(projectId) {
@@ -1958,6 +1981,52 @@ const WordGenerator = {
     return replacements;
   },
 
+  _isBangChuManualField(field) {
+    const text = _wNorm([
+      field.name,
+      field.placeholder,
+      field.targetText,
+      field.description
+    ].filter(Boolean).join(' '));
+    return /bang\s*chu|bangchu|bằng\s*chữ|doc\s*so|đọc\s*số|so\s*tien\s*bang\s*chu|số\s*tiền\s*bằng\s*chữ/.test(text)
+      || /_bangchu$/i.test(String(field.placeholder || field.name || ''));
+  },
+
+  _resolveManualFieldSelectedValue(field, idx) {
+    const mapKey = this._getManualFieldKey(field, idx);
+    const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
+    if (!sel || !sel.value) return undefined;
+    return this._resolveMappingValue(sel.value);
+  },
+
+  _resolveManualFieldAutoValue(field, idx, fields, plan, resolving) {
+    resolving = resolving || new Set();
+    if (!field || resolving.has(field.id)) return undefined;
+    resolving.add(field.id);
+
+    const directValue = this._resolveManualFieldSelectedValue(field, idx);
+    if (!this._isBangChuManualField(field)) {
+      resolving.delete(field.id);
+      return directValue;
+    }
+
+    let baseValue = directValue;
+    const fieldPlan = plan[field.id] || {};
+    const anchorId = fieldPlan.anchorFieldId || field.afterFieldId || '';
+    if (anchorId) {
+      const anchorIdx = fields.findIndex(item => item.id === anchorId);
+      const anchorField = anchorIdx >= 0 ? fields[anchorIdx] : null;
+      const anchorValue = this._resolveManualFieldAutoValue(anchorField, anchorIdx, fields, plan, resolving);
+      if (anchorValue !== undefined && anchorValue !== '') baseValue = anchorValue;
+    }
+
+    resolving.delete(field.id);
+    if (baseValue === undefined || typeof NumberToWords === 'undefined') return undefined;
+    const num = NumberToWords.parse(String(baseValue));
+    if (num === null || !isFinite(num) || num < 0) return undefined;
+    return NumberToWords.convert(num);
+  },
+
   _collectDirectReplacements(tpl) {
     const fields = tpl.manualFields || [];
     const grouped = new Map();
@@ -1969,10 +2038,7 @@ const WordGenerator = {
       const targetText = fieldPlan.targetText || this._getManualFieldTargetText(field);
       const occurrence = fieldPlan.occurrence || 0;
       // Resolve giá trị từ mapping UI
-      const mapKey = this._getManualFieldKey(field, idx);
-      const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
-      if (!sel || !sel.value) return;
-      const resolvedValue = this._resolveMappingValue(sel.value);
+      const resolvedValue = this._resolveManualFieldAutoValue(field, idx, fields, plan);
       if (resolvedValue === undefined) return;
       const val = String(resolvedValue);
 
@@ -2007,13 +2073,11 @@ const WordGenerator = {
   _buildNativeReplacementsFromManual(tpl, baseReplacements) {
     const merged = Object.assign({}, baseReplacements);
     const fields = tpl.manualFields || [];
+    const plan = this._resolveManualFieldPlan(fields);
     fields.forEach((field, idx) => {
       if (!field.placeholder || !field.name) return;
       if (this._legacyPlaceholderAsDirectTarget(field.placeholder)) return;
-      const mapKey = this._getManualFieldKey(field, idx);
-      const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
-      if (!sel || !sel.value) return;
-      const resolvedValue = this._resolveMappingValue(sel.value);
+      const resolvedValue = this._resolveManualFieldAutoValue(field, idx, fields, plan);
       if (resolvedValue === undefined) return;
       merged[field.placeholder] = String(resolvedValue);
     });
