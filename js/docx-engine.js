@@ -93,6 +93,11 @@ const DocxEngine = {
       throw new Error('Không tìm thấy file .docx gốc. Vui lòng upload lại template Word.');
     }
 
+    // Tự động bổ sung _bangchu cho các trường số tiền
+    if (typeof NumberToWords !== 'undefined') {
+      replacements = NumberToWords.expandBangChu(replacements || {});
+    }
+
     const zip = await JSZip.loadAsync(arrayBuffer);
     const report = this.createMergeReport(replacements, directReplacements);
     const directCounters = {};

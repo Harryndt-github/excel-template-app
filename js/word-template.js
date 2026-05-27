@@ -1937,6 +1937,9 @@ const WordGenerator = {
         if (resolvedValue !== undefined) replacements[ph] = String(resolvedValue);
       }
     });
+    if (typeof NumberToWords !== 'undefined') {
+      return NumberToWords.expandBangChu(replacements);
+    }
     return replacements;
   },
 
