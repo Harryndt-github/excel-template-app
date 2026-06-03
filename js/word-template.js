@@ -715,9 +715,12 @@ const WordEditor = {
       tmp.innerHTML = tpl.content;
       const preview = tmp.textContent.substring(0, 200);
       const exportBtn = tpl.nativeDocx
-        ? `<button class="action-btn" onclick="WordEditor.exportTemplateBundle('${tpl.id}')" title="Xuất bundle để chia sẻ sang máy khác">
+        ? `<button class="action-btn" onclick="WordEditor.exportTemplateBundle('${tpl.id}')" title="Xuất bundle JSON để chia sẻ sang máy khác">
              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
            </button>` : '';
+      const downloadDocBtn = `<button class="action-btn" onclick="WordEditor.downloadTemplateAsDoc('${tpl.id}')" title="${tpl.nativeDocx ? 'Tải xuống file DOCX template gốc' : 'Tải xuống template dạng DOC'}">
+             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="17" x2="12" y2="11"/><polyline points="9 14 12 17 15 14"/></svg>
+           </button>`;
       return `
         <div class="template-row" onclick="WordEditor.editTemplate('${tpl.id}')">
           <div class="t-col-name">
@@ -738,6 +741,7 @@ const WordEditor = {
           <div class="t-col-date">${dateStr}</div>
           <div class="t-col-actions" onclick="event.stopPropagation();">
             ${exportBtn}
+            ${downloadDocBtn}
             <button class="action-btn" onclick="WordEditor.duplicateTemplate('${tpl.id}')" title="Nhân bản">
                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
@@ -781,6 +785,55 @@ const WordEditor = {
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
     App.toast(`Đã xuất bundle "${tpl.name}" — gửi file này cho người dùng khác để nhập vào`, 'success');
+  },
+
+  // Download the raw template file: DOCX for native templates, .doc (Word HTML) for editor templates.
+  async downloadTemplateAsDoc(id) {
+    const tpl = WordState.templates.find(t => t.id === id);
+    if (!tpl) return;
+    const fileName = (tpl.name || 'template').replace(/[^a-zA-Z0-9_À-ỹ\s-]/g, '').trim() || 'document';
+
+    if (tpl.nativeDocx) {
+      let docxBuffer = null;
+      if (typeof DocxStore !== 'undefined') {
+        docxBuffer = await DocxStore.load(tpl._idbKey || tpl.id);
+      }
+      if (!docxBuffer) {
+        App.toast('Không tìm thấy file DOCX gốc trong bộ nhớ — hãy upload lại file .docx trước', 'warning');
+        return;
+      }
+      const blob = new Blob([docxBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${fileName}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+      App.toast(`Đã tải xuống template "${tpl.name}" dạng DOCX`, 'success');
+    } else {
+      const content = tpl.content || '<p></p>';
+      const htmlDoc = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>${_wEsc(tpl.name || 'Template')}</title>
+<style>
+body{font-family:"Times New Roman",serif;font-size:12pt;margin:2cm;}
+table{border-collapse:collapse;width:100%;}
+th,td{border:1px solid #000;padding:4pt 8pt;}
+.word-placeholder-chip{background:#e8e8ff;padding:1px 4px;border-radius:3px;}
+</style></head>
+<body>${content}</body></html>`;
+      const blob = new Blob(['﻿', htmlDoc], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${fileName}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+      App.toast(`Đã tải xuống template "${tpl.name}" dạng DOC`, 'success');
+    }
   },
 
   // Import a template bundle exported by exportTemplateBundle.
