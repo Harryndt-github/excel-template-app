@@ -1403,6 +1403,13 @@ const WordGenerator = {
           <input class="mapping-select" id="wmanual-${_wSanId(item.key)}" placeholder="Nhập trực tiếp giá trị cho chỉ tiêu này"
             style="display:none;margin-top:6px;"
             oninput="WordGenerator.onMappingChange('${ek}', 'manual::${ek}')">
+          <div style="margin-top:5px;">
+            <button type="button" id="wmulti-btn-${_wSanId(item.key)}"
+              onclick="WordGenerator.toggleMultiSelect('${ek}')"
+              style="font-size:0.72rem;padding:2px 9px;border-radius:5px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-secondary);line-height:1.6;font-family:inherit;">
+              ⊞ Chọn nhiều giá trị</button>
+          </div>
+          <div id="wmulti-${_wSanId(item.key)}" style="display:none;margin-top:6px;"></div>
         </td>
         <td class="mapping-value-preview" id="wprev-${_wSanId(item.key)}">—</td>
       </tr>`;}).join('')}
@@ -1417,6 +1424,7 @@ const WordGenerator = {
       }
     });
     this.autoMap(mappingItems);
+    this._restoreMultiSelectState(mappingItems);
   },
 
   _getManualFieldKey(field, idx) {
@@ -2022,6 +2030,12 @@ const WordGenerator = {
   _collectReplacements(tpl) {
     const replacements = {};
     (tpl.placeholders || []).forEach(ph => {
+      const multiState = this._multiSelectState[ph];
+      if (multiState && multiState.enabled) {
+        const val = this._resolveMultiSelectValue(ph);
+        if (val !== undefined) replacements[ph] = val;
+        return;
+      }
       const sel = document.getElementById(`wmap-${_wSanId(ph)}`);
       if (sel && sel.value) {
         const resolvedValue = this._resolveMappingValue(sel.value);
@@ -2047,6 +2061,10 @@ const WordGenerator = {
 
   _resolveManualFieldSelectedValue(field, idx) {
     const mapKey = this._getManualFieldKey(field, idx);
+    const multiState = this._multiSelectState[mapKey];
+    if (multiState && multiState.enabled) {
+      return this._resolveMultiSelectValue(mapKey);
+    }
     const sel = document.getElementById(`wmap-${_wSanId(mapKey)}`);
     if (!sel || !sel.value) return undefined;
     return this._resolveMappingValue(sel.value);
@@ -2435,6 +2453,14 @@ const WordGenerator = {
   _collectMappingDiagnostics(tpl) {
     const skipped = [];
     this._getMappingItems(tpl).forEach(item => {
+      const multiState = this._multiSelectState[item.key];
+      if (multiState && multiState.enabled) {
+        const val = this._resolveMultiSelectValue(item.key);
+        if (val === undefined || String(val).trim() === '') {
+          skipped.push({ field: item.label || item.key, source: 'Multi-select', reason: 'empty' });
+        }
+        return;
+      }
       const selectEl = document.getElementById(`wmap-${_wSanId(item.key)}`);
       if (!selectEl || !selectEl.value) return;
       const resolvedValue = this._resolveMappingValue(selectEl.value);
@@ -2456,6 +2482,173 @@ const WordGenerator = {
       ...((diagnostics && diagnostics.skipped) || [])
     ];
     return merged;
+  },
+
+  /* ─────────────────────────────────────────────
+     MULTI-SELECT — Chọn nhiều giá trị để ghép
+     ───────────────────────────────────────────── */
+  _multiSelectState: {}, // key -> { enabled, selections[], joinChar }
+
+  toggleMultiSelect(ph) {
+    const sanKey = _wSanId(ph);
+    const state = this._multiSelectState[ph] || { enabled: false, selections: [], joinChar: ', ' };
+    state.enabled = !state.enabled;
+    this._multiSelectState[ph] = state;
+    const singleSel   = document.getElementById(`wmap-${sanKey}`);
+    const manualInput = document.getElementById(`wmanual-${sanKey}`);
+    const multiPanel  = document.getElementById(`wmulti-${sanKey}`);
+    const toggleBtn   = document.getElementById(`wmulti-btn-${sanKey}`);
+    if (state.enabled) {
+      if (singleSel)   singleSel.style.display   = 'none';
+      if (manualInput) manualInput.style.display  = 'none';
+      if (multiPanel)  { multiPanel.style.display = 'block'; this.renderMultiSelectPanel(ph); }
+      if (toggleBtn)   { toggleBtn.textContent = '✕ Chọn 1 giá trị'; toggleBtn.style.color = '#6366f1'; toggleBtn.style.borderColor = '#6366f1'; }
+    } else {
+      if (singleSel)  singleSel.style.display  = '';
+      if (multiPanel) multiPanel.style.display  = 'none';
+      if (toggleBtn)  { toggleBtn.textContent = '⊞ Chọn nhiều giá trị'; toggleBtn.style.color = ''; toggleBtn.style.borderColor = ''; }
+      this.onMappingChange(ph, singleSel ? singleSel.value : '');
+    }
+  },
+
+  renderMultiSelectPanel(ph) {
+    const sanKey = _wSanId(ph);
+    const panel = document.getElementById(`wmulti-${sanKey}`);
+    if (!panel) return;
+    const state = this._multiSelectState[ph] || { selections: [], joinChar: ', ' };
+    const allOpts = this._buildMultiSelectOptions();
+    const JOIN_OPTS = [
+      { v: ', ',   l: 'Dấu phẩy (,)' },
+      { v: ' / ',  l: 'Dấu gạch chéo (/)' },
+      { v: ' và ', l: 'Từ "và"' },
+      { v: '\n',   l: 'Xuống dòng' },
+    ];
+    panel.innerHTML = `
+      <div style="border:1px solid rgba(99,102,241,0.22);border-radius:10px;padding:10px 12px;background:rgba(99,102,241,0.04);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="font-size:0.78rem;font-weight:700;color:#6366f1;flex:1;">Chọn các giá trị cần ghép:</span>
+          <input id="wmulti-filter-${sanKey}" type="text" placeholder="Tìm nhanh..."
+            style="width:120px;font-size:0.74rem;padding:3px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);"
+            oninput="WordGenerator._filterMultiOptions('${ph}', this.value)">
+        </div>
+        <div id="wmulti-list-${sanKey}" style="max-height:190px;overflow-y:auto;display:flex;flex-direction:column;gap:1px;">
+          ${this._renderMultiOptionRows(ph, allOpts, state.selections)}
+        </div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(99,102,241,0.12);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:0.74rem;color:var(--text-secondary);">Nối bằng:</span>
+          <select style="font-size:0.74rem;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);"
+            onchange="WordGenerator.onMultiJoinChange('${ph}', this.value)">
+            ${JOIN_OPTS.map(j => `<option value="${_wEsc(j.v)}" ${state.joinChar === j.v ? 'selected' : ''}>${j.l}</option>`).join('')}
+          </select>
+          <span id="wmulti-count-${sanKey}" style="font-size:0.72rem;color:var(--text-muted);">${state.selections.length} mục đã chọn</span>
+        </div>
+      </div>`;
+    this._updateMultiSelectPreview(ph);
+  },
+
+  _renderMultiOptionRows(ph, opts, selections) {
+    if (!opts.length) return '<div style="padding:8px;font-size:0.78rem;color:var(--text-muted);">Không có dữ liệu</div>';
+    return opts.map(opt => {
+      const checked = selections.includes(opt.value);
+      const safeVal = opt.value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      return `<label style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;
+          ${checked ? 'background:rgba(99,102,241,0.1);' : 'background:transparent;'}">
+        <input type="checkbox" ${checked ? 'checked' : ''}
+          onchange="WordGenerator.onMultiSelectChange('${ph}', '${safeVal}', this.checked)"
+          style="accent-color:#6366f1;flex-shrink:0;cursor:pointer;">
+        <span style="flex:1;font-size:0.77rem;color:var(--text-primary);">${_wEsc(opt.label)}</span>
+        <span style="font-size:0.71rem;color:var(--text-muted);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_wEsc(opt.preview)}">${_wEsc(opt.preview)}</span>
+      </label>`;
+    }).join('');
+  },
+
+  _buildMultiSelectOptions() {
+    const opts = [];
+    Object.keys(WordState.extractedData).forEach(ft => {
+      const cfg = FILE_TYPES[ft] || {};
+      const data = WordState.extractedData[ft];
+      Object.keys(data).forEach(k => {
+        const val = this._resolveDataField(data, k);
+        opts.push({ value: `${ft}::${k}`, label: `[${cfg.label || ft}] ${k}`, preview: val !== undefined ? String(val).substring(0, 40) : '(trống)' });
+      });
+    });
+    const rateData = this._getRateTemplateData();
+    Object.keys(rateData).forEach(k => {
+      opts.push({ value: `ratecenter::${k}`, label: `[Lãi suất] ${k}`, preview: String(rateData[k] || '').substring(0, 40) });
+    });
+    if (typeof MasterData !== 'undefined' && typeof MasterData.getMappingData === 'function') {
+      const md = MasterData.getMappingData();
+      Object.keys(md).forEach(k => {
+        opts.push({ value: `masterdata::${k}`, label: `[Master Data] ${k}`, preview: String(md[k] || '').substring(0, 40) });
+      });
+    }
+    const calcResult = WordState.currentCalcResult || {};
+    Object.keys(calcResult).filter(k => !k.endsWith('(so)') && !k.endsWith('(số)')).forEach(k => {
+      opts.push({ value: `loanresult::${k}`, label: `[Loan Calc] ${k}`, preview: String(calcResult[k] || '').substring(0, 40) });
+    });
+    return opts;
+  },
+
+  _filterMultiOptions(ph, query) {
+    const sanKey = _wSanId(ph);
+    const list = document.getElementById(`wmulti-list-${sanKey}`);
+    if (!list) return;
+    const state = this._multiSelectState[ph] || { selections: [] };
+    const q = (query || '').toLowerCase().trim();
+    const filtered = q
+      ? this._buildMultiSelectOptions().filter(o => o.label.toLowerCase().includes(q) || o.preview.toLowerCase().includes(q))
+      : this._buildMultiSelectOptions();
+    list.innerHTML = this._renderMultiOptionRows(ph, filtered, state.selections);
+  },
+
+  onMultiSelectChange(ph, optionValue, checked) {
+    const state = this._multiSelectState[ph] || { enabled: true, selections: [], joinChar: ', ' };
+    if (checked) { if (!state.selections.includes(optionValue)) state.selections.push(optionValue); }
+    else { state.selections = state.selections.filter(v => v !== optionValue); }
+    this._multiSelectState[ph] = state;
+    const countEl = document.getElementById(`wmulti-count-${_wSanId(ph)}`);
+    if (countEl) countEl.textContent = `${state.selections.length} mục đã chọn`;
+    this._updateMultiSelectPreview(ph);
+  },
+
+  onMultiJoinChange(ph, joinChar) {
+    const state = this._multiSelectState[ph] || { enabled: true, selections: [], joinChar: ', ' };
+    state.joinChar = joinChar;
+    this._multiSelectState[ph] = state;
+    this._updateMultiSelectPreview(ph);
+  },
+
+  _updateMultiSelectPreview(ph) {
+    const el = document.getElementById(`wprev-${_wSanId(ph)}`);
+    if (!el) return;
+    const val = this._resolveMultiSelectValue(ph);
+    if (val !== undefined) { el.textContent = String(val).substring(0, 80) || '(trống)'; el.title = String(val); }
+    else { el.textContent = '—'; el.title = ''; }
+  },
+
+  _resolveMultiSelectValue(ph) {
+    const state = this._multiSelectState[ph];
+    if (!state || !state.enabled || !state.selections.length) return undefined;
+    const values = state.selections
+      .map(sv => this._resolveMappingValue(sv))
+      .filter(v => v !== undefined && String(v).trim() !== '');
+    return values.length ? values.map(v => String(v)).join(state.joinChar || ', ') : undefined;
+  },
+
+  _restoreMultiSelectState(items) {
+    (items || []).forEach(item => {
+      const state = this._multiSelectState[item.key];
+      if (!state || !state.enabled) return;
+      const sanKey = _wSanId(item.key);
+      const singleSel   = document.getElementById(`wmap-${sanKey}`);
+      const manualInput = document.getElementById(`wmanual-${sanKey}`);
+      const multiPanel  = document.getElementById(`wmulti-${sanKey}`);
+      const toggleBtn   = document.getElementById(`wmulti-btn-${sanKey}`);
+      if (singleSel)   singleSel.style.display   = 'none';
+      if (manualInput) manualInput.style.display  = 'none';
+      if (multiPanel)  { multiPanel.style.display = 'block'; this.renderMultiSelectPanel(item.key); }
+      if (toggleBtn)   { toggleBtn.textContent = '✕ Chọn 1 giá trị'; toggleBtn.style.color = '#6366f1'; toggleBtn.style.borderColor = '#6366f1'; }
+    });
   },
 
   async exportPDF() {
