@@ -1855,3 +1855,100 @@
   gap: 7px;
   padding: 2px 9px 5px;
 }
+
+/* ── Branch Module ─────────────────────────── */
+.branch-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  gap: 0;
+}
+.branch-list-panel {
+  width: 280px;
+  min-width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(99,102,241,0.12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(10,10,25,0.3);
+}
+.branch-form-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.branch-form-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+.branch-list-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(99,102,241,0.07);
+  transition: background 0.15s;
+  font-size: 0.84rem;
+  color: var(--text-secondary, #94a3b8);
+}
+.branch-list-item:hover { background: rgba(99,102,241,0.07); }
+.branch-list-item.active {
+  background: rgba(99,102,241,0.14);
+  color: var(--text-primary, #e2e8f0);
+  font-weight: 600;
+}
+.branch-list-item .branch-item-code {
+  font-size: 0.72rem;
+  color: var(--text-muted, #6b7280);
+  margin-top: 2px;
+}
+.branch-delete-btn {
+  background: none;
+  border: none;
+  color: rgba(239,68,68,0.5);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.branch-delete-btn:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
+.branch-field-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-primary, #e2e8f0);
+  font-family: inherit;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.branch-field-input:focus { border-color: rgba(99,102,241,0.5); }
+.branch-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted, #6b7280);
+  padding: 16px 0 8px;
+  border-bottom: 1px solid rgba(99,102,241,0.1);
+  margin-bottom: 14px;
+}
+.branch-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-muted, #6b7280);
+  font-size: 0.88rem;
+  padding: 40px 20px;
+}

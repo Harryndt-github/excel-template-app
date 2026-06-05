@@ -43,6 +43,7 @@ const MasterData = {
   init() {
     this.loadState();
     this._initDefaultEntities();
+    if (typeof BranchModule !== 'undefined') BranchModule.init();
   },
 
   // ── Persistence ──
@@ -186,7 +187,7 @@ const MasterData = {
     // Hide all panels
     document.querySelectorAll('.md-view-panel').forEach(p => p.style.display = 'none');
     const panel = document.getElementById(`md-view-${mode}`);
-    const flexModes = ['config', 'ratecenter', 'advisor'];
+    const flexModes = ['config', 'ratecenter', 'advisor', 'branches'];
     if (panel) panel.style.display = flexModes.includes(mode) ? 'flex' : 'block';
 
     // Sidebar: only show for mindmap
@@ -197,6 +198,7 @@ const MasterData = {
     if (mode === 'config')     this.cfgRenderEntityList();
     if (mode === 'ratecenter') RateCenter.render();
     if (mode === 'advisor')    { if (typeof PolicyAdvisorUI !== 'undefined') PolicyAdvisorUI.render(); }
+    if (mode === 'branches')   { if (typeof BranchModule !== 'undefined') BranchModule.render(); }
   },
 
   // ── Entity List (sidebar on master data page) ──
@@ -1793,6 +1795,9 @@ Object.assign(MasterData, {
         result[key] = value;
       });
     });
+    if (typeof BranchModule !== 'undefined') {
+      Object.assign(result, BranchModule.getMappingData());
+    }
     return result;
   },
 
