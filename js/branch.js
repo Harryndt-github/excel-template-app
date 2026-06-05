@@ -62,7 +62,7 @@ const BranchModule = {
     } catch (e) {}
     if (typeof UatStorage !== 'undefined' && UatStorage.client) {
       clearTimeout(this._saveTimer);
-      this._saveTimer = setTimeout(() => UatStorage._pushBranchData && UatStorage._pushBranchData(), 800);
+      this._saveTimer = setTimeout(() => UatStorage.upsertState('branch_data'), 800);
     }
   },
 

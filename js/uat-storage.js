@@ -175,6 +175,7 @@ const UatStorage = {
   async upsertState(key, _payload) {
     if (!this.client) return;
     if (key === 'master_data') await this._pushMasterData();
+    if (key === 'branch_data') await this._pushBranchData();
   },
 
   // ── Push ─────────────────────────────────────────────────────
@@ -189,6 +190,7 @@ const UatStorage = {
       if (reason !== 'auto') this.toast('Đang đẩy dữ liệu lên Supabase…', 'info');
       await this.uploadNativeDocxTemplates();
       await this._pushMasterData();
+      await this._pushBranchData();
       await this._pushRateCenter();
       await this._pushTemplates();
       this.lastStatus = `Synced ${new Date().toLocaleTimeString('vi-VN')}`;
@@ -202,6 +204,28 @@ const UatStorage = {
     } finally {
       this.isSyncing = false;
       this.renderStatus();
+    }
+  },
+
+  async _pushBranchData() {
+    if (typeof BranchState === 'undefined') return;
+    const list = BranchState.list || [];
+    const now = new Date().toISOString();
+    this._throwIfErr(
+      await this.client.from('branches').delete().eq('scope', this.scope),
+      'clear branches'
+    );
+    if (list.length) {
+      this._throwIfErr(
+        await this.client.from('branches').insert(
+          list.map(b => ({
+            scope: this.scope,
+            branch_id: b.id,
+            data: b,
+            updated_at: now,
+          }))
+        ), 'insert branches'
+      );
     }
   },
 
@@ -528,12 +552,14 @@ const UatStorage = {
     }
     this.isSyncing = true;
     try {
-      const [mdData, rcData, tplData] = await Promise.all([
+      const [mdData, branchData, rcData, tplData] = await Promise.all([
         this._pullMasterData(),
+        this._pullBranchData(),
         this._pullRateCenter(),
         this._pullTemplates(),
       ]);
       this._restoreMasterData(mdData);
+      this._restoreBranchData(branchData);
       this._restoreRateCenter(rcData);
       await this._restoreTemplates(tplData);
       this.renderStatus();
@@ -611,6 +637,25 @@ const UatStorage = {
 
     if (typeof MasterData !== 'undefined' && typeof MasterData.setView === 'function') {
       MasterData.setView(MasterDataState.viewMode || 'config');
+    }
+  },
+
+  async _pullBranchData() {
+    const res = await this.client.from('branches').select('*').eq('scope', this.scope);
+    this._throwIfErr(res, 'pull branches');
+    return res.data || [];
+  },
+
+  _restoreBranchData(rows) {
+    if (typeof BranchState === 'undefined') return;
+    BranchState.list = rows.map(r => ({ ...r.data, id: r.branch_id }));
+    try {
+      const key = typeof BranchModule !== 'undefined' ? BranchModule.STORAGE_KEY : 'branch_module_v1';
+      localStorage.setItem(key, JSON.stringify({ list: BranchState.list, selectedId: BranchState.selectedId }));
+    } catch (_) {}
+    if (typeof BranchModule !== 'undefined') {
+      const panel = document.getElementById('md-view-branches');
+      if (panel && panel.style.display !== 'none') BranchModule.render();
     }
   },
 
