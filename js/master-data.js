@@ -1340,6 +1340,14 @@ const MasterData = {
       </div>`);
     }
 
+    if (typeof BranchModule !== 'undefined' && typeof BRANCH_FIELDS !== 'undefined') {
+      cards.push(`<div class="ph-source-card md-ph-entity-card" onclick="${callbackPrefix}('__branches__')" style="border-left:3px solid #06b6d4;">
+        <span class="ph-source-icon" style="color:#06b6d4;">🏦</span>
+        <span class="ph-source-label">Chi Nhánh</span>
+        <span class="ph-source-count">${BRANCH_FIELDS.length} trường · lấy từ chi nhánh đang chọn</span>
+      </div>`);
+    }
+
     container.innerHTML = cards.join('');
   },
 
@@ -1359,6 +1367,19 @@ const MasterData = {
         <div class="ph-field-chip md-ph-field-chip" onclick="${callbackPrefix}('Master Data lãi suất', '${_mdEsc(name)}')" style="border-left:3px solid #10b981;">
           <span class="ph-field-icon" style="color:#10b981;">%</span>
           <span class="ph-field-name">${_mdEsc(name)}</span>
+        </div>
+      `).join('');
+      return;
+    }
+
+    if (entityId === '__branches__' && typeof BRANCH_FIELDS !== 'undefined') {
+      const branchFields = filter
+        ? BRANCH_FIELDS.filter(f => f.label.toLowerCase().includes(filter.toLowerCase()))
+        : BRANCH_FIELDS;
+      container.innerHTML = branchFields.map(f => `
+        <div class="ph-field-chip md-ph-field-chip" onclick="${callbackPrefix}('Chi Nhánh', '${_mdEsc(f.label)}')" style="border-left:3px solid #06b6d4;">
+          <span class="ph-field-icon" style="color:#06b6d4;">🏦</span>
+          <span class="ph-field-name">${_mdEsc(f.label)}</span>
         </div>
       `).join('');
       return;
@@ -1396,10 +1417,13 @@ const MasterData = {
   selectSsMdEntity(entityId) {
     this._ssSelectedEntity = entityId;
     const isRateCenter = entityId === '__ratecenter__';
-    const entity = isRateCenter ? { name: 'Master Data lãi suất', color: '#10b981' } : MasterDataState.entities.find(e => e.id === entityId);
+    const isBranches = entityId === '__branches__';
+    const entity = isRateCenter ? { name: 'Master Data lãi suất', color: '#10b981' }
+      : isBranches ? { name: 'Chi Nhánh', color: '#06b6d4' }
+      : MasterDataState.entities.find(e => e.id === entityId);
     if (!entity) return;
 
-    document.getElementById('ss-md-entity-label').textContent = isRateCenter ? '％ Master Data lãi suất' : `⬢ ${entity.name}`;
+    document.getElementById('ss-md-entity-label').textContent = isRateCenter ? '％ Master Data lãi suất' : isBranches ? '🏦 Chi Nhánh' : `⬢ ${entity.name}`;
     document.getElementById('ss-md-entity-label').style.color = entity.color;
     document.getElementById('ss-md-step-entities').style.display = 'none';
     document.getElementById('ss-md-step-fields').style.display = '';
@@ -1436,10 +1460,13 @@ const MasterData = {
   selectWordMdEntity(entityId) {
     this._wordSelectedEntity = entityId;
     const isRateCenter = entityId === '__ratecenter__';
-    const entity = isRateCenter ? { name: 'Master Data lãi suất', color: '#10b981' } : MasterDataState.entities.find(e => e.id === entityId);
+    const isBranches = entityId === '__branches__';
+    const entity = isRateCenter ? { name: 'Master Data lãi suất', color: '#10b981' }
+      : isBranches ? { name: 'Chi Nhánh', color: '#06b6d4' }
+      : MasterDataState.entities.find(e => e.id === entityId);
     if (!entity) return;
 
-    document.getElementById('word-md-entity-label').textContent = isRateCenter ? '％ Master Data lãi suất' : `⬢ ${entity.name}`;
+    document.getElementById('word-md-entity-label').textContent = isRateCenter ? '％ Master Data lãi suất' : isBranches ? '🏦 Chi Nhánh' : `⬢ ${entity.name}`;
     document.getElementById('word-md-entity-label').style.color = entity.color;
     document.getElementById('word-md-step-entities').style.display = 'none';
     document.getElementById('word-md-step-fields').style.display = '';
