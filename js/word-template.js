@@ -1249,6 +1249,7 @@ const WordGenerator = {
       return;
     }
     this._syncRateSelection();
+    this._syncBranchSelection();
     const currentMappings = this._collectCurrentMappings(mappingItems);
     const options = this._buildMappingOptions();
     const projects = (typeof RateCenter !== 'undefined' && typeof RateCenter.getProjects === 'function')
@@ -1386,6 +1387,20 @@ const WordGenerator = {
           <div id="wre-runtime-result" style="margin-top:10px;font-size:0.8rem;color:var(--text-muted);"></div>
         </div>
       </div>
+
+      ${(typeof BranchState !== 'undefined' && BranchState.list && BranchState.list.length > 0) ? `
+      <div style="margin-bottom:18px;padding:14px 18px;border:1px solid rgba(6,182,212,0.2);border-radius:14px;background:rgba(6,182,212,0.03);display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <h4 style="margin:0 0 4px;font-size:0.95rem;color:var(--text-primary);">🏦 Chi Nhánh</h4>
+          <p style="margin:0;font-size:0.82rem;color:var(--text-muted);">Chọn chi nhánh — các trường <code>[Chi Nhánh] *</code> sẽ tự động điền từ bản ghi này.</p>
+        </div>
+        <div style="min-width:260px;">
+          <select class="mapping-select" id="word-branch-select" onchange="WordGenerator.onBranchChange(this.value)">
+            <option value="">-- Chọn chi nhánh --</option>
+            ${BranchState.list.map(b => `<option value="${b.id}" ${b.id === BranchState.selectedId ? 'selected' : ''}>${_wEsc(b.ma_chi_nhanh ? b.ma_chi_nhanh + ' — ' + (b.ten_chi_nhanh || '') : (b.ten_chi_nhanh || b.id))}</option>`).join('')}
+          </select>
+        </div>
+      </div>` : ''}
 
       <table class="mapping-table"><thead><tr>
         <th style="width:30%">Trường Template</th><th style="width:40%">Dữ liệu Excel / Master Data</th><th style="width:30%">Giá trị</th>
@@ -1731,6 +1746,18 @@ const WordGenerator = {
   onRatePolicyChange(policyId) {
     this._selectedRatePolicyId = policyId;
     this.buildMappingUI();
+  },
+
+  onBranchChange(branchId) {
+    if (typeof BranchState !== 'undefined') BranchState.selectedId = branchId;
+    this.buildMappingUI();
+  },
+
+  _syncBranchSelection() {
+    if (typeof BranchState === 'undefined' || !(BranchState.list || []).length) return;
+    if (!BranchState.list.find(b => b.id === BranchState.selectedId)) {
+      BranchState.selectedId = BranchState.list[0].id;
+    }
   },
 
   _resolveMappingValue(mappingValue) {
