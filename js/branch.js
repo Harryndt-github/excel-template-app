@@ -42,6 +42,15 @@ const BranchModule = {
   /* ── Persistence ── */
   init() { this.loadState(); },
 
+  _persistLocalState() {
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify({
+        list: BranchState.list,
+        selectedId: BranchState.selectedId,
+      }));
+    } catch (e) {}
+  },
+
   loadState() {
     try {
       const raw = localStorage.getItem(this.STORAGE_KEY);
@@ -49,17 +58,15 @@ const BranchModule = {
         const saved = JSON.parse(raw);
         BranchState.list = Array.isArray(saved.list) ? saved.list : [];
         BranchState.selectedId = saved.selectedId || null;
+        if (!BranchState.list.some(branch => branch.id === BranchState.selectedId)) {
+          BranchState.selectedId = BranchState.list[0]?.id || null;
+        }
       }
     } catch (e) {}
   },
 
   saveState() {
-    try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify({
-        list: BranchState.list,
-        selectedId: BranchState.selectedId,
-      }));
-    } catch (e) {}
+    this._persistLocalState();
     if (typeof UatStorage !== 'undefined' && UatStorage.client) {
       clearTimeout(this._saveTimer);
       this._saveTimer = setTimeout(() => UatStorage.upsertState('branch_data'), 800);
@@ -153,6 +160,7 @@ const BranchModule = {
   /* ── CRUD ── */
   selectBranch(id) {
     BranchState.selectedId = id;
+    this._persistLocalState();
     this._renderList();
     this._renderForm(id);
   },

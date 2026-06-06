@@ -658,6 +658,9 @@ const UatStorage = {
   _restoreBranchData(rows) {
     if (typeof BranchState === 'undefined') return;
     BranchState.list = rows.map(r => ({ ...r.data, id: r.branch_id }));
+    if (!BranchState.list.some(branch => branch.id === BranchState.selectedId)) {
+      BranchState.selectedId = BranchState.list[0]?.id || null;
+    }
     try {
       const key = typeof BranchModule !== 'undefined' ? BranchModule.STORAGE_KEY : 'branch_module_v1';
       localStorage.setItem(key, JSON.stringify({ list: BranchState.list, selectedId: BranchState.selectedId }));
