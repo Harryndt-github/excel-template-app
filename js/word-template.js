@@ -1388,17 +1388,19 @@ const WordGenerator = {
         </div>
       </div>
 
-      ${(typeof BranchState !== 'undefined' && BranchState.list && BranchState.list.length > 0) ? `
+      ${typeof BranchModule !== 'undefined' ? `
       <div style="margin-bottom:18px;padding:14px 18px;border:1px solid rgba(6,182,212,0.2);border-radius:14px;background:rgba(6,182,212,0.03);display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
         <div style="flex:1;min-width:200px;">
-          <h4 style="margin:0 0 4px;font-size:0.95rem;color:var(--text-primary);">🏦 Chi Nhánh</h4>
+          <h4 style="margin:0 0 4px;font-size:0.95rem;color:#06b6d4;">🏦 Chi Nhánh</h4>
           <p style="margin:0;font-size:0.82rem;color:var(--text-muted);">Chọn chi nhánh — các trường <code>[Chi Nhánh] *</code> sẽ tự động điền từ bản ghi này.</p>
         </div>
         <div style="min-width:260px;">
+          ${(BranchState.list && BranchState.list.length > 0) ? `
           <select class="mapping-select" id="word-branch-select" onchange="WordGenerator.onBranchChange(this.value)">
             <option value="">-- Chọn chi nhánh --</option>
             ${BranchState.list.map(b => `<option value="${b.id}" ${b.id === BranchState.selectedId ? 'selected' : ''}>${_wEsc(b.ma_chi_nhanh ? b.ma_chi_nhanh + ' — ' + (b.ten_chi_nhanh || '') : (b.ten_chi_nhanh || b.id))}</option>`).join('')}
-          </select>
+          </select>` : `
+          <span style="font-size:0.82rem;color:var(--text-muted);">Chưa có chi nhánh — vào <b>Master Data → Chi Nhánh</b> để thêm.</span>`}
         </div>
       </div>` : ''}
 

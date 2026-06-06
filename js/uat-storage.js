@@ -641,9 +641,18 @@ const UatStorage = {
   },
 
   async _pullBranchData() {
-    const res = await this.client.from('branches').select('*').eq('scope', this.scope);
-    this._throwIfErr(res, 'pull branches');
-    return res.data || [];
+    // Gracefully handle missing table — don't fail pullAll if branches table not created yet
+    try {
+      const res = await this.client.from('branches').select('*').eq('scope', this.scope);
+      if (res.error) {
+        console.warn('[UatStorage] _pullBranchData skipped:', res.error.message);
+        return [];
+      }
+      return res.data || [];
+    } catch (e) {
+      console.warn('[UatStorage] _pullBranchData error (non-fatal):', e.message);
+      return [];
+    }
   },
 
   _restoreBranchData(rows) {
@@ -653,9 +662,15 @@ const UatStorage = {
       const key = typeof BranchModule !== 'undefined' ? BranchModule.STORAGE_KEY : 'branch_module_v1';
       localStorage.setItem(key, JSON.stringify({ list: BranchState.list, selectedId: BranchState.selectedId }));
     } catch (_) {}
+    // Re-render Chi Nhánh panel if open
     if (typeof BranchModule !== 'undefined') {
       const panel = document.getElementById('md-view-branches');
       if (panel && panel.style.display !== 'none') BranchModule.render();
+    }
+    // Rebuild Word mapping if currently on step 3
+    if (typeof WordGenerator !== 'undefined' && typeof WordGenerator.buildMappingUI === 'function') {
+      const step3 = document.getElementById('wgen-step-3');
+      if (step3 && step3.classList.contains('active')) WordGenerator.buildMappingUI();
     }
   },
 
