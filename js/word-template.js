@@ -1752,6 +1752,9 @@ const WordGenerator = {
 
   onBranchChange(branchId) {
     if (typeof BranchState !== 'undefined') BranchState.selectedId = branchId;
+    if (typeof BranchModule !== 'undefined' && typeof BranchModule.saveState === 'function') {
+      BranchModule.saveState();
+    }
     this.buildMappingUI();
   },
 
@@ -1893,44 +1896,82 @@ const WordGenerator = {
 
   autoMap(items) {
     const rateData = this._getRateTemplateData();
+    const masterData = (typeof MasterData !== 'undefined' && typeof MasterData.getMappingData === 'function')
+      ? MasterData.getMappingData()
+      : {};
+
+    const scoreCandidate = (placeholderName, candidateName, sourceHint, sourceLabel, hasValue) => {
+      const phL = _wNorm(placeholderName);
+      const kL = _wNorm(candidateName);
+      if (!phL || !kL) return 0;
+
+      let score = 0;
+      if (kL === phL) score = 100;
+      else if (kL.includes(phL) || phL.includes(kL)) score = 60;
+      else {
+        const pw = phL.split(/\s+/);
+        const kw = kL.split(/\s+/);
+        const overlap = pw.filter(word =>
+          word.length > 1 && kw.some(candidate => candidate.includes(word) || word.includes(candidate))
+        );
+        if (overlap.length > 0) score = (overlap.length / Math.max(pw.length, kw.length)) * 55;
+      }
+
+      const normalizedSource = _wNorm(sourceLabel);
+      if (score > 0 && sourceHint && normalizedSource &&
+          (normalizedSource === sourceHint || normalizedSource.includes(sourceHint) || sourceHint.includes(normalizedSource))) {
+        score += 25;
+      }
+      if (!hasValue) score -= 30;
+      return score;
+    };
+
     (items || []).forEach(item => {
       const key = item.key || item;
-      const ph = item.label || item;
-      const sourceHintMatch = String(ph).match(/^\[([^\]]+)\]\s*/);
+      const rawLabel = String(item.label || item || '').trim();
+      const ph = rawLabel.replace(/^\s*\{\{\s*/, '').replace(/\s*\}\}\s*$/, '').trim();
+      const sourceHintMatch = ph.match(/^\[([^\]]+)\]\s*/);
       const sourceHint = sourceHintMatch ? _wNorm(sourceHintMatch[1]) : '';
       const phL = _wNorm(ph.replace(/^\[[^\]]+\]\s*/, ''));
       let best = null, bestS = 0;
       Object.keys(WordState.extractedData).forEach(ft => {
         const cfg = FILE_TYPES[ft] || {};
-        const sourceLabel = _wNorm(cfg.label || ft);
-        const sourceBoost = sourceHint && (sourceLabel === sourceHint || sourceLabel.includes(sourceHint) || sourceHint.includes(sourceLabel)) ? 25 : 0;
         Object.keys(WordState.extractedData[ft]).forEach(k => {
           const value = this._resolveDataField(WordState.extractedData[ft], k);
-          const kL = _wNorm(k);
-          let s = 0;
-          if (kL === phL) s = 100;
-          else if (kL.includes(phL) || phL.includes(kL)) s = 60;
-          else {
-            const pw = phL.split(/\s+/), kw = kL.split(/\s+/);
-            const ov = pw.filter(w => w.length > 1 && kw.some(x => x.includes(w) || w.includes(x)));
-            if (ov.length > 0) s = (ov.length / Math.max(pw.length, kw.length)) * 55;
-          }
-          if (s > 0) s += sourceBoost;
-          if (value === undefined || String(value).trim() === '') s -= 30;
+          const s = scoreCandidate(
+            phL,
+            k,
+            sourceHint,
+            cfg.label || ft,
+            value !== undefined && String(value).trim() !== ''
+          );
           if (s > bestS) { bestS = s; best = `${ft}::${k}`; }
         });
       });
       Object.keys(rateData).forEach(k => {
-        const kL = _wNorm(k);
-        let s = 0;
-        if (kL === phL) s = 100;
-        else if (kL.includes(phL) || phL.includes(kL)) s = 70;
-        else {
-          const pw = phL.split(/\s+/), kw = kL.split(/\s+/);
-          const ov = pw.filter(w => w.length > 1 && kw.some(x => x.includes(w) || w.includes(x)));
-          if (ov.length > 0) s = (ov.length / Math.max(pw.length, kw.length)) * 60;
-        }
+        const value = rateData[k];
+        const s = scoreCandidate(
+          phL,
+          k,
+          sourceHint,
+          'Lãi suất',
+          value !== undefined && String(value).trim() !== ''
+        );
         if (s > bestS) { bestS = s; best = `ratecenter::${k}`; }
+      });
+      Object.keys(masterData).forEach(k => {
+        const value = masterData[k];
+        const sourceMatch = String(k).match(/^\[([^\]]+)\]\s*/);
+        const candidateSource = sourceMatch ? sourceMatch[1] : 'Master Data';
+        const candidateName = String(k).replace(/^\[[^\]]+\]\s*/, '');
+        const s = scoreCandidate(
+          phL,
+          candidateName,
+          sourceHint,
+          candidateSource,
+          value !== undefined && String(value).trim() !== ''
+        );
+        if (s > bestS) { bestS = s; best = `masterdata::${k}`; }
       });
       if (best && bestS >= 65) {
         const sel = document.getElementById(`wmap-${_wSanId(key)}`);
