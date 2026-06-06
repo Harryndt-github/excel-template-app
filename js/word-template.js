@@ -1894,6 +1894,7 @@ const WordGenerator = {
     (items || []).forEach(item => {
       const key = item.key || item;
       const ph = String(item.label || item || '')
+        .replace(/^[^\[{]*/, '')   // strip leading chars (e.g. ⧉ ) before [ or {
         .replace(/^\s*\{\{\s*/, '')
         .replace(/\s*\}\}\s*$/, '')
         .trim();
