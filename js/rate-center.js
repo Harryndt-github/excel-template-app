@@ -69,12 +69,10 @@ function _rcFeeLabel(f, cutoffMonth) {
 }
 
 const RC_DEFAULT_GRACE_RULES = {
-  // Số tháng AHG bổ sung theo thông báo RBG (chỉ áp dụng khi HTLS <= max bucket)
-  supplementMonths: 0,
-  // AHG tối đa theo thông báo RBG — ceiling tuyệt đối
-  maxGrace: 60,
-  // AHG tối đa cho khoản vay không có HTLS (BRD: không vượt quá 24 tháng)
-  noHTLSMaxGrace: 24,
+  supplementMonths: 0,   // AHG bổ sung theo RBG
+  maxGrace: 60,          // AHG tối đa (ceiling tuyệt đối)
+  noHTLSMaxGrace: 24,    // AHG tối đa khi không có HTLS
+  interestGraceMonths: 0, // Ân hạn lãi (UC02: ThoiGianAnHanLaiLd1) — riêng biệt AHG gốc
   note: '',
 };
 
@@ -395,6 +393,38 @@ const RateRuleEngine = {
     // 5. Eligibility
     const { eligible, failed } = this.checkEligibility(pkg.eligibilityConditions, input);
 
+    // 6a. Composite: Mệnh đề lãi suất GĐ2 trên HĐTD
+    // Fixed GĐ2:   "lãi suất cố định 9.5%/năm"
+    // Floating GĐ2: "lãi suất thả nổi = Lãi suất TCB 12 tháng + 3.5%/năm, điều chỉnh định kỳ 6 tháng/lần"
+    const _stdRate   = bucket ? String(bucket.standardRate || '') : '';
+    const _margin    = bucket ? String(bucket.standardMargin || bucket.margin || '') : '';
+    const _benchmark = String(pkg.benchmarkRateName || '');
+    const _resetM    = Number(pkg.rateResetMonths) || 0;
+    let _menhDeGD2 = '';
+    if (_stdRate) {
+      _menhDeGD2 = `lãi suất cố định ${_stdRate}%/năm`;
+    } else if (_margin) {
+      const _benchPart = _benchmark || 'lãi suất tham chiếu';
+      const _resetPart = _resetM ? `, điều chỉnh định kỳ ${_resetM} tháng/lần` : '';
+      _menhDeGD2 = `lãi suất thả nổi = ${_benchPart} + ${_margin}%/năm${_resetPart}`;
+    }
+
+    // 6b. Ân hạn lãi (ThoiGianAnHanLaiLd1 trong UC02)
+    const _anhHanLai = Number((pkg.graceRules || {}).interestGraceMonths) || 0;
+
+    // 6c. Điều kiện phí TNTH dạng câu văn
+    const _feeCutoff = Number(pkg.feeCutoffMonth) || 60;
+    const _feeParts  = [];
+    (pkg.feeRules || []).forEach(rule => {
+      const f = String(rule.fee ?? '');
+      if (f === '') return;
+      const fStr = (f === '0' || f === 0) ? 'Miễn phí' : `${f}%`;
+      if (rule.phase === 'inHTLS')            _feeParts.push(`Trong HTLS: ${fStr}`);
+      else if (rule.phase === 'afterHTLS_to60') _feeParts.push(`Sau HTLS – T${_feeCutoff}: ${fStr}`);
+      else if (rule.phase === 'from61')        _feeParts.push(`Từ T${_feeCutoff + 1} trở đi: ${fStr}`);
+    });
+    const _dieuKienPhiTNTH = _feeParts.join('; ');
+
     // 6. Composite field: Mệnh đề HTLS trên HĐTD
     // BRD VD1: "24 tháng kể từ ngày nhận nợ đến hết ngày 30/12/2027"
     // BRD VD2: "30 tháng kể từ ngày nhận nợ đến hết ngày 30/04/2029"
@@ -432,8 +462,11 @@ const RateRuleEngine = {
       'Ngày chặn HTLS':            ngayChansHTLSStr || (bucket ? (bucket.preferentialEndDate || '') : ''),
       'Số tháng HTLS thực tế':     actualHTLSMonthsDisplay || htlsMonths,
       'Tháng chặn HTLS':           bucket ? bucket.maxMonths : '',
-      'Thời gian HTLS trên HĐTD':  _thoiGianHTLS,
-      'Mệnh đề HTLS trên HĐTD':   _menhDeHTLS,
+      'Thời gian HTLS trên HĐTD':    _thoiGianHTLS,
+      'Mệnh đề HTLS trên HĐTD':     _menhDeHTLS,
+      'Mệnh đề lãi suất GĐ2':       _menhDeGD2,
+      'Ân hạn lãi':                  _anhHanLai,
+      'Điều kiện phí TNTH':          _dieuKienPhiTNTH,
       'Nguồn bucket lãi suất':     bucket ? bucket.effectiveSourceLabel : '',
       'Kế thừa bucket lớn hơn':    bucket && bucket.inherited ? 'Có' : 'Không',
       'Có hỗ trợ lãi suất':        supportRules.enabled !== false ? 'Có' : 'Không',
@@ -553,8 +586,13 @@ const RateCenter = {
         pkg.rateBuckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
         if (!pkg.feeRules)    { pkg.feeRules    = RC_DEFAULT_FEE_RULES.map(r => ({...r, id:_rcId()})); changed = true; }
         if (!pkg.graceRules)  { pkg.graceRules  = { ...RC_DEFAULT_GRACE_RULES }; changed = true; }
-        if (pkg.htlsMaxMonths  === undefined) { pkg.htlsMaxMonths  = ''; changed = true; }
-        if (pkg.htlsCutoffDate === undefined) { pkg.htlsCutoffDate = ''; changed = true; }
+        if (pkg.htlsMaxMonths      === undefined) { pkg.htlsMaxMonths      = '';  changed = true; }
+        if (pkg.htlsCutoffDate     === undefined) { pkg.htlsCutoffDate     = '';  changed = true; }
+        if (pkg.benchmarkRateName  === undefined) { pkg.benchmarkRateName  = '';  changed = true; }
+        if (pkg.rateResetMonths    === undefined) { pkg.rateResetMonths    = '';  changed = true; }
+        if (pkg.graceRules && pkg.graceRules.interestGraceMonths === undefined) {
+          pkg.graceRules.interestGraceMonths = 0; changed = true;
+        }
         // Migrate old grace schema → new BRD schema
         if (pkg.graceRules.supplementMonths === undefined) {
           pkg.graceRules.supplementMonths = 0; changed = true;
@@ -950,6 +988,30 @@ const RateCenter = {
       </div>
       <div id="rc-htls-preview-${pkgId}" class="rc-bucket-info" style="display:none;background:rgba(99,102,241,0.06);border-left:3px solid var(--accent);padding:8px 12px;line-height:1.8;"></div>
     </div>
+    <div class="rc-detail-section" style="margin-bottom:10px;">
+      <div class="rc-detail-section-title">📊 Tham số lãi suất Giai đoạn 2</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-bottom:6px;">
+        <div class="rc-field-item">
+          <label class="rc-field-label">Lãi suất tham chiếu GĐ2
+            <span style="font-weight:400;color:var(--text-muted);"> — VD: Lãi suất TCB 12 tháng</span>
+          </label>
+          <input class="rc-field-input" value="${_rcEsc(pkg.benchmarkRateName || '')}"
+            placeholder="VD: Lãi suất TCB 12 tháng / VNIBOR 12M"
+            onchange="RateCenter.setPkgField('${projectId}','${pkgId}','benchmarkRateName',this.value)">
+        </div>
+        <div class="rc-field-item">
+          <label class="rc-field-label">Kỳ điều chỉnh lãi suất (tháng)
+            <span style="font-weight:400;color:var(--text-muted);"> — VD: 6</span>
+          </label>
+          <input class="rc-field-input" type="number" min="1" step="1"
+            value="${_rcEsc(pkg.rateResetMonths || '')}" placeholder="VD: 3 / 6 / 12"
+            onchange="RateCenter.setPkgField('${projectId}','${pkgId}','rateResetMonths',+this.value||'')">
+        </div>
+      </div>
+      <div class="rc-bucket-info">
+        💡 Khi điền Biên độ trong bảng lãi suất, tool tự sinh: <i>lãi suất thả nổi = [Tham chiếu] + [Biên độ]%/năm, điều chỉnh định kỳ [Kỳ] tháng/lần</i>
+      </div>
+    </div>
     <div class="rc-detail-section">
       <div class="rc-detail-section-title">📈 Bảng lãi suất 2 giai đoạn
         <button onclick="RateCenter.addBucket('${projectId}','${pkgId}')"
@@ -1124,6 +1186,13 @@ const RateCenter = {
     return `<div class="rc-detail-section">
       <div class="rc-detail-section-title">⏳ Cấu hình Ân hạn gốc (theo BRD Section 6)</div>
       <div class="rc-grace-grid">
+        <div class="rc-field-item">
+          <label class="rc-field-label">Ân hạn lãi (tháng)
+            <span style="font-weight:400;color:var(--text-muted);"> — Khác ân hạn gốc; UC02: ThoiGianAnHanLai</span>
+          </label>
+          <input class="rc-field-input" type="number" min="0" value="${_rcEsc(gr.interestGraceMonths || 0)}"
+            onchange="RateCenter.setGraceVal('${projectId}','${pkgId}','interestGraceMonths',+this.value)">
+        </div>
         <div class="rc-field-item">
           <label class="rc-field-label">AHG bổ sung theo thông báo RBG (tháng)
             <span style="font-weight:400;color:var(--text-muted);"> — chỉ áp dụng khi HTLS ≤ max bucket</span>
@@ -1706,6 +1775,7 @@ const RateCenter = {
       'Biên độ',
       'Ngày GN','Ngày chặn HTLS','Số tháng HTLS thực tế','Tháng chặn HTLS',
       'Thời gian HTLS trên HĐTD','Mệnh đề HTLS trên HĐTD',
+      'Mệnh đề lãi suất GĐ2','Ân hạn lãi','Điều kiện phí TNTH',
       'Số tiền vay tối đa',
       'Nguồn bucket lãi suất','Kế thừa bucket lớn hơn','Có hỗ trợ lãi suất',
       'Mã chính sách hỗ trợ lãi suất','Chính sách hỗ trợ lãi suất',
