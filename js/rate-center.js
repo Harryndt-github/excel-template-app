@@ -395,7 +395,27 @@ const RateRuleEngine = {
     // 5. Eligibility
     const { eligible, failed } = this.checkEligibility(pkg.eligibilityConditions, input);
 
-    // 6. Derived fields for template
+    // 6. Composite field: Mệnh đề HTLS trên HĐTD
+    // BRD VD1: "24 tháng kể từ ngày nhận nợ đến hết ngày 30/12/2027"
+    // BRD VD2: "30 tháng kể từ ngày nhận nợ đến hết ngày 30/04/2029"
+    const _cDLSMonths = bucket ? bucket.maxMonths : '';
+    const _rate1      = bucket ? String(bucket.effectiveRate || bucket.rate || '') : '';
+    const _ngayChan   = ngayChansHTLSStr || (bucket ? (bucket.preferentialEndDate || '') : '');
+
+    let _thoiGianHTLS = '';
+    if (_cDLSMonths && _ngayChan) {
+      _thoiGianHTLS = `${_cDLSMonths} tháng kể từ ngày nhận nợ đến hết ngày ${_ngayChan}`;
+    } else if (_cDLSMonths) {
+      _thoiGianHTLS = `${_cDLSMonths} tháng kể từ ngày nhận nợ`;
+    } else if (_ngayChan) {
+      _thoiGianHTLS = `đến hết ngày ${_ngayChan}`;
+    }
+
+    const _menhDeHTLS = (_rate1 && _thoiGianHTLS)
+      ? `lãi suất cố định ${_thoiGianHTLS} là ${_rate1}%/năm`
+      : _thoiGianHTLS;
+
+    // 7. Derived fields for template
     const maxLoanAmountField = pkg ? (pkg.fields||[]).find(f=>f.id==='f_max_loan_amount') : null;
     const derived = {
       'Bucket HTLS':              bucket ? bucket.label : '',
@@ -412,6 +432,8 @@ const RateRuleEngine = {
       'Ngày chặn HTLS':            ngayChansHTLSStr || (bucket ? (bucket.preferentialEndDate || '') : ''),
       'Số tháng HTLS thực tế':     actualHTLSMonthsDisplay || htlsMonths,
       'Tháng chặn HTLS':           bucket ? bucket.maxMonths : '',
+      'Thời gian HTLS trên HĐTD':  _thoiGianHTLS,
+      'Mệnh đề HTLS trên HĐTD':   _menhDeHTLS,
       'Nguồn bucket lãi suất':     bucket ? bucket.effectiveSourceLabel : '',
       'Kế thừa bucket lớn hơn':    bucket && bucket.inherited ? 'Có' : 'Không',
       'Có hỗ trợ lãi suất':        supportRules.enabled !== false ? 'Có' : 'Không',
@@ -1683,6 +1705,7 @@ const RateCenter = {
       'Lãi suất giai đoạn 2','Biên độ giai đoạn 2',
       'Biên độ',
       'Ngày GN','Ngày chặn HTLS','Số tháng HTLS thực tế','Tháng chặn HTLS',
+      'Thời gian HTLS trên HĐTD','Mệnh đề HTLS trên HĐTD',
       'Số tiền vay tối đa',
       'Nguồn bucket lãi suất','Kế thừa bucket lớn hơn','Có hỗ trợ lãi suất',
       'Mã chính sách hỗ trợ lãi suất','Chính sách hỗ trợ lãi suất',
