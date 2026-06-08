@@ -199,11 +199,11 @@ const RateRuleEngine = {
       notes.push(`HTLS ${htlsMonths}th ≤ max bucket ${maxBucket}th → AHG TC = ${standardGrace}th`);
       if (supplementGrace > 0) notes.push(`AHG bổ sung = ${supplementGrace}th (tối đa ${maxGrace}th)`);
     } else {
-      // HTLS > max bucket: AHG làm tròn theo HTLS, không quá min(60, maxGrace)
-      totalGrace = Math.min(htlsMonths, maxGrace, 60);
+      // HTLS > max bucket: AHG làm tròn (ceil) theo thời gian HTLS, không quá min(60, maxGrace)
+      totalGrace = Math.min(Math.ceil(htlsMonths), maxGrace, 60);
       standardGrace = totalGrace;
       supplementGrace = 0;
-      notes.push(`HTLS ${htlsMonths}th > max bucket ${maxBucket}th → AHG theo HTLS = ${totalGrace}th`);
+      notes.push(`HTLS ${htlsMonths.toFixed ? htlsMonths.toFixed(2) : htlsMonths}th > max bucket ${maxBucket}th → AHG làm tròn = ${totalGrace}th`);
     }
 
     if (graceRules.note) notes.push(graceRules.note);
@@ -274,16 +274,99 @@ const RateRuleEngine = {
   },
 
   /**
+   * Số tháng (phần thập phân) giữa hai ngày — dùng để tính HTLS thực tế.
+   * Ví dụ: 14/05/2026 → 30/12/2027 ≈ 19.53 tháng
+   */
+  _monthsDiff(from, to) {
+    const y = to.getFullYear() - from.getFullYear();
+    const m = to.getMonth() - from.getMonth();
+    const d = to.getDate() - from.getDate();
+    return Math.max(0, y * 12 + m + d / 30);
+  },
+
+  /**
+   * Tính Ngày chặn HTLS và số tháng HTLS thực tế theo BRD Section 6.
+   *
+   * Input:
+   *   gnDateStr        — Ngày giải ngân (ISO string hoặc dd/mm/yyyy)
+   *   htlsMaxMonths    — Số tháng HTLS tối đa theo CSBH (ví dụ 30)
+   *   htlsCutoffDateStr — Ngày chặn cứng của CĐT  (ví dụ "2027-12-30")
+   *
+   * Output:
+   *   ngayChansHTLS     — Date object: min(GN + htlsMaxMonths, htlsCutoffDate)
+   *   ngayChansHTLSStr  — Formatted dd/MM/yyyy
+   *   actualHTLSMonths  — Số tháng thực tế (float)
+   *   usedCutoffDate    — true nếu ngày chặn cứng nhỏ hơn GN + htlsMaxMonths
+   *
+   * Ví dụ 1 (BRD): GN=14/05/2026, max=30th, cutoff=30/12/2027
+   *   → min(14/11/2028, 30/12/2027) = 30/12/2027 → 19.53th → bucket ≤24
+   * Ví dụ 2 (BRD): GN=14/05/2026, max=36th, cutoff=30/04/2029
+   *   → min(14/05/2029, 30/04/2029) = 30/04/2029 → 35.53th → bucket ≤36 (max)
+   */
+  calcHTLSCutoff(gnDateStr, htlsMaxMonths, htlsCutoffDateStr) {
+    if (!gnDateStr) return null;
+    // Accept dd/mm/yyyy or ISO yyyy-mm-dd
+    let gn;
+    if (typeof gnDateStr === 'string' && gnDateStr.includes('/')) {
+      const parts = gnDateStr.split('/');
+      gn = new Date(`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`);
+    } else {
+      gn = new Date(gnDateStr);
+    }
+    if (isNaN(gn)) return null;
+
+    const maxM = Number(htlsMaxMonths) || 0;
+    // GN + htlsMaxMonths (same day-of-month)
+    const gnPlusMonths = new Date(gn);
+    gnPlusMonths.setMonth(gnPlusMonths.getMonth() + maxM);
+
+    let cutoff = gnPlusMonths;
+    let usedCutoffDate = false;
+    if (htlsCutoffDateStr) {
+      const hard = new Date(htlsCutoffDateStr);
+      if (!isNaN(hard) && hard < gnPlusMonths) {
+        cutoff = hard;
+        usedCutoffDate = true;
+      }
+    }
+
+    const actualHTLSMonths = this._monthsDiff(gn, cutoff);
+
+    return {
+      ngayChansHTLS: cutoff,
+      ngayChansHTLSStr: _rcFmtDate(cutoff),
+      actualHTLSMonths,
+      usedCutoffDate,
+    };
+  },
+
+  /**
    * Evaluate toàn bộ: nhận input hồ sơ → trả output cuối cho template
    */
   evaluate(pkg, project, input) {
     if (!pkg) return {};
     const supportRules = { ...RC_DEFAULT_INTEREST_SUPPORT_RULES, ...(pkg.interestSupportRules || {}) };
-    const htlsMonths = Number(
-      input.cdtSupportMonths !== undefined && input.cdtSupportMonths !== ''
-        ? input.cdtSupportMonths
-        : (input.htlsMonths || supportRules.defaultSupportMonths || 0)
-    ) || 0;
+
+    // 0. Tính Ngày chặn HTLS và htlsMonths thực tế từ ngày GN (BRD Section 6)
+    let htlsMonths;
+    let ngayChansHTLSStr = '';
+    let actualHTLSMonthsDisplay = '';
+    const gnDate = input.disbursementDate || input.gnDate || '';
+    const htlsCutoffResult = (gnDate && (pkg.htlsMaxMonths || pkg.htlsCutoffDate))
+      ? this.calcHTLSCutoff(gnDate, pkg.htlsMaxMonths, pkg.htlsCutoffDate)
+      : null;
+
+    if (htlsCutoffResult) {
+      htlsMonths = htlsCutoffResult.actualHTLSMonths;
+      ngayChansHTLSStr = htlsCutoffResult.ngayChansHTLSStr;
+      actualHTLSMonthsDisplay = `${htlsCutoffResult.actualHTLSMonths.toFixed(2)} tháng`;
+    } else {
+      htlsMonths = Number(
+        input.cdtSupportMonths !== undefined && input.cdtSupportMonths !== ''
+          ? input.cdtSupportMonths
+          : (input.htlsMonths || supportRules.defaultSupportMonths || 0)
+      ) || 0;
+    }
 
     // 1. Bucket lãi suất
     const selectedBucket = this.selectBucket(pkg.rateBuckets, htlsMonths);
@@ -325,7 +408,9 @@ const RateRuleEngine = {
       'Lãi suất giai đoạn 2':      bucket ? (bucket.standardRate || '') : '',
       'Biên độ':                   bucket ? (bucket.standardMargin || bucket.margin || '') : '',
       'Biên độ giai đoạn 2':       bucket ? (bucket.standardMargin || bucket.margin || '') : '',
-      'Ngày chặn HTLS':            bucket ? (bucket.preferentialEndDate || '') : '',
+      'Ngày GN':                   gnDate ? _rcFmtDate(new Date(gnDate)) : '',
+      'Ngày chặn HTLS':            ngayChansHTLSStr || (bucket ? (bucket.preferentialEndDate || '') : ''),
+      'Số tháng HTLS thực tế':     actualHTLSMonthsDisplay || htlsMonths,
       'Tháng chặn HTLS':           bucket ? bucket.maxMonths : '',
       'Nguồn bucket lãi suất':     bucket ? bucket.effectiveSourceLabel : '',
       'Kế thừa bucket lớn hơn':    bucket && bucket.inherited ? 'Có' : 'Không',
@@ -446,6 +531,8 @@ const RateCenter = {
         pkg.rateBuckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
         if (!pkg.feeRules)    { pkg.feeRules    = RC_DEFAULT_FEE_RULES.map(r => ({...r, id:_rcId()})); changed = true; }
         if (!pkg.graceRules)  { pkg.graceRules  = { ...RC_DEFAULT_GRACE_RULES }; changed = true; }
+        if (pkg.htlsMaxMonths  === undefined) { pkg.htlsMaxMonths  = ''; changed = true; }
+        if (pkg.htlsCutoffDate === undefined) { pkg.htlsCutoffDate = ''; changed = true; }
         // Migrate old grace schema → new BRD schema
         if (pkg.graceRules.supplementMonths === undefined) {
           pkg.graceRules.supplementMonths = 0; changed = true;
@@ -813,7 +900,35 @@ const RateCenter = {
       </tr>`;
     }).join('');
 
-    return `<div class="rc-detail-section">
+    return `
+    <div class="rc-detail-section" style="margin-bottom:10px;">
+      <div class="rc-detail-section-title">🗓️ Tham số HTLS của chính sách (BRD Section 6)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 16px;margin-bottom:10px;">
+        <div class="rc-field-item">
+          <label class="rc-field-label">Thời gian HTLS tối đa theo CSBH (tháng)
+            <span style="font-weight:400;color:var(--text-muted);"> — VD: 30</span>
+          </label>
+          <input class="rc-field-input" type="number" min="0" step="1"
+            value="${_rcEsc(pkg.htlsMaxMonths || '')}" placeholder="VD: 30"
+            onchange="RateCenter.setPkgField('${projectId}','${pkgId}','htlsMaxMonths',+this.value||'')">
+        </div>
+        <div class="rc-field-item">
+          <label class="rc-field-label">Ngày chặn cứng của CĐT
+            <span style="font-weight:400;color:var(--text-muted);"> — VD: 30/12/2027</span>
+          </label>
+          <input class="rc-field-input" type="date"
+            value="${_rcEsc(pkg.htlsCutoffDate || '')}"
+            onchange="RateCenter.setPkgField('${projectId}','${pkgId}','htlsCutoffDate',this.value)">
+        </div>
+        <div class="rc-field-item">
+          <label class="rc-field-label">Thử tính — Ngày GN dự kiến</label>
+          <input class="rc-field-input" type="date" id="rc-test-gn-${pkgId}"
+            onchange="RateCenter.previewHTLS('${projectId}','${pkgId}',this.value)">
+        </div>
+      </div>
+      <div id="rc-htls-preview-${pkgId}" class="rc-bucket-info" style="display:none;background:rgba(99,102,241,0.06);border-left:3px solid var(--accent);padding:8px 12px;line-height:1.8;"></div>
+    </div>
+    <div class="rc-detail-section">
       <div class="rc-detail-section-title">📈 Bảng lãi suất 2 giai đoạn
         <button onclick="RateCenter.addBucket('${projectId}','${pkgId}')"
           style="margin-left:auto;padding:3px 10px;border-radius:6px;border:1px dashed rgba(99,102,241,0.3);
@@ -844,6 +959,46 @@ const RateCenter = {
         <tbody>${rows}</tbody>
       </table>
       </div></div>`;
+  },
+
+  // ── Setter cho policy-level fields (htlsMaxMonths, htlsCutoffDate…)
+  setPkgField(projectId, pkgId, key, value) {
+    const pkg = this._getPkg(projectId, pkgId);
+    if (!pkg) return;
+    pkg[key] = value;
+    this.save();
+    this.renderDetail(projectId, pkgId);
+  },
+
+  // ── Live preview: tính Ngày chặn HTLS cho một ngày GN thử nghiệm
+  previewHTLS(projectId, pkgId, gnDateStr) {
+    const pkg = this._getPkg(projectId, pkgId);
+    const previewEl = document.getElementById(`rc-htls-preview-${pkgId}`);
+    if (!pkg || !previewEl) return;
+    if (!gnDateStr) { previewEl.style.display = 'none'; return; }
+
+    const result = RateRuleEngine.calcHTLSCutoff(gnDateStr, pkg.htlsMaxMonths, pkg.htlsCutoffDate);
+    if (!result) { previewEl.style.display = 'none'; return; }
+
+    const buckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
+    const maxBucketMonths = buckets.length ? buckets[buckets.length - 1].maxMonths : 0;
+    const actualCeil = Math.ceil(result.actualHTLSMonths);
+    const selectedBucket = RateRuleEngine.selectBucket(pkg.rateBuckets, result.actualHTLSMonths);
+    const effective = RateRuleEngine.resolveEffectiveBucket(pkg.rateBuckets, selectedBucket);
+
+    const graceRules = pkg.graceRules || RC_DEFAULT_GRACE_RULES;
+    const hasHTLS = result.actualHTLSMonths > 0;
+    const { standardGrace, supplementGrace, totalGrace, maxGrace } = RateRuleEngine.calcGrace(
+      graceRules, { htlsMonths: result.actualHTLSMonths, hasHTLS }, effective, maxBucketMonths
+    );
+
+    previewEl.style.display = '';
+    previewEl.innerHTML = [
+      `<b>📅 Ngày chặn HTLS:</b> ${result.ngayChansHTLSStr} &nbsp;${result.usedCutoffDate ? '<span style="color:#f59e0b">(dùng ngày chặn cứng CĐT)</span>' : `<span style="color:var(--text-muted)">(GN + ${pkg.htlsMaxMonths} tháng)</span>`}`,
+      `<b>⏱ Thời gian HTLS thực tế:</b> ${result.actualHTLSMonths.toFixed(2)} tháng → làm tròn ${actualCeil} tháng`,
+      `<b>📈 Bucket áp dụng:</b> ${effective ? effective.label : '—'} &nbsp;→&nbsp; <b>Lãi suất GĐ1:</b> ${effective ? (effective.effectiveRate || effective.rate || '—') : '—'}%/năm`,
+      `<b>⏳ AHG:</b> Tiêu chuẩn = ${standardGrace}th | Bổ sung = ${supplementGrace}th | Tổng áp dụng = <b>${totalGrace} tháng</b> (tối đa ${maxGrace}th)`,
+    ].join('<br>');
   },
 
   // Tab 3: Nghĩa vụ trả lãi / Tích hợp chính sách
@@ -1526,7 +1681,8 @@ const RateCenter = {
       'Lãi suất áp dụng','Lãi suất hiệu lực','Lãi suất bucket',
       'Lãi suất giai đoạn 1','Lãi suất cố định',
       'Lãi suất giai đoạn 2','Biên độ giai đoạn 2',
-      'Biên độ','Ngày chặn HTLS','Tháng chặn HTLS',
+      'Biên độ',
+      'Ngày GN','Ngày chặn HTLS','Số tháng HTLS thực tế','Tháng chặn HTLS',
       'Số tiền vay tối đa',
       'Nguồn bucket lãi suất','Kế thừa bucket lớn hơn','Có hỗ trợ lãi suất',
       'Mã chính sách hỗ trợ lãi suất','Chính sách hỗ trợ lãi suất',
