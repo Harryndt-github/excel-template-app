@@ -878,7 +878,8 @@ const WordGenerator = {
   _selectedRatePolicyId: '',
   // [P2-2] Rule Engine runtime
   _runtimeConditions: {
-    htlsMonths: '', loanTermMonths: '', currentMonth: 1, loanType: 'HTLS',
+    disbursementDate: '', htlsMonths: '', loanTermMonths: '',
+    currentMonth: 1, loanType: 'HTLS',
     hasSupplementGrace: false, projectGroup: '',
     contractFields: {
       'Xếp hạng khách hàng': '', 'Hạng khách hàng': '',
@@ -1331,13 +1332,19 @@ const WordGenerator = {
         <div style="display:none;padding:0 18px 16px;">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:12px;">
             <div>
-	              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Thời gian hỗ trợ lãi suất (tháng)</label>
-	              <input type="number" min="0" class="mapping-select" placeholder="VD: 24"
-	                value="${this._runtimeConditions.htlsMonths||''}"
-	                oninput="WordGenerator._runtimeConditions.htlsMonths=this.value">
-	            </div>
-	            <div>
-	              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Tổng kỳ hạn vay (tháng)</label>
+              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Ngày giải ngân dự kiến <span style="color:#10b981;font-weight:400;">(tính Ngày chặn HTLS)</span></label>
+              <input type="date" class="mapping-select"
+                value="${this._runtimeConditions.disbursementDate||''}"
+                oninput="WordGenerator._runtimeConditions.disbursementDate=this.value">
+            </div>
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Thời gian HTLS (tháng) <span style="color:var(--text-muted);font-weight:400;">— dùng nếu không nhập ngày GN</span></label>
+              <input type="number" min="0" class="mapping-select" placeholder="VD: 24"
+                value="${this._runtimeConditions.htlsMonths||''}"
+                oninput="WordGenerator._runtimeConditions.htlsMonths=this.value">
+            </div>
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Tổng kỳ hạn vay (tháng)</label>
 	              <input type="number" min="1" class="mapping-select" placeholder="VD: 240"
 	                value="${this._runtimeConditions.loanTermMonths||''}"
 	                oninput="WordGenerator._runtimeConditions.loanTermMonths=this.value">
