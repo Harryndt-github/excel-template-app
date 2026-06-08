@@ -187,18 +187,19 @@ const MasterData = {
     // Hide all panels
     document.querySelectorAll('.md-view-panel').forEach(p => p.style.display = 'none');
     const panel = document.getElementById(`md-view-${mode}`);
-    const flexModes = ['config', 'ratecenter', 'advisor', 'branches'];
+    const flexModes = ['config', 'ratecenter', 'advisor', 'branches', 'projectinfo'];
     if (panel) panel.style.display = flexModes.includes(mode) ? 'flex' : 'block';
 
     // Sidebar: only show for mindmap
     const sidebar = document.querySelector('.md-sidebar');
     if (sidebar) sidebar.style.display = (mode === 'mindmap') ? '' : 'none';
 
-    if (mode === 'mindmap')    { this.renderMindmap(); this.renderEntityList(); }
-    if (mode === 'config')     this.cfgRenderEntityList();
-    if (mode === 'ratecenter') RateCenter.render();
-    if (mode === 'advisor')    { if (typeof PolicyAdvisorUI !== 'undefined') PolicyAdvisorUI.render(); }
-    if (mode === 'branches')   { if (typeof BranchModule !== 'undefined') BranchModule.render(); }
+    if (mode === 'mindmap')     { this.renderMindmap(); this.renderEntityList(); }
+    if (mode === 'config')      this.cfgRenderEntityList();
+    if (mode === 'ratecenter')  RateCenter.render();
+    if (mode === 'advisor')     { if (typeof PolicyAdvisorUI !== 'undefined') PolicyAdvisorUI.render(); }
+    if (mode === 'branches')    { if (typeof BranchModule !== 'undefined') BranchModule.render(); }
+    if (mode === 'projectinfo') { if (typeof ProjectInfoModule !== 'undefined') ProjectInfoModule.render(); }
   },
 
   // ── Entity List (sidebar on master data page) ──
@@ -1348,6 +1349,14 @@ const MasterData = {
       </div>`);
     }
 
+    if (typeof ProjectInfoModule !== 'undefined' && typeof PROJECT_INFO_FIELDS !== 'undefined') {
+      cards.push(`<div class="ph-source-card md-ph-entity-card" onclick="${callbackPrefix}('__projectinfo__')" style="border-left:3px solid #f97316;">
+        <span class="ph-source-icon" style="color:#f97316;">🏗️</span>
+        <span class="ph-source-label">Thông tin dự án</span>
+        <span class="ph-source-count">${PROJECT_INFO_FIELDS.length} trường · lấy từ dự án đang chọn</span>
+      </div>`);
+    }
+
     container.innerHTML = cards.join('');
   },
 
@@ -1379,6 +1388,19 @@ const MasterData = {
       container.innerHTML = branchFields.map(f => `
         <div class="ph-field-chip md-ph-field-chip" onclick="${callbackPrefix}('Chi Nhánh', '${_mdEsc(f.label)}')" style="border-left:3px solid #06b6d4;">
           <span class="ph-field-icon" style="color:#06b6d4;">🏦</span>
+          <span class="ph-field-name">${_mdEsc(f.label)}</span>
+        </div>
+      `).join('');
+      return;
+    }
+
+    if (entityId === '__projectinfo__' && typeof PROJECT_INFO_FIELDS !== 'undefined') {
+      const piFields = filter
+        ? PROJECT_INFO_FIELDS.filter(f => f.label.toLowerCase().includes(filter.toLowerCase()))
+        : PROJECT_INFO_FIELDS;
+      container.innerHTML = piFields.map(f => `
+        <div class="ph-field-chip md-ph-field-chip" onclick="${callbackPrefix}('Thông tin dự án', '${_mdEsc(f.label)}')" style="border-left:3px solid #f97316;">
+          <span class="ph-field-icon" style="color:#f97316;">🏗️</span>
           <span class="ph-field-name">${_mdEsc(f.label)}</span>
         </div>
       `).join('');
@@ -1418,12 +1440,14 @@ const MasterData = {
     this._ssSelectedEntity = entityId;
     const isRateCenter = entityId === '__ratecenter__';
     const isBranches = entityId === '__branches__';
+    const isProjectInfo = entityId === '__projectinfo__';
     const entity = isRateCenter ? { name: 'Master Data lãi suất', color: '#10b981' }
       : isBranches ? { name: 'Chi Nhánh', color: '#06b6d4' }
+      : isProjectInfo ? { name: 'Thông tin dự án', color: '#f97316' }
       : MasterDataState.entities.find(e => e.id === entityId);
     if (!entity) return;
 
-    document.getElementById('ss-md-entity-label').textContent = isRateCenter ? '％ Master Data lãi suất' : isBranches ? '🏦 Chi Nhánh' : `⬢ ${entity.name}`;
+    document.getElementById('ss-md-entity-label').textContent = isRateCenter ? '％ Master Data lãi suất' : isBranches ? '🏦 Chi Nhánh' : isProjectInfo ? '🏗️ Thông tin dự án' : `⬢ ${entity.name}`;
     document.getElementById('ss-md-entity-label').style.color = entity.color;
     document.getElementById('ss-md-step-entities').style.display = 'none';
     document.getElementById('ss-md-step-fields').style.display = '';
@@ -1461,12 +1485,14 @@ const MasterData = {
     this._wordSelectedEntity = entityId;
     const isRateCenter = entityId === '__ratecenter__';
     const isBranches = entityId === '__branches__';
+    const isProjectInfo = entityId === '__projectinfo__';
     const entity = isRateCenter ? { name: 'Master Data lãi suất', color: '#10b981' }
       : isBranches ? { name: 'Chi Nhánh', color: '#06b6d4' }
+      : isProjectInfo ? { name: 'Thông tin dự án', color: '#f97316' }
       : MasterDataState.entities.find(e => e.id === entityId);
     if (!entity) return;
 
-    document.getElementById('word-md-entity-label').textContent = isRateCenter ? '％ Master Data lãi suất' : isBranches ? '🏦 Chi Nhánh' : `⬢ ${entity.name}`;
+    document.getElementById('word-md-entity-label').textContent = isRateCenter ? '％ Master Data lãi suất' : isBranches ? '🏦 Chi Nhánh' : isProjectInfo ? '🏗️ Thông tin dự án' : `⬢ ${entity.name}`;
     document.getElementById('word-md-entity-label').style.color = entity.color;
     document.getElementById('word-md-step-entities').style.display = 'none';
     document.getElementById('word-md-step-fields').style.display = '';
@@ -1824,6 +1850,9 @@ Object.assign(MasterData, {
     });
     if (typeof BranchModule !== 'undefined') {
       Object.assign(result, BranchModule.getMappingData());
+    }
+    if (typeof ProjectInfoModule !== 'undefined') {
+      Object.assign(result, ProjectInfoModule.getMappingData());
     }
     return result;
   },

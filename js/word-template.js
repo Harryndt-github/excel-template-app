@@ -1404,6 +1404,22 @@ const WordGenerator = {
         </div>
       </div>` : ''}
 
+      ${typeof ProjectInfoModule !== 'undefined' ? `
+      <div style="margin-bottom:18px;padding:14px 18px;border:1px solid rgba(249,115,22,0.2);border-radius:14px;background:rgba(249,115,22,0.03);display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <h4 style="margin:0 0 4px;font-size:0.95rem;color:#f97316;">🏗️ Thông tin dự án</h4>
+          <p style="margin:0;font-size:0.82rem;color:var(--text-muted);">Chọn dự án — các trường <code>[Thông tin dự án] *</code> sẽ tự động điền từ bản ghi này.</p>
+        </div>
+        <div style="min-width:260px;">
+          ${(ProjectInfoState.list && ProjectInfoState.list.length > 0) ? `
+          <select class="mapping-select" id="word-project-select" onchange="WordGenerator.onProjectInfoChange(this.value)">
+            <option value="">-- Chọn dự án --</option>
+            ${ProjectInfoState.list.map(p => `<option value="${p.id}" ${p.id === ProjectInfoState.selectedId ? 'selected' : ''}>${_wEsc(p.ten_du_an || p.ma_du_an || p.id)}${p.ten_cdt ? ' — ' + _wEsc(p.ten_cdt) : ''}</option>`).join('')}
+          </select>` : `
+          <span style="font-size:0.82rem;color:var(--text-muted);">Chưa có dự án — vào <b>Master Data → Thông tin dự án</b> để thêm.</span>`}
+        </div>
+      </div>` : ''}
+
       <table class="mapping-table"><thead><tr>
         <th style="width:30%">Trường Template</th><th style="width:40%">Dữ liệu Excel / Master Data</th><th style="width:30%">Giá trị</th>
       </tr></thead><tbody>
@@ -1746,6 +1762,14 @@ const WordGenerator = {
     if (typeof BranchState !== 'undefined') BranchState.selectedId = branchId;
     if (typeof BranchModule !== 'undefined' && typeof BranchModule._persistLocalState === 'function') {
       BranchModule._persistLocalState();
+    }
+    this.buildMappingUI();
+  },
+
+  onProjectInfoChange(projectId) {
+    if (typeof ProjectInfoState !== 'undefined') ProjectInfoState.selectedId = projectId;
+    if (typeof ProjectInfoModule !== 'undefined' && typeof ProjectInfoModule._persistLocalState === 'function') {
+      ProjectInfoModule._persistLocalState();
     }
     this.buildMappingUI();
   },

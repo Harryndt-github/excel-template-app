@@ -1025,6 +1025,12 @@
                 </svg>
                 Chi Nhánh
               </button>
+              <button class="md-view-btn" data-view="projectinfo" onclick="MasterData.setView('projectinfo')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="7" width="20" height="14" rx="1"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="17"/><line x1="9" y1="14.5" x2="15" y2="14.5"/>
+                </svg>
+                Thông tin dự án
+              </button>
             </div>
             <span id="md-save-status" style="font-size:0.78rem;margin-left:auto;padding:0 8px;transition:color 0.3s;white-space:nowrap;align-self:center;"></span>
           </div>
@@ -1079,6 +1085,7 @@
             <div id="pa-main" style="height:100%;"></div>
           </div>
           <div class="md-view-panel" id="md-view-branches" style="display:none;overflow:hidden;height:100%;"></div>
+          <div class="md-view-panel" id="md-view-projectinfo" style="display:none;overflow:hidden;height:100%;"></div>
           <div class="md-view-panel" id="md-view-ratecenter" style="display:none;overflow:hidden;height:100%;">
             <div class="rc-layout">
               <!-- RC Panel 1: Projects -->
@@ -1684,6 +1691,7 @@
   <script src="js/app.js?v=20260526_composite_fix"></script>
   <script src="js/master-data.js?v=20260606_branch_phmodal"></script>
   <script src="js/branch.js?v=20260606_branch_audit1"></script>
+  <script src="js/project-info.js?v=20260608_projectinfo_v1"></script>
   <script src="js/rate-center.js?v=20260526_composite_fix"></script>
   <script src="js/policy-advisor.js?v=20260526_composite_fix"></script>
   <script src="js/md-import.js?v=20260526_composite_fix"></script>

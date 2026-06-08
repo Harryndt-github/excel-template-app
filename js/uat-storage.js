@@ -174,8 +174,9 @@ const UatStorage = {
   // ── Incremental upsert (called by individual modules on save) ──
   async upsertState(key, _payload) {
     if (!this.client) return;
-    if (key === 'master_data') await this._pushMasterData();
-    if (key === 'branch_data') await this._pushBranchData();
+    if (key === 'master_data')      await this._pushMasterData();
+    if (key === 'branch_data')      await this._pushBranchData();
+    if (key === 'project_info_data') await this._pushProjectInfoData();
   },
 
   // ── Push ─────────────────────────────────────────────────────
@@ -191,6 +192,7 @@ const UatStorage = {
       await this.uploadNativeDocxTemplates();
       await this._pushMasterData();
       await this._pushBranchData();
+      await this._pushProjectInfoData();
       await this._pushRateCenter();
       await this._pushTemplates();
       this.lastStatus = `Synced ${new Date().toLocaleTimeString('vi-VN')}`;
@@ -204,6 +206,28 @@ const UatStorage = {
     } finally {
       this.isSyncing = false;
       this.renderStatus();
+    }
+  },
+
+  async _pushProjectInfoData() {
+    if (typeof ProjectInfoState === 'undefined') return;
+    const list = ProjectInfoState.list || [];
+    const now = new Date().toISOString();
+    this._throwIfErr(
+      await this.client.from('project_infos').delete().eq('scope', this.scope),
+      'clear project_infos'
+    );
+    if (list.length) {
+      this._throwIfErr(
+        await this.client.from('project_infos').insert(
+          list.map(p => ({
+            scope: this.scope,
+            project_info_id: p.id,
+            data: p,
+            updated_at: now,
+          }))
+        ), 'insert project_infos'
+      );
     }
   },
 
@@ -552,14 +576,16 @@ const UatStorage = {
     }
     this.isSyncing = true;
     try {
-      const [mdData, branchData, rcData, tplData] = await Promise.all([
+      const [mdData, branchData, piData, rcData, tplData] = await Promise.all([
         this._pullMasterData(),
         this._pullBranchData(),
+        this._pullProjectInfoData(),
         this._pullRateCenter(),
         this._pullTemplates(),
       ]);
       this._restoreMasterData(mdData);
       this._restoreBranchData(branchData);
+      this._restoreProjectInfoData(piData);
       this._restoreRateCenter(rcData);
       await this._restoreTemplates(tplData);
       this.renderStatus();
@@ -637,6 +663,40 @@ const UatStorage = {
 
     if (typeof MasterData !== 'undefined' && typeof MasterData.setView === 'function') {
       MasterData.setView(MasterDataState.viewMode || 'config');
+    }
+  },
+
+  async _pullProjectInfoData() {
+    try {
+      const res = await this.client.from('project_infos').select('*').eq('scope', this.scope);
+      if (res.error) {
+        console.warn('[UatStorage] _pullProjectInfoData skipped:', res.error.message);
+        return [];
+      }
+      return res.data || [];
+    } catch (e) {
+      console.warn('[UatStorage] _pullProjectInfoData error (non-fatal):', e.message);
+      return [];
+    }
+  },
+
+  _restoreProjectInfoData(rows) {
+    if (typeof ProjectInfoState === 'undefined') return;
+    ProjectInfoState.list = rows.map(r => ({ ...r.data, id: r.project_info_id }));
+    if (!ProjectInfoState.list.some(p => p.id === ProjectInfoState.selectedId)) {
+      ProjectInfoState.selectedId = ProjectInfoState.list[0]?.id || null;
+    }
+    try {
+      const key = typeof ProjectInfoModule !== 'undefined' ? ProjectInfoModule.STORAGE_KEY : 'project_info_module_v1';
+      localStorage.setItem(key, JSON.stringify({ list: ProjectInfoState.list, selectedId: ProjectInfoState.selectedId }));
+    } catch (_) {}
+    if (typeof ProjectInfoModule !== 'undefined') {
+      const panel = document.getElementById('md-view-projectinfo');
+      if (panel && panel.style.display !== 'none') ProjectInfoModule.render();
+    }
+    if (typeof WordGenerator !== 'undefined' && typeof WordGenerator.buildMappingUI === 'function') {
+      const step3 = document.getElementById('wgen-step-3');
+      if (step3 && step3.classList.contains('active')) WordGenerator.buildMappingUI();
     }
   },
 
