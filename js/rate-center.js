@@ -69,11 +69,12 @@ function _rcFeeLabel(f, cutoffMonth) {
 }
 
 const RC_DEFAULT_GRACE_RULES = {
-  baseMonths: 0,
-  withHTLS: true,
-  withSupplement: false,
-  useMaxByGroup: false,
-  maxByGroup: { A: 36, B: 24, default: 0 },
+  // Số tháng AHG bổ sung theo thông báo RBG (chỉ áp dụng khi HTLS <= max bucket)
+  supplementMonths: 0,
+  // AHG tối đa theo thông báo RBG — ceiling tuyệt đối
+  maxGrace: 60,
+  // AHG tối đa cho khoản vay không có HTLS (BRD: không vượt quá 24 tháng)
+  noHTLSMaxGrace: 24,
   note: '',
 };
 
@@ -160,48 +161,54 @@ const RateRuleEngine = {
   },
 
   /**
-   * Tính ân hạn gốc tối đa
-   * Phụ thuộc: project group, exception per project, có hỗ trợ lãi, có bổ sung
+   * Tính ân hạn gốc theo BRD Section 6:
+   *
+   * Có HTLS:
+   *   - HTLS <= max bucket → AHG tiêu chuẩn = bucket.maxMonths; AHG bổ sung theo RBG
+   *   - HTLS >  max bucket → AHG = HTLS months (làm tròn), không quá min(60, maxGrace)
+   * Không HTLS:
+   *   - AHG tối đa = noHTLSMaxGrace (mặc định 24 tháng)
+   *
+   * Ví dụ 1 (BRD): GN 14/05/2026, HTLS=19th (chặn 30/12/2027), maxBucket=24, maxGrace=30, supplement=12
+   *   → standardGrace=24, supplementGrace=6, totalGrace=30
+   * Ví dụ 2 (BRD): GN 14/05/2026, HTLS=36th (chặn 30/04/2029), maxBucket=30, maxGrace=60
+   *   → HTLS>maxBucket → totalGrace=36
    */
-  calcGrace(graceRules, projectExceptions, input) {
-    const { projectGroup, hasHTLS, hasSupplementGrace, projectName, htlsMonths } = input;
+  calcGrace(graceRules, input, bucket, maxBucketMonths) {
+    const htlsMonths = Number(input.htlsMonths) || 0;
+    const hasHTLS = input.hasHTLS !== false && htlsMonths > 0;
+    const maxBucket = Number(maxBucketMonths) || (bucket ? Number(bucket.maxMonths) : 0);
+    const maxGrace = Number(graceRules.maxGrace) || 60;
     const notes = [];
-    let grace = Number(graceRules.baseMonths) || 0;
 
-    // Kiểm tra exception theo tên dự án
-    const exception = (projectExceptions || []).find(e =>
-      e.projectName && projectName &&
-      projectName.toLowerCase().includes(e.projectName.toLowerCase())
-    );
+    let standardGrace, supplementGrace, totalGrace;
 
-    if (exception) {
-      grace = Number(exception.maxGrace) || grace;
-      notes.push(`Ngoại lệ dự án: ${exception.projectName} → tối đa ${grace} tháng`);
-    } else if (graceRules.useMaxByGroup && projectGroup) {
-      const groupMax = graceRules.maxByGroup[projectGroup] || graceRules.maxByGroup.default || 0;
-      if (groupMax > 0) {
-        grace = Math.min(grace || groupMax, groupMax);
-        notes.push(`Nhóm ${projectGroup}: tối đa ${groupMax} tháng`);
-      }
+    if (!hasHTLS) {
+      const noHTLSMax = Number(graceRules.noHTLSMaxGrace) || 24;
+      standardGrace = Math.min(noHTLSMax, maxGrace);
+      supplementGrace = 0;
+      totalGrace = standardGrace;
+      notes.push(`Không HTLS: AHG tiêu chuẩn tối đa ${standardGrace} tháng`);
+    } else if (htlsMonths <= maxBucket || maxBucket === 0) {
+      // HTLS <= max bucket: AHG TC = bucket.maxMonths, AHG bổ sung từ RBG
+      const bucketMonths = bucket ? Number(bucket.maxMonths) : 0;
+      standardGrace = Math.min(bucketMonths, maxGrace);
+      const supplementCap = Math.min(60, maxGrace) - standardGrace;
+      supplementGrace = Math.max(0, Math.min(Number(graceRules.supplementMonths) || 0, supplementCap));
+      totalGrace = Math.min(standardGrace + supplementGrace, maxGrace, 60);
+      notes.push(`HTLS ${htlsMonths}th ≤ max bucket ${maxBucket}th → AHG TC = ${standardGrace}th`);
+      if (supplementGrace > 0) notes.push(`AHG bổ sung = ${supplementGrace}th (tối đa ${maxGrace}th)`);
+    } else {
+      // HTLS > max bucket: AHG làm tròn theo HTLS, không quá min(60, maxGrace)
+      totalGrace = Math.min(htlsMonths, maxGrace, 60);
+      standardGrace = totalGrace;
+      supplementGrace = 0;
+      notes.push(`HTLS ${htlsMonths}th > max bucket ${maxBucket}th → AHG theo HTLS = ${totalGrace}th`);
     }
 
-    // Nếu không có exception và không có group → giới hạn bằng thời gian hỗ trợ lãi
-    if (!exception && !(graceRules.useMaxByGroup && projectGroup)) {
-      const htls = Number(htlsMonths) || 0;
-      if (htls > 0 && (grace === 0 || grace > htls)) {
-        grace = htls;
-        notes.push('Không vượt quá thời gian hỗ trợ lãi (' + htls + ' tháng)');
-      }
-    }
+    if (graceRules.note) notes.push(graceRules.note);
 
-    if (graceRules.withHTLS && hasHTLS) {
-      notes.push('Có hỗ trợ lãi từ CĐT → ân hạn đầy đủ');
-    }
-    if (graceRules.withSupplement && hasSupplementGrace) {
-      notes.push('Có ân hạn gốc bổ sung');
-    }
-
-    return { grace, notes };
+    return { standardGrace, supplementGrace, totalGrace, maxGrace, notes };
   },
 
   /**
@@ -286,11 +293,17 @@ const RateRuleEngine = {
     const feeCutoff = Number(pkg.feeCutoffMonth) || 60;
     const feeRule = this.calcFee(pkg.feeRules, { currentMonth: input.currentMonth, htlsMonths, cutoffMonth: feeCutoff });
 
-    // 3. Ân hạn gốc
-    const { grace, notes: graceNotes } = this.calcGrace(
+    // 3. Ân hạn gốc theo BRD Section 6
+    const normalizedBuckets = this.normalizeBuckets(pkg.rateBuckets);
+    const maxBucketMonths = normalizedBuckets.length
+      ? normalizedBuckets[normalizedBuckets.length - 1].maxMonths
+      : 0;
+    const hasHTLS = input.loanType !== 'standard' && htlsMonths > 0;
+    const { standardGrace, supplementGrace, totalGrace, maxGrace: graceMax, notes: graceNotes } = this.calcGrace(
       pkg.graceRules || RC_DEFAULT_GRACE_RULES,
-      pkg.projectExceptions,
-      { ...input, htlsMonths, cdtSupportMonths: htlsMonths, projectName: project ? project.name : '' }
+      { ...input, htlsMonths, hasHTLS },
+      bucket,
+      maxBucketMonths
     );
 
     // 4. Nghĩa vụ trả lãi/gốc giữa CĐT và Khách hàng
@@ -333,7 +346,10 @@ const RateRuleEngine = {
       'Nguyên tắc trả nợ gốc':     responsibility.principalRule,
       'Phí TNTH hiện hành':        feeRule ? feeRule.fee  : '',
       'Giai đoạn TNTH':            feeRule ? feeRule.label : '',
-      'Ân hạn gốc tối đa':         grace,
+      'Ân hạn gốc tiêu chuẩn':     standardGrace,
+      'Ân hạn gốc bổ sung':        supplementGrace,
+      'Ân hạn gốc tối đa':         graceMax,
+      'Ân hạn gốc áp dụng':        totalGrace,
       'Số tiền vay tối đa':        maxLoanAmountField ? (maxLoanAmountField.value || '') : '',
       'Ghi chú rule':              [...responsibility.notes, ...graceNotes].join(' | '),
       'Điều kiện đủ':              eligible ? 'Đủ điều kiện' : 'Không đủ: ' + failed.join(', '),
@@ -430,6 +446,20 @@ const RateCenter = {
         pkg.rateBuckets = RateRuleEngine.normalizeBuckets(pkg.rateBuckets);
         if (!pkg.feeRules)    { pkg.feeRules    = RC_DEFAULT_FEE_RULES.map(r => ({...r, id:_rcId()})); changed = true; }
         if (!pkg.graceRules)  { pkg.graceRules  = { ...RC_DEFAULT_GRACE_RULES }; changed = true; }
+        // Migrate old grace schema → new BRD schema
+        if (pkg.graceRules.supplementMonths === undefined) {
+          pkg.graceRules.supplementMonths = 0; changed = true;
+        }
+        if (pkg.graceRules.maxGrace === undefined) {
+          // Heuristic: nếu có maxByGroup, lấy giá trị lớn nhất làm maxGrace
+          const oldMax = pkg.graceRules.useMaxByGroup && pkg.graceRules.maxByGroup
+            ? Math.max(...Object.values(pkg.graceRules.maxByGroup).map(Number).filter(n => n > 0), 60)
+            : 60;
+          pkg.graceRules.maxGrace = oldMax; changed = true;
+        }
+        if (pkg.graceRules.noHTLSMaxGrace === undefined) {
+          pkg.graceRules.noHTLSMaxGrace = 24; changed = true;
+        }
         if (!pkg.interestSupportRules) { pkg.interestSupportRules = { ...RC_DEFAULT_INTEREST_SUPPORT_RULES }; changed = true; }
         Object.keys(RC_DEFAULT_INTEREST_SUPPORT_RULES).forEach(key => {
           if (pkg.interestSupportRules[key] === undefined) {
@@ -911,62 +941,44 @@ const RateCenter = {
       <div class="rc-fee-list">${feeRows}</div>
     </div>`;
   },
-  // Tab 3: Ân hạn gốc
+  // Tab 3: Ân hạn gốc (theo BRD Section 6)
   _renderTabGrace(projectId, pkgId, pkg) {
     const gr = pkg.graceRules || RC_DEFAULT_GRACE_RULES;
     return `<div class="rc-detail-section">
-      <div class="rc-detail-section-title">⏳ Rule tính Ân hạn gốc tối đa</div>
+      <div class="rc-detail-section-title">⏳ Cấu hình Ân hạn gốc (theo BRD Section 6)</div>
       <div class="rc-grace-grid">
         <div class="rc-field-item">
-          <label class="rc-field-label">Ân hạn cơ bản (tháng)</label>
-          <input class="rc-field-input" type="number" min="0" value="${_rcEsc(gr.baseMonths||0)}"
-            onchange="RateCenter.setGraceVal('${projectId}','${pkgId}','baseMonths',this.value)">
+          <label class="rc-field-label">AHG bổ sung theo thông báo RBG (tháng)
+            <span style="font-weight:400;color:var(--text-muted);"> — chỉ áp dụng khi HTLS ≤ max bucket</span>
+          </label>
+          <input class="rc-field-input" type="number" min="0" value="${_rcEsc(gr.supplementMonths || 0)}"
+            onchange="RateCenter.setGraceVal('${projectId}','${pkgId}','supplementMonths',+this.value)">
         </div>
         <div class="rc-field-item">
-          <label class="rc-field-label">Có hỗ trợ lãi từ CĐT → ân hạn đầy đủ?</label>
-          <select class="rc-field-input" onchange="RateCenter.setGraceVal('${projectId}','${pkgId}','withHTLS',this.value==='true')">
-            <option value="true"  ${gr.withHTLS?'selected':''}>Có</option>
-            <option value="false" ${!gr.withHTLS?'selected':''}>Không</option>
-          </select>
+          <label class="rc-field-label">AHG tối đa theo thông báo RBG (tháng)
+            <span style="font-weight:400;color:var(--text-muted);"> — ceiling tuyệt đối, không vượt quá 60</span>
+          </label>
+          <input class="rc-field-input" type="number" min="0" max="60" value="${_rcEsc(gr.maxGrace ?? 60)}"
+            onchange="RateCenter.setGraceVal('${projectId}','${pkgId}','maxGrace',+this.value)">
         </div>
         <div class="rc-field-item">
-          <label class="rc-field-label">Có ân hạn gốc bổ sung?</label>
-          <select class="rc-field-input" onchange="RateCenter.setGraceVal('${projectId}','${pkgId}','withSupplement',this.value==='true')">
-            <option value="false" ${!gr.withSupplement?'selected':''}>Không</option>
-            <option value="true"  ${gr.withSupplement?'selected':''}>Có</option>
-          </select>
+          <label class="rc-field-label">AHG tối đa — khoản vay không có HTLS (tháng)
+            <span style="font-weight:400;color:var(--text-muted);"> — BRD: mặc định 24 tháng</span>
+          </label>
+          <input class="rc-field-input" type="number" min="0" max="60" value="${_rcEsc(gr.noHTLSMaxGrace ?? 24)}"
+            onchange="RateCenter.setGraceVal('${projectId}','${pkgId}','noHTLSMaxGrace',+this.value)">
         </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Áp dụng tối đa theo nhóm dự án?</label>
-          <select class="rc-field-input" onchange="RateCenter.setGraceVal('${projectId}','${pkgId}','useMaxByGroup',this.value==='true')">
-            <option value="false" ${!gr.useMaxByGroup?'selected':''}>Không (giới hạn = thời gian hỗ trợ lãi)</option>
-            <option value="true"  ${gr.useMaxByGroup?'selected':''}>Có (theo nhóm)</option>
-          </select>
-        </div>
-        ${gr.useMaxByGroup ? `
-        <div class="rc-field-item">
-          <label class="rc-field-label">Nhóm A – tối đa (tháng)</label>
-          <input class="rc-field-input" type="number" min="0" value="${_rcEsc((gr.maxByGroup||{}).A||36)}"
-            onchange="RateCenter.setGraceGroup('${projectId}','${pkgId}','A',this.value)">
-        </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Nhóm B – tối đa (tháng)</label>
-          <input class="rc-field-input" type="number" min="0" value="${_rcEsc((gr.maxByGroup||{}).B||24)}"
-            onchange="RateCenter.setGraceGroup('${projectId}','${pkgId}','B',this.value)">
-        </div>
-        <div class="rc-field-item">
-          <label class="rc-field-label">Nhóm mặc định – tối đa (tháng)</label>
-          <input class="rc-field-input" type="number" min="0" value="${_rcEsc((gr.maxByGroup||{}).default||0)}"
-            onchange="RateCenter.setGraceGroup('${projectId}','${pkgId}','default',this.value)">
-        </div>` : ''}
         <div class="rc-field-item" style="grid-column:1/-1">
-          <label class="rc-field-label">Ghi chú rule ân hạn</label>
-          <input class="rc-field-input" value="${_rcEsc(gr.note||'')}" placeholder="VD: Áp dụng từ đợt giải ngân 2..."
+          <label class="rc-field-label">Ghi chú</label>
+          <input class="rc-field-input" value="${_rcEsc(gr.note || '')}" placeholder="VD: Theo thông báo RBG tháng 05/2026..."
             onchange="RateCenter.setGraceVal('${projectId}','${pkgId}','note',this.value)">
         </div>
       </div>
       <div class="rc-bucket-info" style="margin-top:12px;">
-        💡 <b>Logic:</b> Nếu có ngoại lệ dự án → dùng theo ngoại lệ. Nếu có nhóm → dùng max nhóm. Còn lại → không vượt quá thời gian hỗ trợ lãi.
+        💡 <b>Logic BRD:</b>
+        <b>Có HTLS &amp; HTLS ≤ max bucket</b> → AHG tiêu chuẩn = bucket.maxMonths + AHG bổ sung (RBG), tổng ≤ min(maxGrace, 60). &nbsp;
+        <b>Có HTLS &amp; HTLS &gt; max bucket</b> → AHG = HTLS months, tối đa min(maxGrace, 60). &nbsp;
+        <b>Không HTLS</b> → AHG ≤ noHTLSMaxGrace (mặc định 24 tháng).
       </div>
     </div>`;
   },
@@ -1524,7 +1536,8 @@ const RateCenter = {
       'Lãi suất CĐT trả','Lãi suất khách hàng trả',
       'Nợ gốc do ai trả','Nguyên tắc trả nợ gốc',
       'Phí TNTH hiện hành','Giai đoạn TNTH',
-      'Ân hạn gốc tối đa','Ghi chú rule','Điều kiện đủ',
+      'Ân hạn gốc tiêu chuẩn','Ân hạn gốc bổ sung','Ân hạn gốc tối đa','Ân hạn gốc áp dụng',
+      'Ghi chú rule','Điều kiện đủ',
     ];
     RC_DEFAULT_FIELDS.forEach(f => { if (!fields.includes(f.label)) fields.push(f.label); });
     return fields;
