@@ -1119,8 +1119,8 @@ const WordGenerator = {
           const expectedSet = new Set(config.fields);
           const filteredData = {};
           for (const key in data) {
-            const baseKey = key.replace(/\s*\(Dòng \d+\)$/, '');
-            const unprefixedKey = key.replace(/^\[[^\]]+\]\s*/, '').replace(/\s*\(Dòng \d+\)$/, '');
+            const baseKey = key.replace(/\s*\(Dòng \d+\)$/, '').replace(/\s*\(\d+\)$/, '').trim();
+            const unprefixedKey = key.replace(/^\[[^\]]+\]\s*/, '').replace(/\s*\(Dòng \d+\)$/, '').replace(/\s*\(\d+\)$/, '').trim();
             const isSheetScoped = /^\[[^\]]+\]\s*/.test(key);
             if (expectedSet.has(baseKey) || expectedSet.has(key) || expectedSet.has(unprefixedKey) || isSheetScoped) {
               filteredData[key] = data[key];
