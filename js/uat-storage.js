@@ -190,7 +190,9 @@ const UatStorage = {
     try {
       if (reason !== 'auto') this.toast('Đang đẩy dữ liệu lên Supabase…', 'info');
       await this.uploadNativeDocxTemplates();
-      await this._uploadVideoTemplates();
+      await this._uploadVideoTemplates().catch(e =>
+        console.warn('[UatStorage] _uploadVideoTemplates skipped (non-fatal):', e.message)
+      );
       await this._pushMasterData();
       await this._pushBranchData();
       await this._pushProjectInfoData();
@@ -557,22 +559,6 @@ const UatStorage = {
       });
     }
 
-    if (typeof VideoTemplateState !== 'undefined') {
-      (VideoTemplateState.templates || []).forEach(tpl => {
-        rows.push({
-          scope: this.scope, template_id: tpl.id,
-          template_name: tpl.name || 'Video Template',
-          template_type: 'mp4',
-          storage_bucket: this.bucket,
-          storage_path: tpl.storagePath || null,
-          source_file_name: tpl.fileName || null,
-          placeholders: [], manual_fields: [],
-          metadata: { fileName: tpl.fileName, size: tpl.size, createdAt: tpl.createdAt, description: tpl.description || '' },
-          updated_at: tpl.createdAt || now,
-        });
-      });
-    }
-
     this._throwIfErr(
       await this.client.from('document_templates').delete().eq('scope', this.scope),
       'clear document_templates'
@@ -582,6 +568,35 @@ const UatStorage = {
         await this.client.from('document_templates').insert(rows),
         'insert document_templates'
       );
+    }
+
+    // Video templates stored separately — non-fatal if table doesn't exist yet
+    await this._pushVideoTemplatesMeta().catch(e =>
+      console.warn('[UatStorage] _pushVideoTemplatesMeta skipped (non-fatal):', e.message)
+    );
+  },
+
+  async _pushVideoTemplatesMeta() {
+    if (typeof VideoTemplateState === 'undefined') return;
+    const templates = VideoTemplateState.templates || [];
+    if (!templates.length) return;
+    const now = new Date().toISOString();
+    const rows = templates.map(tpl => ({
+      scope: this.scope,
+      video_id: tpl.id,
+      video_name: tpl.name || 'Video',
+      file_name: tpl.fileName || null,
+      file_size: tpl.size || 0,
+      storage_path: tpl.storagePath || null,
+      description: tpl.description || '',
+      created_at: tpl.createdAt || now,
+      updated_at: now,
+    }));
+    const del = await this.client.from('video_templates').delete().eq('scope', this.scope);
+    if (del.error) throw new Error(del.error.message);
+    if (rows.length) {
+      const ins = await this.client.from('video_templates').insert(rows);
+      if (ins.error) throw new Error(ins.error.message);
     }
   },
 
@@ -880,7 +895,6 @@ const UatStorage = {
   async _restoreTemplates(templates) {
     const wordTpls  = templates.filter(t => t.template_type === 'docx');
     const excelTpls = templates.filter(t => t.template_type === 'excel');
-    const videoTpls = templates.filter(t => t.template_type === 'mp4');
 
     if (typeof WordState !== 'undefined') {
       WordState.templates = wordTpls.map(t => ({
@@ -900,18 +914,28 @@ const UatStorage = {
       if (typeof App !== 'undefined') App.updateDashboard();
     }
 
-    if (typeof VideoTemplateState !== 'undefined') {
-      VideoTemplateState.templates = await Promise.all(videoTpls.map(async t => {
-        const inIDB = typeof VideoStore !== 'undefined' ? await VideoStore.has(t.template_id) : false;
-        return {
-          ...(t.metadata || {}), id: t.template_id,
-          name: t.template_name, storagePath: t.storage_path,
-          _inIDB: inIDB,
-        };
-      }));
-      await this._restoreVideoFiles();
-      if (typeof VideoTemplateModule !== 'undefined') VideoTemplateModule.renderList();
-    }
+    // Video templates pulled separately from video_templates table — non-fatal
+    await this._pullAndRestoreVideoTemplates().catch(e =>
+      console.warn('[UatStorage] _pullAndRestoreVideoTemplates skipped (non-fatal):', e.message)
+    );
+  },
+
+  async _pullAndRestoreVideoTemplates() {
+    if (typeof VideoTemplateState === 'undefined' || !this.client) return;
+    const res = await this.client.from('video_templates').select('*').eq('scope', this.scope);
+    if (res.error) throw new Error(res.error.message);
+    const rows = res.data || [];
+    VideoTemplateState.templates = await Promise.all(rows.map(async r => {
+      const inIDB = typeof VideoStore !== 'undefined' ? await VideoStore.has(r.video_id) : false;
+      return {
+        id: r.video_id, name: r.video_name, fileName: r.file_name,
+        size: r.file_size, storagePath: r.storage_path,
+        description: r.description || '', createdAt: r.created_at,
+        _inIDB: inIDB,
+      };
+    }));
+    await this._restoreVideoFiles();
+    if (typeof VideoTemplateModule !== 'undefined') VideoTemplateModule.renderList();
   },
 
   // ── DocX Storage ─────────────────────────────────────────────
