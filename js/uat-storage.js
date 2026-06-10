@@ -236,6 +236,17 @@ const UatStorage = {
       await this.uploadNativeDocxTemplates().catch(e =>
         warnings.push('DOCX upload: ' + e.message)
       );
+
+      // Nếu đang có background upload chạy, đợi nó xong trước (tránh HTTP connection conflict)
+      if (this._videoUploadInProgress) {
+        await new Promise(r => {
+          const check = setInterval(() => {
+            if (!this._videoUploadInProgress) { clearInterval(check); r(); }
+          }, 500);
+          setTimeout(() => { clearInterval(check); r(); }, 30000); // timeout 30s
+        });
+      }
+
       await this._pushVideoTemplatesMeta().catch(e =>
         warnings.push('Video metadata: ' + e.message)
       );
@@ -1114,39 +1125,51 @@ const UatStorage = {
 
   // ── Video Storage ─────────────────────────────────────────────
 
-  // Chạy ngầm sau khi metadata đã được push — không block pipeline chính
+  _videoUploadInProgress: false, // lock — tránh concurrent upload gây Failed to fetch
+
+  // Chạy ngầm sau khi metadata đã được push
+  // Dùng lock để chỉ 1 upload chạy tại một thời điểm
   _uploadVideoTemplatesBackground() {
     if (typeof VideoTemplateState === 'undefined' || typeof VideoStore === 'undefined') return;
+    if (this._videoUploadInProgress) return; // upload đang chạy, bỏ qua
     const pending = (VideoTemplateState.templates || []).filter(t => t._inIDB && !t.storagePath);
     if (!pending.length) return;
 
     const totalMB = pending.reduce((s, t) => s + (t.size || 0), 0) / (1024 * 1024);
     if (totalMB > 5) this.toast(`Đang upload ${totalMB.toFixed(0)} MB lên Storage (ngầm)…`, 'info');
 
+    this._videoUploadInProgress = true;
     (async () => {
-      let uploaded = 0;
-      for (const tpl of pending) {
-        const arrayBuffer = await VideoStore.load(tpl.id).catch(() => null);
-        if (!arrayBuffer) continue;
-        const storagePath = `templates/${this.scope}/videos/${tpl.id}.mp4`;
-        const res = await this.client.storage.from(this.bucket).upload(
-          storagePath,
-          new Blob([arrayBuffer], { type: 'video/mp4' }),
-          { contentType: 'video/mp4', upsert: true }
-        );
-        if (!res.error) {
-          tpl.storagePath = storagePath;
-          uploaded++;
-        } else {
-          console.warn('[UatStorage] Video Storage upload (background):', res.error.message);
-          this.toast(`Upload Storage thất bại "${tpl.name}": ${res.error.message}`, 'warning');
+      try {
+        let uploaded = 0;
+        for (const tpl of pending) {
+          const arrayBuffer = await VideoStore.load(tpl.id).catch(() => null);
+          if (!arrayBuffer) continue;
+          const storagePath = `templates/${this.scope}/videos/${tpl.id}.mp4`;
+          const res = await this.client.storage.from(this.bucket).upload(
+            storagePath,
+            new Blob([arrayBuffer], { type: 'video/mp4' }),
+            { contentType: 'video/mp4', upsert: true }
+          );
+          if (!res.error) {
+            tpl.storagePath = storagePath;
+            uploaded++;
+          } else {
+            console.warn('[UatStorage] Video Storage upload:', res.error.message);
+            this.toast(`Upload Storage thất bại "${tpl.name}": ${res.error.message}`, 'warning');
+          }
         }
-      }
-      // Cập nhật lại storage_path vào DB sau khi upload xong
-      if (uploaded > 0) {
-        await this._pushVideoTemplatesMeta().catch(e =>
-          console.warn('[UatStorage] update storagePath after upload:', e.message)
-        );
+        // Cập nhật storage_path vào DB sau khi upload xong
+        if (uploaded > 0) {
+          // Chờ 2s để đảm bảo không xung đột với connection pool
+          await new Promise(r => setTimeout(r, 2000));
+          await this._pushVideoTemplatesMeta().catch(e =>
+            console.warn('[UatStorage] update storagePath after upload:', e.message)
+          );
+          if (totalMB > 5) this.toast(`Đã upload ${uploaded} video lên Storage`, 'success');
+        }
+      } finally {
+        this._videoUploadInProgress = false;
       }
     })();
   },
