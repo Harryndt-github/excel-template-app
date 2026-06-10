@@ -360,10 +360,15 @@ const UatStorage = {
       );
     }
 
-    if (connections.length) {
+    // Chỉ insert connections có cả from_entity và to_entity còn tồn tại
+    // Tránh FK violation khi entity bị xóa nhưng connection chưa được dọn
+    const validConnections = connections.filter(c =>
+      currentEntityIds.has(c.fromEntity) && currentEntityIds.has(c.toEntity)
+    );
+    if (validConnections.length) {
       this._throwIfErr(
         await this.client.from('md_connections').insert(
-          connections.map(c => ({
+          validConnections.map(c => ({
             scope: this.scope, connection_id: c.id,
             from_entity_id: c.fromEntity, to_entity_id: c.toEntity,
             from_field_id: c.fromField, to_field_id: c.toField,
@@ -371,6 +376,10 @@ const UatStorage = {
           }))
         ), 'insert md_connections'
       );
+    }
+    // Dọn invalid connections khỏi local state luôn
+    if (validConnections.length < connections.length && typeof MasterDataState !== 'undefined') {
+      MasterDataState.connections = validConnections;
     }
   },
 
