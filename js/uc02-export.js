@@ -662,6 +662,11 @@ const UC02Module = {
   /* ── export ── */
   exportXLSX() {
     if (typeof XLSX === 'undefined') { this._toast('Thư viện XLSX chưa load', 'error'); return; }
+    // BRD mục 8: chặn nếu vi phạm nghiệp vụ (vượt hạn mức, GN quá 70% giai đoạn HTTL...)
+    if (typeof BusinessValidator !== 'undefined' && !BusinessValidator.confirmIfBlocked('xuất template giải ngân')) {
+      this._toast('Đã hủy xuất — xử lý các lỗi chặn ở trang "Cảnh báo nghiệp vụ"', 'warning');
+      return;
+    }
     const values = UC02_COLUMNS.map(col => this.resolve(col));
     const emptyCount = values.filter(v => String(v).trim() === '').length;
 

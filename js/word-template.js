@@ -2303,6 +2303,11 @@ const WordGenerator = {
   async exportDOCX() {
     const tpl = WordState.templates.find(t => t.id === WordState.selectedTemplateId);
     if (!tpl) { App.toast('Vui lòng chọn template Word', 'warning'); return; }
+    // BRD mục 8: chặn nếu hồ sơ đang soạn vi phạm nghiệp vụ
+    if (typeof BusinessValidator !== 'undefined' && !BusinessValidator.confirmIfBlocked('xuất hồ sơ Word')) {
+      App.toast('Đã hủy xuất — xử lý các lỗi chặn ở trang "Cảnh báo nghiệp vụ"', 'warning');
+      return;
+    }
     if (tpl.nativeDocx) {
       if (typeof DocxEngine === 'undefined') {
         App.toast('DocxEngine chưa được tải. Kiểm tra js/docx-engine.js', 'error');
