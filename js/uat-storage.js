@@ -230,25 +230,47 @@ const UatStorage = {
     this.renderStatus();
     try {
       if (reason !== 'auto') this.toast('Đang đẩy dữ liệu lên Supabase…', 'info');
-      await this.uploadNativeDocxTemplates();
-      // Video metadata pushed first (fast) — Storage upload runs in background after
-      await this._pushVideoTemplatesMeta().catch(e => {
-        console.warn('[UatStorage] video metadata push failed:', e.message);
-        this.toast('Cảnh báo: Chưa sync được metadata video — ' + e.message, 'warning');
-      });
-      this._uploadVideoTemplatesBackground(); // fire-and-forget, không block pipeline
-      await this._pushMasterData();
-      await this._pushBranchData();
-      await this._pushProjectInfoData();
-      await this._pushRateCenter();
-      await this._pushTemplates();
+      const warnings = [];
+
+      // ── Các bước critical (DOCX + Video) ──────────────────────
+      await this.uploadNativeDocxTemplates().catch(e =>
+        warnings.push('DOCX upload: ' + e.message)
+      );
+      await this._pushVideoTemplatesMeta().catch(e =>
+        warnings.push('Video metadata: ' + e.message)
+      );
+      this._uploadVideoTemplatesBackground();
+
+      // ── Các bước non-critical (Master Data, Branch, Rate...) ──
+      // Mỗi bước tự xử lý lỗi — không để một bước fail kill toàn bộ sync
+      await this._pushMasterData().catch(e =>
+        warnings.push('Master Data: ' + e.message)
+      );
+      await this._pushBranchData().catch(e =>
+        warnings.push('Branch: ' + e.message)
+      );
+      await this._pushProjectInfoData().catch(e =>
+        warnings.push('Project Info: ' + e.message)
+      );
+      await this._pushRateCenter().catch(e =>
+        warnings.push('Rate Center: ' + e.message)
+      );
+      await this._pushTemplates().catch(e =>
+        warnings.push('Templates: ' + e.message)
+      );
+
       this.lastStatus = `Synced ${new Date().toLocaleTimeString('vi-VN')}`;
-      if (reason !== 'auto') this.toast('Đã đẩy dữ liệu lên Supabase', 'success');
+      if (warnings.length > 0) {
+        console.warn('[UatStorage] pushAll warnings:', warnings);
+        if (reason !== 'auto') this.toast(`Đã đẩy (${warnings.length} cảnh báo — xem Console)`, 'warning');
+      } else {
+        if (reason !== 'auto') this.toast('Đã đẩy dữ liệu lên Supabase', 'success');
+      }
       return true;
     } catch (err) {
-      console.error('[UatStorage] pushAll failed:', err);
+      console.error('[UatStorage] pushAll unexpected error:', err);
       this.lastStatus = 'Lỗi đồng bộ';
-      this.toast('Đồng bộ Supabase thất bại: ' + (err.message || String(err)), 'error');
+      this.toast('Lỗi đồng bộ không mong đợi: ' + (err.message || String(err)), 'error');
       return false;
     } finally {
       this.isSyncing = false;
