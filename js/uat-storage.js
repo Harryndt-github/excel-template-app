@@ -623,8 +623,16 @@ const UatStorage = {
   async _pushVideoTemplatesMeta() {
     if (typeof VideoTemplateState === 'undefined') return;
     const templates = VideoTemplateState.templates || [];
-    if (!templates.length) return;
     const now = new Date().toISOString();
+
+    // Nếu list rỗng → xóa tất cả records của scope này (đã xóa hết local)
+    if (!templates.length) {
+      const { error } = await this.client
+        .from('video_templates').delete().eq('scope', this.scope);
+      if (error) throw new Error(error.message);
+      return;
+    }
+
     const rows = templates.map(tpl => ({
       scope: this.scope,
       video_id: tpl.id,
@@ -636,21 +644,22 @@ const UatStorage = {
       created_at: tpl.createdAt || now,
       updated_at: now,
     }));
-    // Upsert thay DELETE+INSERT: tránh lỗi quyền SELECT sau DELETE
-    // onConflict theo primary key (scope, video_id)
+
+    // Upsert active records
     const { error: upsertErr } = await this.client
       .from('video_templates')
       .upsert(rows, { onConflict: 'scope,video_id' });
     if (upsertErr) throw new Error(upsertErr.message);
-    // Xóa các video đã bị xóa cục bộ (best-effort, không throw)
+
+    // Xóa các video đã bị xóa cục bộ — dùng IN với array Supabase syntax
     const activeIds = templates.map(t => t.id);
-    try {
-      await this.client
-        .from('video_templates')
-        .delete()
-        .eq('scope', this.scope)
-        .not('video_id', 'in', `(${activeIds.join(',')})`);
-    } catch (_) {} // non-fatal
+    const { error: delErr } = await this.client
+      .from('video_templates')
+      .delete()
+      .eq('scope', this.scope)
+      .not('video_id', 'in', `(${activeIds.map(id => `"${id}"`).join(',')})`);
+    // non-fatal: ignore delErr (best-effort cleanup)
+    void delErr;
   },
 
   // ── Pull ─────────────────────────────────────────────────────
@@ -1087,6 +1096,9 @@ const UatStorage = {
     const pending = (VideoTemplateState.templates || []).filter(t => t._inIDB && !t.storagePath);
     if (!pending.length) return;
 
+    const totalMB = pending.reduce((s, t) => s + (t.size || 0), 0) / (1024 * 1024);
+    if (totalMB > 5) this.toast(`Đang upload ${totalMB.toFixed(0)} MB lên Storage (ngầm)…`, 'info');
+
     (async () => {
       let uploaded = 0;
       for (const tpl of pending) {
@@ -1103,6 +1115,7 @@ const UatStorage = {
           uploaded++;
         } else {
           console.warn('[UatStorage] Video Storage upload (background):', res.error.message);
+          this.toast(`Upload Storage thất bại "${tpl.name}": ${res.error.message}`, 'warning');
         }
       }
       // Cập nhật lại storage_path vào DB sau khi upload xong
