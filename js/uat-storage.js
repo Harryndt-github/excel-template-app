@@ -142,6 +142,47 @@ const UatStorage = {
     this.syncTimer = setTimeout(() => this.pushAll(reason || 'auto'), 1200);
   },
 
+  // Sync video templates thủ công (gọi từ nút trên trang Video Templates)
+  async syncVideoTemplates() {
+    if (!this.client && !this.connect()) {
+      this.toast('Chưa cấu hình Supabase', 'warning'); return;
+    }
+    const btn = document.getElementById('video-sync-btn');
+    const orig = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang sync...'; }
+    try {
+      // 1. Push metadata
+      await this._pushVideoTemplatesMeta();
+      // 2. Upload các file chưa có trên Storage (background OK, hiển thị progress)
+      await this._uploadVideoTemplatesSync();
+      // 3. Cập nhật lại metadata với storage_path sau upload
+      await this._pushVideoTemplatesMeta();
+      this.toast('Đã đồng bộ video templates lên Supabase', 'success');
+    } catch (e) {
+      this.toast('Lỗi sync video: ' + e.message, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
+    }
+  },
+
+  // Upload video đồng bộ (blocking) — dùng cho nút manual sync
+  async _uploadVideoTemplatesSync() {
+    if (typeof VideoTemplateState === 'undefined' || typeof VideoStore === 'undefined') return;
+    const pending = (VideoTemplateState.templates || []).filter(t => t._inIDB && !t.storagePath);
+    for (const tpl of pending) {
+      const arrayBuffer = await VideoStore.load(tpl.id).catch(() => null);
+      if (!arrayBuffer) continue;
+      const storagePath = `templates/${this.scope}/videos/${tpl.id}.mp4`;
+      const res = await this.client.storage.from(this.bucket).upload(
+        storagePath,
+        new Blob([arrayBuffer], { type: 'video/mp4' }),
+        { contentType: 'video/mp4', upsert: true }
+      );
+      if (!res.error) tpl.storagePath = storagePath;
+      else throw new Error(`Upload "${tpl.name}": ${res.error.message}`);
+    }
+  },
+
   // ── Helpers ──────────────────────────────────────────────────
   _throwIfErr(res, label) {
     if (res && res.error) {
@@ -190,9 +231,12 @@ const UatStorage = {
     try {
       if (reason !== 'auto') this.toast('Đang đẩy dữ liệu lên Supabase…', 'info');
       await this.uploadNativeDocxTemplates();
-      await this._uploadVideoTemplates().catch(e =>
-        console.warn('[UatStorage] _uploadVideoTemplates skipped (non-fatal):', e.message)
-      );
+      // Video metadata pushed first (fast) — Storage upload runs in background after
+      await this._pushVideoTemplatesMeta().catch(e => {
+        console.warn('[UatStorage] video metadata push failed:', e.message);
+        this.toast('Cảnh báo: Chưa sync được metadata video — ' + e.message, 'warning');
+      });
+      this._uploadVideoTemplatesBackground(); // fire-and-forget, không block pipeline
       await this._pushMasterData();
       await this._pushBranchData();
       await this._pushProjectInfoData();
@@ -1028,28 +1072,42 @@ const UatStorage = {
 
   // ── Video Storage ─────────────────────────────────────────────
 
-  async _uploadVideoTemplates() {
+  // Chạy ngầm sau khi metadata đã được push — không block pipeline chính
+  _uploadVideoTemplatesBackground() {
     if (typeof VideoTemplateState === 'undefined' || typeof VideoStore === 'undefined') return;
-    for (const tpl of (VideoTemplateState.templates || [])) {
-      if (!tpl._inIDB) continue;
-      const arrayBuffer = await VideoStore.load(tpl.id);
-      if (!arrayBuffer) continue;
-      const storagePath = tpl.storagePath || `templates/${this.scope}/videos/${tpl.id}.mp4`;
-      const res = await this.client.storage.from(this.bucket).upload(
-        storagePath,
-        new Blob([arrayBuffer], { type: 'video/mp4' }),
-        { contentType: 'video/mp4', upsert: true }
-      );
-      if (res.error) {
-        console.warn('[UatStorage] Video storage upload warning (non-fatal):', res.error);
-      } else {
-        tpl.storagePath = storagePath;
+    const pending = (VideoTemplateState.templates || []).filter(t => t._inIDB && !t.storagePath);
+    if (!pending.length) return;
+
+    (async () => {
+      let uploaded = 0;
+      for (const tpl of pending) {
+        const arrayBuffer = await VideoStore.load(tpl.id).catch(() => null);
+        if (!arrayBuffer) continue;
+        const storagePath = `templates/${this.scope}/videos/${tpl.id}.mp4`;
+        const res = await this.client.storage.from(this.bucket).upload(
+          storagePath,
+          new Blob([arrayBuffer], { type: 'video/mp4' }),
+          { contentType: 'video/mp4', upsert: true }
+        );
+        if (!res.error) {
+          tpl.storagePath = storagePath;
+          uploaded++;
+        } else {
+          console.warn('[UatStorage] Video Storage upload (background):', res.error.message);
+        }
       }
-    }
+      // Cập nhật lại storage_path vào DB sau khi upload xong
+      if (uploaded > 0) {
+        await this._pushVideoTemplatesMeta().catch(e =>
+          console.warn('[UatStorage] update storagePath after upload:', e.message)
+        );
+      }
+    })();
   },
 
   async _restoreVideoFiles() {
     if (typeof VideoTemplateState === 'undefined' || typeof VideoStore === 'undefined') return;
+    let downloaded = 0, failed = 0;
     for (const tpl of (VideoTemplateState.templates || [])) {
       if (tpl._inIDB) continue;
       if (!tpl.storagePath || !this.client) continue;
@@ -1058,10 +1116,14 @@ const UatStorage = {
         const arrayBuffer = await data.arrayBuffer();
         await VideoStore.save(tpl.id, arrayBuffer);
         tpl._inIDB = true;
+        downloaded++;
       } else {
-        console.warn('[UatStorage] Video restore warning (non-fatal):', tpl.storagePath, error);
+        failed++;
+        console.warn('[UatStorage] Video restore failed:', tpl.storagePath, error?.message);
       }
     }
+    if (downloaded > 0 && typeof VideoTemplateModule !== 'undefined') VideoTemplateModule.renderList();
+    if (failed > 0) this.toast(`${failed} video chưa tải được file — Storage chưa upload hoặc lỗi mạng`, 'warning');
   },
 
   _arrayBufferToBase64(buffer) {
