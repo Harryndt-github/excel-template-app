@@ -262,7 +262,8 @@ const UatStorage = {
       this.lastStatus = `Synced ${new Date().toLocaleTimeString('vi-VN')}`;
       if (warnings.length > 0) {
         console.warn('[UatStorage] pushAll warnings:', warnings);
-        if (reason !== 'auto') this.toast(`Đã đẩy (${warnings.length} cảnh báo — xem Console)`, 'warning');
+        // Hiển thị nội dung cảnh báo thực tế thay vì "xem Console"
+        warnings.forEach(w => this.toast('⚠ Sync warning: ' + w, 'warning'));
       } else {
         if (reason !== 'auto') this.toast('Đã đẩy dữ liệu lên Supabase', 'success');
       }
