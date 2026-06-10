@@ -1174,6 +1174,12 @@
                 </svg>
                 Thông tin dự án
               </button>
+              <button class="md-view-btn" data-view="priceinfo" onclick="MasterData.setView('priceinfo')">
+                💰 Thông tin giá
+              </button>
+              <button class="md-view-btn" data-view="casefolder" onclick="MasterData.setView('casefolder')">
+                📁 Case Folder
+              </button>
             </div>
             <span id="md-save-status" style="font-size:0.78rem;margin-left:auto;padding:0 8px;transition:color 0.3s;white-space:nowrap;align-self:center;"></span>
           </div>
@@ -1229,6 +1235,8 @@
           </div>
           <div class="md-view-panel" id="md-view-branches" style="display:none;overflow:hidden;height:100%;"></div>
           <div class="md-view-panel" id="md-view-projectinfo" style="display:none;overflow:hidden;height:100%;"></div>
+          <div class="md-view-panel" id="md-view-priceinfo" style="display:none;overflow:hidden;height:100%;"></div>
+          <div class="md-view-panel" id="md-view-casefolder" style="display:none;overflow:hidden;height:100%;"></div>
           <div class="md-view-panel" id="md-view-ratecenter" style="display:none;overflow:hidden;height:100%;">
             <div class="rc-layout">
               <!-- RC Panel 1: Projects -->
@@ -1826,7 +1834,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js"></script>
   <!-- Local scripts: version hash updated on each deploy to bust browser cache -->
-  <script>window.APP_VERSION = '20260610_biz_validator';</script>
+  <script>window.APP_VERSION = '20260610_price_casefolder';</script>
   <script src="js/config.js"></script>
   <script src="js/number-to-words.js?v=20260527_bangchu"></script>
   <script src="js/uat-storage.js?v=20260610_video_tus1"></script>
@@ -1847,5 +1855,6 @@
   <script src="js/uc02-export.js?v=20260610_uc02"></script>
   <script src="js/doc-rules.js?v=20260610_uc01"></script>
   <script src="js/business-validator.js?v=20260610_validator"></script>
+  <script src="js/price-casefolder.js?v=20260610_price_cf"></script>
 </body>
 </html>

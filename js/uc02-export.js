@@ -88,7 +88,7 @@ const UC02_DEFAULT_MAP = {
   'SoTienNienKimKu1':         ['thong_tin_vay::Số tiền niên kim'],
   'SoKyTraNoLd1':             ['thong_tin_vay::Số kỳ trả nợ gốc'],
   'LuaChonLaiSuatLd1':        ['thong_tin_vay::Lựa chọn HTLS KU1'],
-  'NgayChanHoTroLaiSuatLd1':  ['derived::Ngày chặn HTLS', 'thong_tin_vay::Ngày chặn HTLS'],
+  'NgayChanHoTroLaiSuatLd1':  ['derived::Ngày chặn HTLS', 'thong_tin_vay::Ngày chặn HTLS', 'price::ngay_chan_htls_cdt'],
   'ThoiGianCoDinhLaiSuatLd1': ['derived::Tháng chặn HTLS', 'thong_tin_vay::Lựa chọn cố định lãi suất'],
   'LaiSuatCoDinhLd1':         ['derived::Lãi suất cố định', 'thong_tin_vay::Lãi suất cố định'],
   'BienDoLaiSuatLd1':         ['derived::Biên độ', 'thong_tin_vay::Biên độ'],
@@ -124,12 +124,12 @@ const UC02_DEFAULT_MAP = {
   'SoTienTraMoiKyLd3':        ['thong_tin_vay::Số tiền trả gốc mỗi kỳ (3)'],
   'SoTienTraKyCuoiLd3':       ['thong_tin_vay::Só tiền trả gốc kỳ cuối (3)'],
   // ----- Bàn giao / địa chỉ
-  'NgayBanGiao':              ['tai_san_ctt::Ngày dự kiến bàn giao'],
+  'NgayBanGiao':              ['tai_san_ctt::Ngày dự kiến bàn giao', 'price::ngay_ban_giao_du_kien'],
   'HubUyQuyen':               ['branch::hub'],
   'SoCmndNoiCapNgayCap':      ['special::cmnd1_full'],
   'DiaChi':                   ['thong_tin_vay::Địa chỉ thường trú bên vay 1'],
   // ----- Bên vay
-  'IdKhachHang':              ['thong_tin_vay::ID khách hàng'],
+  'IdKhachHang':              ['thong_tin_vay::ID khách hàng', 'price::id_kh_hdmb'],
   'BenVay1':                  ['thong_tin_vay::Họ tên bên vay 1'],
   'QuocTichBenVay1':          ['thong_tin_vay::Quốc tịch bên vay 1'],
   'NamSinhBenVay1':           ['thong_tin_vay::Ngày sinh bên vay 1'],
@@ -179,29 +179,29 @@ const UC02_DEFAULT_MAP = {
   'TenDuAn':                  ['tai_san_ctt::Tên dự án trên hợp đồng', 'project::ten_du_an'],
   'ChuDauTu':                 ['tai_san_ctt::Tên chủ đầu tư', 'project::ten_cdt'],
   'DiaChiDuAn':               ['tai_san_ctt::Địa chỉ dự án', 'project::dia_chi_du_an'],
-  'SoHdmbVbttTtkqHddc':       ['tai_san_ctt::Số HĐMB', 'project::so_hdmb'],
-  'NgayKy':                   ['tai_san_ctt::Ngày ký HĐMB'],
+  'SoHdmbVbttTtkqHddc':       ['tai_san_ctt::Số HĐMB', 'project::so_hdmb', 'price::so_hdmb'],
+  'NgayKy':                   ['tai_san_ctt::Ngày ký HĐMB', 'price::ngay_ky_hdmb'],
   'BenBanTrenHdmb':           ['tai_san_ctt::Tên người ký trên HĐMB'],
   'NguoiDungTenTrenHdmb':     ['tai_san_ctt::Tên người ký trên HĐMB'],
   'BenMuaTrenHopDong':        ['thong_tin_vay::Họ tên bên vay 1'],
   'DuAn':                     ['project::ten_du_an', 'tai_san_ctt::Tên dự án trên hợp đồng'],
   'ChinhSach':                ['thong_tin_vay::Chính sách bán hàng'],
-  'DienThoaiTrenHd':          ['thong_tin_vay::Số điện thoại khách hàng'],
-  'EmailTrenHd':              ['thong_tin_vay::Email khách hàng'],
-  'DiaChiLienHeTrenHd':       ['thong_tin_vay::Địa chỉ thường trú bên vay 1'],
+  'DienThoaiTrenHd':          ['thong_tin_vay::Số điện thoại khách hàng', 'price::dien_thoai_hd'],
+  'EmailTrenHd':              ['thong_tin_vay::Email khách hàng', 'price::email_hd'],
+  'DiaChiLienHeTrenHd':       ['thong_tin_vay::Địa chỉ thường trú bên vay 1', 'price::dia_chi_lien_he_hd'],
   // ----- Phương thức trả nợ & khác
   'PhuongThucTraNoThongThuong': ['thong_tin_vay::Phương thức trả nợ'],
   'TkSale':                   ['thong_tin_vay::Tài khoản CTV'],
   'LinhVucSuDungVon':         ['thong_tin_vay::Mục đích vay'],
   'ChinhSachAd':              ['thong_tin_vay::Chính sách bán hàng'],
   // ----- Mã hạch toán & xuất file
-  'NgayBanGiaoDuKien':        ['tai_san_ctt::Ngày dự kiến bàn giao'],
+  'NgayBanGiaoDuKien':        ['tai_san_ctt::Ngày dự kiến bàn giao', 'price::ngay_ban_giao_du_kien'],
   'MaCs':                     ['project::ma_chinh_sach', 'thong_tin_vay::Mã chính sách'],
   'MaCt':                     ['project::ma_chuong_trinh', 'thong_tin_vay::Mã chương trình'],
   'MaDuAn':                   ['thong_tin_vay::Mã dự án vay vốn', 'tai_san::Mã dự án', 'project::ma_du_an'],
-  'Net':                      ['tai_san_ctt::Giá NET'],
-  'Vat':                      ['tai_san_ctt::Giá VAT'],
-  'Kpbt':                     ['tai_san_ctt::Kinh phí bảo trì'],
+  'Net':                      ['tai_san_ctt::Giá NET', 'price::gia_net_hdmb'],
+  'Vat':                      ['tai_san_ctt::Giá VAT', 'price::gia_vat_hdmb'],
+  'Kpbt':                     ['tai_san_ctt::Kinh phí bảo trì', 'price::kpbt'],
   'MaCanXuatTt':              ['tai_san::Mã căn', 'thong_tin_vay::Mã căn vay vốn'],
   'LuaChonLsKu1':             ['thong_tin_vay::Lựa chọn HTLS KU1'],
   'LuaChonLsKu2':             ['thong_tin_vay::Lựa chọn HTLS KU1 (2)'],
@@ -269,6 +269,8 @@ const UC02Module = {
       if (source === 'derived')   { const v = this._getDerived()[field]; return v === undefined || v === null ? '' : v; }
       if (source === 'branch')    { const b = (typeof BranchModule !== 'undefined') ? BranchModule.getSelectedBranch() : null; return (b && b[field]) || ''; }
       if (source === 'project')   { const p = (typeof ProjectInfoModule !== 'undefined') ? ProjectInfoModule.getSelectedProject() : null; return (p && p[field]) || ''; }
+      if (source === 'price')     { const r = (typeof PriceInfoModule !== 'undefined') ? (PriceInfoModule.getMatched() || PriceInfoModule.getSelected()) : null; return (r && r[field]) || ''; }
+      if (source === 'casefolder') { const r = (typeof CaseFolderModule !== 'undefined') ? (CaseFolderModule.getMatched() || CaseFolderModule.getSelected()) : null; return (r && r[field]) || ''; }
       if (source === 'masterdata') {
         if (typeof MasterData !== 'undefined' && MasterData.getMappingData) return MasterData.getMappingData()[field] ?? '';
         return '';
@@ -544,6 +546,7 @@ const UC02Module = {
     const labels = {
       derived: '⚙️ Rule', branch: '🏦 CN', project: '🏗️ DA',
       masterdata: '📋 MD', ratecenter: '💹 LS', special: '✨',
+      price: '💰 Giá', casefolder: '📁 CF',
     };
     const ftLabel = (typeof FILE_TYPES !== 'undefined' && FILE_TYPES[source]) ? FILE_TYPES[source].label : null;
     return `[${labels[source] || ftLabel || source}] ${field}`;
@@ -597,6 +600,16 @@ const UC02Module = {
     if (typeof ProjectInfoModule !== 'undefined' && typeof PROJECT_INFO_FIELDS !== 'undefined') {
       const p = ProjectInfoModule.getSelectedProject() || {};
       group('🏗️ Thông tin dự án', PROJECT_INFO_FIELDS.map(f => ({ value: `project::${f.key}`, label: f.label, preview: p[f.key] })));
+    }
+    // Thông tin giá (theo mã căn đang xử lý) — BRD Bảng 6
+    if (typeof PriceInfoModule !== 'undefined' && typeof PRICE_INFO_FIELDS !== 'undefined') {
+      const r = PriceInfoModule.getMatched() || PriceInfoModule.getSelected() || {};
+      group('💰 Thông tin giá', PRICE_INFO_FIELDS.map(f => ({ value: `price::${f.key}`, label: f.label, preview: r[f.key] })));
+    }
+    // Case Folder (theo CSBH/dự án đang xử lý) — BRD Bảng 7
+    if (typeof CaseFolderModule !== 'undefined' && typeof CASE_FOLDER_FIELDS !== 'undefined') {
+      const r = CaseFolderModule.getMatched() || CaseFolderModule.getSelected() || {};
+      group('📁 Case Folder', CASE_FOLDER_FIELDS.map(f => ({ value: `casefolder::${f.key}`, label: f.label, preview: r[f.key] })));
     }
     // Master Data entities
     if (typeof MasterData !== 'undefined' && MasterData.getMappingData) {

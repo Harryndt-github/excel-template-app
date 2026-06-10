@@ -187,7 +187,7 @@ const MasterData = {
     // Hide all panels
     document.querySelectorAll('.md-view-panel').forEach(p => p.style.display = 'none');
     const panel = document.getElementById(`md-view-${mode}`);
-    const flexModes = ['config', 'ratecenter', 'advisor', 'branches', 'projectinfo'];
+    const flexModes = ['config', 'ratecenter', 'advisor', 'branches', 'projectinfo', 'priceinfo', 'casefolder'];
     if (panel) panel.style.display = flexModes.includes(mode) ? 'flex' : 'block';
 
     // Sidebar: only show for mindmap
@@ -200,6 +200,8 @@ const MasterData = {
     if (mode === 'advisor')     { if (typeof PolicyAdvisorUI !== 'undefined') PolicyAdvisorUI.render(); }
     if (mode === 'branches')    { if (typeof BranchModule !== 'undefined') BranchModule.render(); }
     if (mode === 'projectinfo') { if (typeof ProjectInfoModule !== 'undefined') ProjectInfoModule.render(); }
+    if (mode === 'priceinfo')   { if (typeof PriceInfoModule !== 'undefined') PriceInfoModule.render(); }
+    if (mode === 'casefolder')  { if (typeof CaseFolderModule !== 'undefined') CaseFolderModule.render(); }
   },
 
   // ── Entity List (sidebar on master data page) ──

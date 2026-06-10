@@ -88,7 +88,14 @@ const BusinessValidator = {
       if (!isNaN(n) && n > 0) kunnAmounts.push(n);
     }
 
+    // Master data Thông tin giá (Bảng 6) + Case Folder (Bảng 7) — khớp theo mã căn/CSBH
+    const priceRec = (typeof PriceInfoModule !== 'undefined')
+      ? (PriceInfoModule.getMatched() || PriceInfoModule.getSelected()) : null;
+    const caseFolder = (typeof CaseFolderModule !== 'undefined')
+      ? (CaseFolderModule.getMatched() || CaseFolderModule.getSelected()) : null;
+
     return {
+      priceRec, caseFolder,
       // Nhóm 1
       soTienVay: this._num(tv['Tổng số tiền vay']),
       soTienPheDuyet: this._num(cfg.hanMucOverride) || this._num(tv['Số tiền phê duyệt']) || this._num(hm['Giá trị được phê duyệt']),
@@ -97,8 +104,9 @@ const BusinessValidator = {
       kunnChiHo: this._num(cfg.kunnChiHo),
       duNoBenBan: this._num(cfg.duNoBenBan),
       yeuCauBoiSo5: this._norm(ctt['Có yêu cầu bội số của 5%']) === 'y',
-      giaNET: this._num(ctt['Giá NET']),
-      giaVAT: this._num(ctt['Giá VAT']),
+      // Giá NET/VAT: ưu tiên Extract CTT, fallback master data Thông tin giá (Bảng 6)
+      giaNET: this._num(ctt['Giá NET']) || this._num(priceRec && priceRec.gia_net_hdmb),
+      giaVAT: this._num(ctt['Giá VAT']) || this._num(priceRec && priceRec.gia_vat_hdmb),
       // Nhóm 2
       giaTriTaiSan: this._num(ts['Giá trị tài sản']),
       giaTriTaiSanPheDuyet: this._num(tv['Tổng giá trị tài sản']),
@@ -214,6 +222,52 @@ const BusinessValidator = {
           status: 'warn',
           message: `Số tiền KUNN tiếp nối chi hộ ${V._fmt(ctx.kunnChiHo)} đ LỚN HƠN dư nợ hiện tại của bên bán ` +
                    `${V._fmt(ctx.duNoBenBan)} đ (chênh ${V._fmt(ctx.kunnChiHo - ctx.duNoBenBan)} đ)`,
+        };
+      },
+    });
+
+    // Parse tỷ lệ %: '70', '70%' hoặc '0.7' đều hiểu là 70%
+    const pct = (v) => {
+      const n = V._num(String(v ?? '').replace('%', ''));
+      if (isNaN(n)) return NaN;
+      return n > 0 && n <= 1 ? n * 100 : n;
+    };
+    this.register({
+      id: 'g1_ty_le_hdv', group: 1, severity: 'warn',
+      title: 'Tỷ lệ vay không vượt tỷ lệ hợp đồng vay theo CSBH (Case Folder)',
+      check(ctx) {
+        const cf = ctx.caseFolder;
+        const maxPct = cf ? pct(cf.ty_le_hop_dong_vay) : NaN;
+        if (isNaN(maxPct)) return skip('Chưa có Case Folder khớp CSBH/dự án (master data Bảng 7) hoặc thiếu "Tỷ lệ hợp đồng vay"');
+        const giaTri = (ctx.giaNET || 0) + (ctx.giaVAT || 0);
+        if (isNaN(ctx.soTienVay) || !giaTri) return skip('Thiếu số tiền vay hoặc giá trị HĐMB (NET+VAT)');
+        const ratio = ctx.soTienVay / giaTri * 100;
+        if (ratio <= maxPct + 0.01) {
+          return pass(`Tỷ lệ vay ${ratio.toFixed(2)}% ≤ tỷ lệ HĐV ${maxPct}% theo CSBH "${cf.csbh || cf.ten_case}"`);
+        }
+        return {
+          status: 'warn',
+          message: `Tỷ lệ vay ${ratio.toFixed(2)}% VƯỢT tỷ lệ hợp đồng vay ${maxPct}% theo CSBH "${cf.csbh || cf.ten_case}" — check lại tỷ lệ vay theo CSBH`,
+        };
+      },
+    });
+    this.register({
+      id: 'g1_ty_le_gn1', group: 1, severity: 'warn',
+      title: 'Số tiền GN lần 1 không vượt tỷ lệ GN lần 1 theo CSBH (Case Folder)',
+      check(ctx) {
+        const cf = ctx.caseFolder;
+        const maxPct = cf ? pct(cf.ty_le_gn_lan_1) : NaN;
+        if (isNaN(maxPct)) return skip('Chưa có Case Folder khớp hoặc thiếu "Tỷ lệ GN lần 1"');
+        const giaTri = (ctx.giaNET || 0) + (ctx.giaVAT || 0);
+        if (isNaN(ctx.soTienGnLan1) || !giaTri) return skip('Thiếu số tiền GN lần đầu hoặc giá trị HĐMB (NET+VAT)');
+        const ratio = ctx.soTienGnLan1 / giaTri * 100;
+        if (ratio <= maxPct + 0.01) {
+          return pass(`GN lần 1 = ${ratio.toFixed(2)}% ≤ tỷ lệ GN lần 1 ${maxPct}% theo CSBH "${cf.csbh || cf.ten_case}"`);
+        }
+        return {
+          status: 'warn',
+          message: `Số tiền GN lần 1 ${V._fmt(ctx.soTienGnLan1)} đ = ${ratio.toFixed(2)}% giá trị HĐMB, VƯỢT tỷ lệ GN lần 1 ` +
+                   `${maxPct}% theo CSBH "${cf.csbh || cf.ten_case}"`,
         };
       },
     });
