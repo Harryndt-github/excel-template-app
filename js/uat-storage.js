@@ -142,45 +142,168 @@ const UatStorage = {
     this.syncTimer = setTimeout(() => this.pushAll(reason || 'auto'), 1200);
   },
 
-  // Sync video templates thủ công (gọi từ nút trên trang Video Templates)
-  async syncVideoTemplates() {
+  // Đồng bộ hai chiều: upload file local trước, sau đó kéo danh sách/file remote.
+  async syncVideoTemplates(options = {}) {
     if (!this.client && !this.connect()) {
       this.toast('Chưa cấu hình Supabase', 'warning'); return;
+    }
+    if (this._videoUploadInProgress) {
+      if (!options.silent) this.toast('Video đang được đồng bộ, vui lòng đợi hoàn tất', 'info');
+      return;
     }
     const btn = document.getElementById('video-sync-btn');
     const orig = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang sync...'; }
+    this._videoUploadInProgress = true;
     try {
-      // 1. Push metadata
+      // Metadata chỉ được publish sau khi object đã upload thành công.
+      await this._uploadVideoTemplatesSync({ verifyExisting: true });
       await this._pushVideoTemplatesMeta();
-      // 2. Upload các file chưa có trên Storage (background OK, hiển thị progress)
-      await this._uploadVideoTemplatesSync();
-      // 3. Cập nhật lại metadata với storage_path sau upload
-      await this._pushVideoTemplatesMeta();
-      this.toast('Đã đồng bộ video templates lên Supabase', 'success');
+      await this._pullAndRestoreVideoTemplates();
+      if (!options.silent) this.toast('Đã đồng bộ video giữa thiết bị và Supabase', 'success');
     } catch (e) {
+      (VideoTemplateState.templates || []).forEach(tpl => {
+        if (tpl.syncStatus === 'uploading') tpl.syncStatus = 'error';
+      });
+      if (typeof VideoTemplateModule !== 'undefined') {
+        VideoTemplateModule.persistLocalState();
+        VideoTemplateModule.renderList();
+      }
       this.toast('Lỗi sync video: ' + e.message, 'error');
+      throw e;
     } finally {
+      this._videoUploadInProgress = false;
       if (btn) { btn.disabled = false; btn.textContent = orig; }
     }
   },
 
-  // Upload video đồng bộ (blocking) — dùng cho nút manual sync
-  async _uploadVideoTemplatesSync() {
+  // Upload video đồng bộ (blocking). File > 6 MB dùng TUS resumable upload.
+  async _uploadVideoTemplatesSync(options = {}) {
     if (typeof VideoTemplateState === 'undefined' || typeof VideoStore === 'undefined') return;
-    const pending = (VideoTemplateState.templates || []).filter(t => t._inIDB && !t.storagePath);
-    for (const tpl of pending) {
+    const localTemplates = (VideoTemplateState.templates || []).filter(t => t._inIDB);
+    for (const tpl of localTemplates) {
+      const exists = tpl.storagePath && options.verifyExisting
+        ? await this._videoObjectExists(tpl.storagePath, tpl.size)
+        : !!tpl.storagePath;
+      if (exists) {
+        tpl.syncStatus = 'synced';
+        continue;
+      }
       const arrayBuffer = await VideoStore.load(tpl.id).catch(() => null);
-      if (!arrayBuffer) continue;
+      if (!arrayBuffer) {
+        tpl.syncStatus = 'error';
+        throw new Error(`Không đọc được file local "${tpl.name}"`);
+      }
       const storagePath = `templates/${this.scope}/videos/${tpl.id}.mp4`;
+      tpl.syncStatus = 'uploading';
+      tpl.syncProgress = 0;
+      if (typeof VideoTemplateModule !== 'undefined') VideoTemplateModule.renderList();
+      await this._uploadVideoFile(storagePath, arrayBuffer, tpl, progress => {
+        tpl.syncProgress = progress;
+        if (typeof VideoTemplateModule !== 'undefined') VideoTemplateModule.renderList();
+      });
+      tpl.storagePath = storagePath;
+      tpl.syncStatus = 'synced';
+      tpl.syncProgress = 100;
+      if (typeof VideoTemplateModule !== 'undefined') {
+        VideoTemplateModule.persistLocalState();
+        VideoTemplateModule.renderList();
+      }
+    }
+  },
+
+  async _videoObjectExists(storagePath, expectedSize) {
+    if (!storagePath || !this.client) return false;
+    const slash = storagePath.lastIndexOf('/');
+    const folder = slash >= 0 ? storagePath.slice(0, slash) : '';
+    const fileName = slash >= 0 ? storagePath.slice(slash + 1) : storagePath;
+    const { data, error } = await this.client.storage
+      .from(this.bucket)
+      .list(folder, { limit: 10, search: fileName });
+    if (error) return false;
+    const object = (data || []).find(item => item.name === fileName);
+    if (!object) return false;
+    const remoteSize = Number(object.metadata?.size || object.metadata?.contentLength || 0);
+    return !expectedSize || !remoteSize || remoteSize === Number(expectedSize);
+  },
+
+  async _uploadVideoFile(storagePath, arrayBuffer, tpl, onProgress) {
+    const blob = new Blob([arrayBuffer], { type: 'video/mp4' });
+    if (blob.size <= 6 * 1024 * 1024) {
       const res = await this.client.storage.from(this.bucket).upload(
         storagePath,
-        new Blob([arrayBuffer], { type: 'video/mp4' }),
+        blob,
         { contentType: 'video/mp4', upsert: true }
       );
-      if (!res.error) tpl.storagePath = storagePath;
-      else throw new Error(`Upload "${tpl.name}": ${res.error.message}`);
+      if (res.error) throw new Error(`Upload "${tpl.name}": ${res.error.message}`);
+      if (onProgress) onProgress(100);
+      return;
     }
+    await this._uploadVideoTus(storagePath, blob, tpl, onProgress);
+  },
+
+  async _uploadVideoTus(storagePath, blob, tpl, onProgress) {
+    if (!window.tus || !window.tus.Upload) {
+      throw new Error('Thiếu thư viện TUS resumable upload. Hãy tải lại trang.');
+    }
+
+    const signed = await this.client.storage
+      .from(this.bucket)
+      .createSignedUploadUrl(storagePath, { upsert: true });
+    if (signed.error || !signed.data?.token) {
+      throw new Error(`Không tạo được upload token: ${signed.error?.message || 'missing token'}`);
+    }
+
+    const projectId = String(this.url || '')
+      .replace(/^https?:\/\//, '')
+      .split('.')[0];
+    const endpoint = `https://${projectId}.storage.supabase.co/storage/v1/upload/resumable`;
+
+    await new Promise((resolve, reject) => {
+      const upload = new window.tus.Upload(blob, {
+        endpoint,
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        chunkSize: 6 * 1024 * 1024,
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        headers: {
+          apikey: this.key,
+          authorization: `Bearer ${this.key}`,
+          'x-signature': signed.data.token,
+          'x-upsert': 'true',
+        },
+        metadata: {
+          bucketName: this.bucket,
+          objectName: storagePath,
+          contentType: 'video/mp4',
+          cacheControl: '3600',
+        },
+        onError: error => reject(new Error(`Upload "${tpl.name}": ${error.message || error}`)),
+        onProgress: (uploaded, total) => {
+          if (onProgress) onProgress(total ? (uploaded / total) * 100 : 0);
+        },
+        onSuccess: () => resolve(),
+      });
+      upload.findPreviousUploads()
+        .then(previous => {
+          if (previous.length) upload.resumeFromPreviousUpload(previous[0]);
+          upload.start();
+        })
+        .catch(reject);
+    });
+  },
+
+  async deleteVideoTemplateRemote(tpl) {
+    if (!this.client || !tpl) return;
+    if (tpl.storagePath) {
+      const storageRes = await this.client.storage.from(this.bucket).remove([tpl.storagePath]);
+      if (storageRes.error) throw new Error(storageRes.error.message);
+    }
+    const dbRes = await this.client.from('video_templates')
+      .delete()
+      .eq('scope', this.scope)
+      .eq('video_id', tpl.id);
+    if (dbRes.error) throw new Error(dbRes.error.message);
   },
 
   // ── Helpers ──────────────────────────────────────────────────
@@ -684,29 +807,34 @@ const UatStorage = {
 
   async _doVideoMetaPush() {
     if (typeof VideoTemplateState === 'undefined') return;
-    const templates = VideoTemplateState.templates || [];
+    // Chỉ publish video có object thật trên Storage. Không tạo metadata "ma"
+    // khiến thiết bị khác nhìn thấy card nhưng không thể tải file.
+    const templates = (VideoTemplateState.templates || []).filter(t => t.storagePath);
     const now = new Date().toISOString();
-
-    const { error: delErr } = await this.client
-      .from('video_templates').delete().eq('scope', this.scope);
-    if (delErr) throw new Error(delErr.message);
-
     if (!templates.length) return;
 
-    const rows = templates.map(tpl => ({
-      scope: this.scope, video_id: tpl.id,
-      video_name: tpl.name || 'Video',
-      file_name: tpl.fileName || null,
-      file_size: typeof tpl.size === 'number' ? tpl.size : (parseInt(tpl.size, 10) || 0),
-      storage_path: tpl.storagePath || null,
-      description: tpl.description || '',
-      created_at: tpl.createdAt || now,
-      updated_at: now,
-    }));
-
-    const { error: insErr } = await this.client
-      .from('video_templates').insert(rows);
-    if (insErr) throw new Error(insErr.message);
+    // Không DELETE toàn scope: một máy có danh sách cũ không được phép xóa
+    // metadata video do máy khác vừa upload. Thay từng row theo khóa riêng.
+    for (const tpl of templates) {
+      const row = {
+        scope: this.scope, video_id: tpl.id,
+        video_name: tpl.name || 'Video',
+        file_name: tpl.fileName || null,
+        file_size: typeof tpl.size === 'number' ? tpl.size : (parseInt(tpl.size, 10) || 0),
+        storage_path: tpl.storagePath,
+        description: tpl.description || '',
+        created_at: tpl.createdAt || now,
+        updated_at: now,
+      };
+      const { error: delErr } = await this.client
+        .from('video_templates')
+        .delete()
+        .eq('scope', this.scope)
+        .eq('video_id', tpl.id);
+      if (delErr) throw new Error(delErr.message);
+      const { error: insErr } = await this.client.from('video_templates').insert([row]);
+      if (insErr) throw new Error(insErr.message);
+    }
   },
 
   // ── Pull ─────────────────────────────────────────────────────
@@ -1034,17 +1162,48 @@ const UatStorage = {
     const res = await this.client.from('video_templates').select('*').eq('scope', this.scope);
     if (res.error) throw new Error(res.error.message);
     const rows = res.data || [];
-    VideoTemplateState.templates = await Promise.all(rows.map(async r => {
-      const inIDB = typeof VideoStore !== 'undefined' ? await VideoStore.has(r.video_id) : false;
-      return {
-        id: r.video_id, name: r.video_name, fileName: r.file_name,
-        size: r.file_size, storagePath: r.storage_path,
-        description: r.description || '', createdAt: r.created_at,
+    const localById = new Map((VideoTemplateState.templates || []).map(t => [t.id, t]));
+    const merged = [];
+
+    for (const row of rows) {
+      const local = localById.get(row.video_id);
+      const inIDB = typeof VideoStore !== 'undefined'
+        ? await VideoStore.has(row.video_id).catch(() => false)
+        : false;
+      merged.push({
+        ...(local || {}),
+        id: row.video_id,
+        name: row.video_name,
+        fileName: row.file_name,
+        size: Number(row.file_size || local?.size || 0),
+        storagePath: row.storage_path || local?.storagePath || null,
+        description: row.description || '',
+        createdAt: row.created_at || local?.createdAt,
         _inIDB: inIDB,
-      };
-    }));
+        syncStatus: row.storage_path ? 'synced' : (local?.syncStatus || 'error'),
+      });
+      localById.delete(row.video_id);
+    }
+
+    // Giữ các file local chưa publish. Pull từ máy khác không được làm mất
+    // video đang chờ upload trên thiết bị hiện tại.
+    for (const local of localById.values()) {
+      const inIDB = typeof VideoStore !== 'undefined'
+        ? await VideoStore.has(local.id).catch(() => false)
+        : false;
+      merged.push({
+        ...local,
+        _inIDB: inIDB,
+        syncStatus: local.storagePath ? 'synced' : (local.syncStatus || 'pending'),
+      });
+    }
+
+    VideoTemplateState.templates = merged;
     await this._restoreVideoFiles();
-    if (typeof VideoTemplateModule !== 'undefined') VideoTemplateModule.renderList();
+    if (typeof VideoTemplateModule !== 'undefined') {
+      VideoTemplateModule.persistLocalState();
+      VideoTemplateModule.renderList();
+    }
   },
 
   // ── DocX Storage ─────────────────────────────────────────────
@@ -1139,51 +1298,15 @@ const UatStorage = {
 
   _videoUploadInProgress: false, // lock — tránh concurrent upload gây Failed to fetch
 
-  // Chạy ngầm sau khi metadata đã được push
-  // Dùng lock để chỉ 1 upload chạy tại một thời điểm
+  // Chạy ngầm bằng cùng pipeline TUS như nút đồng bộ thủ công.
   _uploadVideoTemplatesBackground() {
     if (typeof VideoTemplateState === 'undefined' || typeof VideoStore === 'undefined') return;
-    if (this._videoUploadInProgress) return; // upload đang chạy, bỏ qua
+    if (this._videoUploadInProgress) return;
     const pending = (VideoTemplateState.templates || []).filter(t => t._inIDB && !t.storagePath);
     if (!pending.length) return;
-
-    const totalMB = pending.reduce((s, t) => s + (t.size || 0), 0) / (1024 * 1024);
-    if (totalMB > 5) this.toast(`Đang upload ${totalMB.toFixed(0)} MB lên Storage (ngầm)…`, 'info');
-
-    this._videoUploadInProgress = true;
-    (async () => {
-      try {
-        let uploaded = 0;
-        for (const tpl of pending) {
-          const arrayBuffer = await VideoStore.load(tpl.id).catch(() => null);
-          if (!arrayBuffer) continue;
-          const storagePath = `templates/${this.scope}/videos/${tpl.id}.mp4`;
-          const res = await this.client.storage.from(this.bucket).upload(
-            storagePath,
-            new Blob([arrayBuffer], { type: 'video/mp4' }),
-            { contentType: 'video/mp4', upsert: true }
-          );
-          if (!res.error) {
-            tpl.storagePath = storagePath;
-            uploaded++;
-          } else {
-            console.warn('[UatStorage] Video Storage upload:', res.error.message);
-            this.toast(`Upload Storage thất bại "${tpl.name}": ${res.error.message}`, 'warning');
-          }
-        }
-        // Cập nhật storage_path vào DB sau khi upload xong
-        if (uploaded > 0) {
-          // Chờ 2s để đảm bảo không xung đột với connection pool
-          await new Promise(r => setTimeout(r, 2000));
-          await this._pushVideoTemplatesMeta().catch(e =>
-            console.warn('[UatStorage] update storagePath after upload:', e.message)
-          );
-          if (totalMB > 5) this.toast(`Đã upload ${uploaded} video lên Storage`, 'success');
-        }
-      } finally {
-        this._videoUploadInProgress = false;
-      }
-    })();
+    this.syncVideoTemplates({ silent: true }).catch(error => {
+      console.warn('[UatStorage] Background video sync failed:', error.message);
+    });
   },
 
   async _restoreVideoFiles() {
@@ -1195,15 +1318,31 @@ const UatStorage = {
       const { data, error } = await this.client.storage.from(this.bucket).download(tpl.storagePath);
       if (!error && data) {
         const arrayBuffer = await data.arrayBuffer();
+        if (tpl.size && arrayBuffer.byteLength !== Number(tpl.size)) {
+          tpl.syncStatus = 'error';
+          failed++;
+          console.warn(
+            '[UatStorage] Video restore size mismatch:',
+            tpl.storagePath,
+            arrayBuffer.byteLength,
+            tpl.size
+          );
+          continue;
+        }
         await VideoStore.save(tpl.id, arrayBuffer);
         tpl._inIDB = true;
+        tpl.syncStatus = 'synced';
         downloaded++;
       } else {
+        tpl.syncStatus = 'error';
         failed++;
         console.warn('[UatStorage] Video restore failed:', tpl.storagePath, error?.message);
       }
     }
-    if (downloaded > 0 && typeof VideoTemplateModule !== 'undefined') VideoTemplateModule.renderList();
+    if (typeof VideoTemplateModule !== 'undefined') {
+      VideoTemplateModule.persistLocalState();
+      if (downloaded > 0 || failed > 0) VideoTemplateModule.renderList();
+    }
     if (failed > 0) this.toast(`${failed} video chưa tải được file — Storage chưa upload hoặc lỗi mạng`, 'warning');
   },
 

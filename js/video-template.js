@@ -1,7 +1,7 @@
 /* ================================================================
    Video Template Manager
    - Stores MP4 files in IndexedDB (VideoStore)
-   - Metadata synced via UatStorage (document_templates, type='mp4')
+   - Metadata synced via UatStorage (video_templates)
    - Upload (drag-drop + browse), preview, download, delete
    ================================================================ */
 
@@ -67,11 +67,54 @@ const VideoTemplateState = {
 // ── Module ────────────────────────────────────────────────────────
 
 const VideoTemplateModule = {
-  _MAX_MB: 500,
+  // Supabase Free giới hạn file tối đa 50 MB. Có thể tăng theo plan/bucket
+  // khi triển khai production, nhưng UI UAT không nên hứa quá cấu hình hiện tại.
+  _MAX_MB: 50,
+  STORAGE_KEY: 'excelmapper_video_template_meta_v1',
 
-  init() {
+  async init() {
+    await this.loadLocalState();
     this.renderList();
     this._initDropZone();
+  },
+
+  async loadLocalState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '[]');
+      if (Array.isArray(saved) && saved.length) {
+        const current = new Map((VideoTemplateState.templates || []).map(t => [t.id, t]));
+        for (const t of saved) {
+          if (!t || !t.id || current.has(t.id)) continue;
+          const inIDB = await VideoStore.has(t.id).catch(() => false);
+          current.set(t.id, {
+            ...t,
+            _inIDB: inIDB,
+            syncStatus: t.storagePath ? 'synced' : (t.syncStatus || 'pending'),
+          });
+        }
+        VideoTemplateState.templates = Array.from(current.values());
+      }
+    } catch (e) {
+      console.warn('[VideoTemplate] Cannot restore local metadata:', e.message);
+    }
+  },
+
+  persistLocalState() {
+    try {
+      const metadata = (VideoTemplateState.templates || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        fileName: t.fileName,
+        size: t.size,
+        createdAt: t.createdAt,
+        description: t.description || '',
+        storagePath: t.storagePath || null,
+        syncStatus: t.syncStatus || (t.storagePath ? 'synced' : 'pending'),
+      }));
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(metadata));
+    } catch (e) {
+      console.warn('[VideoTemplate] Cannot persist local metadata:', e.message);
+    }
   },
 
   _uid() {
@@ -145,14 +188,13 @@ const VideoTemplateModule = {
         createdAt: new Date().toISOString(),
         description: '',
         _inIDB: true,
+        syncStatus: 'pending',
       };
       VideoTemplateState.templates.unshift(tpl);
+      this.persistLocalState();
       this.renderList();
-      App.toast(`Đã upload "${this._esc(tpl.name)}"`, 'success');
-      // Delay sync: cho browser thời gian settle sau khi write file lớn vào IndexedDB
-      // (đặc biệt Windows Chrome cần ~5s sau 20MB+ write trước khi fetch khả dụng)
-      const delaySec = file.size > 5 * 1024 * 1024 ? 5000 : 1500;
-      setTimeout(() => this.saveState(), delaySec);
+      App.toast(`Đã lưu "${this._esc(tpl.name)}" trên thiết bị. Đang đồng bộ...`, 'info');
+      this.saveState();
     } catch (err) {
       console.error('[VideoTemplate] Upload error:', err);
       App.toast('Lỗi khi upload video: ' + err.message, 'error');
@@ -162,16 +204,30 @@ const VideoTemplateModule = {
   },
 
   saveState() {
-    if (typeof UatStorage !== 'undefined') UatStorage.queueSync('video_templates');
+    this.persistLocalState();
+    if (typeof UatStorage !== 'undefined') {
+      UatStorage.syncVideoTemplates({ silent: true }).catch(err => {
+        console.error('[VideoTemplate] Auto sync failed:', err);
+      });
+    }
   },
 
   // ── Actions ───────────────────────────────────────────────────
 
   async deleteTemplate(id) {
     if (!confirm('Xóa video template này?')) return;
+    const tpl = VideoTemplateState.templates.find(t => t.id === id);
+    if (tpl && typeof UatStorage !== 'undefined' && UatStorage.client) {
+      try {
+        await UatStorage.deleteVideoTemplateRemote(tpl);
+      } catch (e) {
+        App.toast('Không thể xóa video trên cloud: ' + e.message, 'error');
+        return;
+      }
+    }
     VideoTemplateState.templates = VideoTemplateState.templates.filter(t => t.id !== id);
     await VideoStore.remove(id).catch(() => {});
-    this.saveState();
+    this.persistLocalState();
     this.renderList();
     App.toast('Đã xóa video template', 'success');
   },
@@ -288,6 +344,28 @@ const VideoTemplateModule = {
       await UatStorage.client.from('video_templates').delete().eq('scope', '__diag_test__');
     } catch(e) { step('SDK INSERT video_templates', false, e.message); }
 
+    // 5. Storage list — xác nhận bucket/policy đọc file
+    try {
+      const { data, error } = await UatStorage.client.storage
+        .from(UatStorage.bucket)
+        .list(`templates/${UatStorage.scope}/videos`, { limit: 1 });
+      step('Storage list', !error, error ? error.message : `ok (${(data || []).length} objects)`);
+    } catch(e) { step('Storage list', false, e.message); }
+
+    // 6. TUS library — bắt buộc cho MP4 > 6 MB
+    step('TUS resumable client', !!(window.tus && window.tus.Upload),
+      window.tus && window.tus.Upload ? 'ready' : 'missing');
+
+    // 7. Signed upload token — xác nhận policy INSERT của bucket hoạt động.
+    try {
+      const path = `templates/${UatStorage.scope}/videos/__diagnostic__.mp4`;
+      const { data, error } = await UatStorage.client.storage
+        .from(UatStorage.bucket)
+        .createSignedUploadUrl(path, { upsert: true });
+      step('Storage signed upload token', !error && !!data?.token,
+        error ? error.message : (data?.token ? 'ready' : 'missing token'));
+    } catch(e) { step('Storage signed upload token', false, e.message); }
+
     const msg = results.join('\n');
     console.log('[VIDEO DIAGNOSTIC]\n' + msg);
     alert('Kết quả chẩn đoán:\n\n' + msg + '\n\nCopy kết quả này gửi cho admin.');
@@ -348,15 +426,29 @@ const VideoTemplateModule = {
           </button>
         </div>
 
-        ${!tpl._inIDB ? `
+        ${tpl.syncStatus === 'uploading' ? `
+        <div style="margin-top:10px;font-size:0.75rem;color:#0284c7;padding:5px 9px;background:rgba(2,132,199,0.08);border:1px solid rgba(2,132,199,0.2);border-radius:7px;">
+          ⏳ Đang đồng bộ ${Number(tpl.syncProgress || 0).toFixed(0)}%
+        </div>` : tpl.syncStatus === 'error' ? `
+        <div style="margin-top:10px;font-size:0.75rem;color:#ef4444;padding:5px 9px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:7px;">
+          ⚠ Đồng bộ thất bại — bấm Đồng bộ để thử lại
+        </div>` : !tpl._inIDB ? `
         <div style="margin-top:10px;font-size:0.75rem;color:#f59e0b;padding:5px 9px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:7px;">
-          ⚠ File chưa có trên thiết bị này — upload lại hoặc kéo từ Supabase để dùng
-        </div>` : ''}
+          ⚠ File chưa có trên thiết bị này — bấm Đồng bộ để tải từ Supabase
+        </div>` : tpl.storagePath ? `
+        <div style="margin-top:10px;font-size:0.75rem;color:#10b981;padding:5px 9px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:7px;">
+          ✓ Đã đồng bộ — có thể sử dụng trên thiết bị khác
+        </div>` : `
+        <div style="margin-top:10px;font-size:0.75rem;color:#f59e0b;padding:5px 9px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:7px;">
+          ⏳ Chờ đồng bộ lên cloud
+        </div>`}
       </div>
     `).join('');
   },
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-  VideoTemplateModule.init();
+  VideoTemplateModule.init().catch(error => {
+    console.error('[VideoTemplate] Init failed:', error);
+  });
 });
