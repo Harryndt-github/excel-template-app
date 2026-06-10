@@ -115,7 +115,14 @@
         </svg>
         <span>Video Templates</span>
       </a>
-      <div class="nav-divider-label"><span>Giải ngân</span></div>
+      <div class="nav-divider-label"><span>Hồ sơ &amp; Giải ngân</span></div>
+      <a href="#" class="nav-item" data-page="uc01-docs" id="nav-uc01-docs">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 11l3 3L22 4"/>
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+        </svg>
+        <span>Danh mục hồ sơ</span>
+      </a>
       <a href="#" class="nav-item" data-page="uc02-export" id="nav-uc02-export">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -1043,6 +1050,17 @@
       </div>
     </section>
 
+    <!-- ========== UC01 - DANH MỤC HỒ SƠ CẦN SOẠN ========== -->
+    <section id="page-uc01-docs" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Danh mục hồ sơ cần soạn</h2>
+          <p class="page-subtitle">UC01 — Rule Engine xác định mẫu biểu theo BRD Bảng 2, 9, 10 và quy tắc đặt tên file mục 3.2</p>
+        </div>
+      </div>
+      <div id="uc01-container"></div>
+    </section>
+
     <!-- ========== UC02 - XUẤT TEMPLATE GIẢI NGÂN ========== -->
     <section id="page-uc02-export" class="page">
       <div class="page-header">
@@ -1790,7 +1808,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js"></script>
   <!-- Local scripts: version hash updated on each deploy to bust browser cache -->
-  <script>window.APP_VERSION = '20260610_uc02_export';</script>
+  <script>window.APP_VERSION = '20260610_uc01_docrules';</script>
   <script src="js/config.js"></script>
   <script src="js/number-to-words.js?v=20260527_bangchu"></script>
   <script src="js/uat-storage.js?v=20260610_video_tus1"></script>
@@ -1809,5 +1827,6 @@
   <script src="js/address-parser.js?v=20260610h"></script>
   <script src="js/video-template.js?v=20260610_video_tus1"></script>
   <script src="js/uc02-export.js?v=20260610_uc02"></script>
+  <script src="js/doc-rules.js?v=20260610_uc01"></script>
 </body>
 </html>

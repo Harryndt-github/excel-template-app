@@ -1310,6 +1310,8 @@ const App = {
     if (page === 'address-parser' && typeof AddressParserUI !== 'undefined') AddressParserUI.init();
     // Video Templates
     if (page === 'video-templates' && typeof VideoTemplateModule !== 'undefined') VideoTemplateModule.renderList();
+    // UC01 - Danh mục hồ sơ cần soạn
+    if (page === 'uc01-docs' && typeof DocRules !== 'undefined') DocRules.initPage();
     // UC02 - Xuất template giải ngân
     if (page === 'uc02-export' && typeof UC02Module !== 'undefined') UC02Module.initPage();
   },

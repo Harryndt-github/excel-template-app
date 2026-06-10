@@ -2328,7 +2328,9 @@ const WordGenerator = {
         const mappingDiagnostics = this._collectMappingDiagnostics(tpl);
         const blob = await DocxEngine.exportDocx(tpl.id, replacements, {}, directReplacements);
         const mergeReport = this._combineMergeReport(DocxEngine.lastReport || null, mappingDiagnostics);
-        const fileName = (tpl.name || 'word-template').replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() || 'document';
+        // UC01 BRD 3.2: template g\u1EAFn DocumentType \u2192 t\u00EAn file DocumentType.T\u00EAn c\u0103n.yyyymmddhhmmss
+        const brdName = (typeof DocRules !== 'undefined') ? DocRules.fileNameForTemplate(tpl.id) : null;
+        const fileName = brdName || (tpl.name || 'word-template').replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() || 'document';
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -2379,7 +2381,8 @@ const WordGenerator = {
         type: 'blob',
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       });
-      const fileName = (tpl.name || 'word-template').replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() || 'document';
+      const brdName2 = (typeof DocRules !== 'undefined') ? DocRules.fileNameForTemplate(tpl.id) : null;
+      const fileName = brdName2 || (tpl.name || 'word-template').replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() || 'document';
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -2567,7 +2570,8 @@ const WordGenerator = {
       }
     }
 
-    const fileName = tpl ? tpl.name.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() : 'document';
+    const brdPdfName = (tpl && typeof DocRules !== 'undefined') ? DocRules.fileNameForTemplate(tpl.id) : null;
+    const fileName = brdPdfName || (tpl ? tpl.name.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, '').trim() : 'document');
 
     // A4 ở 96 DPI = 794px, dùng kích thước cố định thay vì scrollWidth (để tránh PDF cắt nửa trang)
     const A4_WIDTH_PX = 794;
