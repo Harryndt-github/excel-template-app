@@ -1308,6 +1308,8 @@ const App = {
     if (page === 'word-generate' && typeof WordGenerator !== 'undefined') WordGenerator.initStep1();
     // Address Parser
     if (page === 'address-parser' && typeof AddressParserUI !== 'undefined') AddressParserUI.init();
+    // Video Templates
+    if (page === 'video-templates' && typeof VideoTemplateModule !== 'undefined') VideoTemplateModule.renderList();
   },
 
   updateDashboard() {

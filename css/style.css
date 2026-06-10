@@ -3303,3 +3303,10 @@ select.input option {
     text-align: left;
   }
 }
+
+/* ── Video Template drop zone ── */
+#video-upload-drop.dragover {
+  background: rgba(225, 29, 72, 0.08);
+  border-color: #e11d48;
+  color: #e11d48;
+}

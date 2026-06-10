@@ -190,6 +190,7 @@ const UatStorage = {
     try {
       if (reason !== 'auto') this.toast('Đang đẩy dữ liệu lên Supabase…', 'info');
       await this.uploadNativeDocxTemplates();
+      await this._uploadVideoTemplates();
       await this._pushMasterData();
       await this._pushBranchData();
       await this._pushProjectInfoData();
@@ -556,6 +557,22 @@ const UatStorage = {
       });
     }
 
+    if (typeof VideoTemplateState !== 'undefined') {
+      (VideoTemplateState.templates || []).forEach(tpl => {
+        rows.push({
+          scope: this.scope, template_id: tpl.id,
+          template_name: tpl.name || 'Video Template',
+          template_type: 'mp4',
+          storage_bucket: this.bucket,
+          storage_path: tpl.storagePath || null,
+          source_file_name: tpl.fileName || null,
+          placeholders: [], manual_fields: [],
+          metadata: { fileName: tpl.fileName, size: tpl.size, createdAt: tpl.createdAt, description: tpl.description || '' },
+          updated_at: tpl.createdAt || now,
+        });
+      });
+    }
+
     this._throwIfErr(
       await this.client.from('document_templates').delete().eq('scope', this.scope),
       'clear document_templates'
@@ -863,6 +880,7 @@ const UatStorage = {
   async _restoreTemplates(templates) {
     const wordTpls  = templates.filter(t => t.template_type === 'docx');
     const excelTpls = templates.filter(t => t.template_type === 'excel');
+    const videoTpls = templates.filter(t => t.template_type === 'mp4');
 
     if (typeof WordState !== 'undefined') {
       WordState.templates = wordTpls.map(t => ({
@@ -880,6 +898,19 @@ const UatStorage = {
         name: t.template_name, updatedAt: t.updated_at,
       }));
       if (typeof App !== 'undefined') App.updateDashboard();
+    }
+
+    if (typeof VideoTemplateState !== 'undefined') {
+      VideoTemplateState.templates = await Promise.all(videoTpls.map(async t => {
+        const inIDB = typeof VideoStore !== 'undefined' ? await VideoStore.has(t.template_id) : false;
+        return {
+          ...(t.metadata || {}), id: t.template_id,
+          name: t.template_name, storagePath: t.storage_path,
+          _inIDB: inIDB,
+        };
+      }));
+      await this._restoreVideoFiles();
+      if (typeof VideoTemplateModule !== 'undefined') VideoTemplateModule.renderList();
     }
   },
 
@@ -967,6 +998,44 @@ const UatStorage = {
         } catch (e) {
           console.warn('[UatStorage] base64 fallback restore failed:', e);
         }
+      }
+    }
+  },
+
+  // ── Video Storage ─────────────────────────────────────────────
+
+  async _uploadVideoTemplates() {
+    if (typeof VideoTemplateState === 'undefined' || typeof VideoStore === 'undefined') return;
+    for (const tpl of (VideoTemplateState.templates || [])) {
+      if (!tpl._inIDB) continue;
+      const arrayBuffer = await VideoStore.load(tpl.id);
+      if (!arrayBuffer) continue;
+      const storagePath = tpl.storagePath || `templates/${this.scope}/videos/${tpl.id}.mp4`;
+      const res = await this.client.storage.from(this.bucket).upload(
+        storagePath,
+        new Blob([arrayBuffer], { type: 'video/mp4' }),
+        { contentType: 'video/mp4', upsert: true }
+      );
+      if (res.error) {
+        console.warn('[UatStorage] Video storage upload warning (non-fatal):', res.error);
+      } else {
+        tpl.storagePath = storagePath;
+      }
+    }
+  },
+
+  async _restoreVideoFiles() {
+    if (typeof VideoTemplateState === 'undefined' || typeof VideoStore === 'undefined') return;
+    for (const tpl of (VideoTemplateState.templates || [])) {
+      if (tpl._inIDB) continue;
+      if (!tpl.storagePath || !this.client) continue;
+      const { data, error } = await this.client.storage.from(this.bucket).download(tpl.storagePath);
+      if (!error && data) {
+        const arrayBuffer = await data.arrayBuffer();
+        await VideoStore.save(tpl.id, arrayBuffer);
+        tpl._inIDB = true;
+      } else {
+        console.warn('[UatStorage] Video restore warning (non-fatal):', tpl.storagePath, error);
       }
     }
   },
