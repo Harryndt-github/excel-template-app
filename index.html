@@ -115,6 +115,15 @@
         </svg>
         <span>Video Templates</span>
       </a>
+      <div class="nav-divider-label"><span>Giải ngân</span></div>
+      <a href="#" class="nav-item" data-page="uc02-export" id="nav-uc02-export">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>
+        </svg>
+        <span>Xuất template GN</span>
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -995,7 +1004,7 @@
               <polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/>
               <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
             </svg>
-            Đồng bộ
+            Đồng bộ 2 chiều
           </button>
           <label class="btn btn-primary" style="cursor:pointer;" title="Upload file MP4">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -1013,7 +1022,7 @@
           <polygon points="10 9 15 12 10 15 10 9"/>
         </svg>
         <div style="font-size:0.88rem;font-weight:600;">Kéo thả file MP4 vào đây</div>
-        <div style="font-size:0.78rem;margin-top:4px;">hoặc bấm <b>Upload MP4</b> ở trên &nbsp;·&nbsp; Tối đa 500 MB mỗi file</div>
+        <div style="font-size:0.78rem;margin-top:4px;">hoặc bấm <b>Upload MP4</b> ở trên &nbsp;·&nbsp; UAT tối đa 50 MB mỗi file</div>
       </div>
 
       <!-- Grid -->
@@ -1032,6 +1041,17 @@
           <input type="file" accept=".mp4,video/mp4" hidden onchange="VideoTemplateModule.handleUpload(this.files[0])">
         </label>
       </div>
+    </section>
+
+    <!-- ========== UC02 - XUẤT TEMPLATE GIẢI NGÂN ========== -->
+    <section id="page-uc02-export" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Xuất template giải ngân</h2>
+          <p class="page-subtitle">UC02 — mapping 188 cột theo BRD và xuất file Excel phục vụ giải ngân/hạch toán</p>
+        </div>
+      </div>
+      <div id="uc02-container"></div>
     </section>
 
     <!-- Video Preview Modal -->
@@ -1768,11 +1788,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js"></script>
   <!-- Local scripts: version hash updated on each deploy to bust browser cache -->
-  <script>window.APP_VERSION = '20260526_composite_fix';</script>
+  <script>window.APP_VERSION = '20260610_uc02_export';</script>
   <script src="js/config.js"></script>
   <script src="js/number-to-words.js?v=20260527_bangchu"></script>
-  <script src="js/uat-storage.js?v=20260610h"></script>
+  <script src="js/uat-storage.js?v=20260610_video_tus1"></script>
   <script src="js/docx-engine.js?v=20260610h"></script>
   <script src="js/spreadsheet.js?v=20260610h"></script>
   <script src="js/app.js?v=20260610h"></script>
@@ -1786,6 +1807,7 @@
   <script src="data/master-wards-2025.js?v=20260610h"></script>
   <script src="js/address-data.js?v=20260610h"></script>
   <script src="js/address-parser.js?v=20260610h"></script>
-  <script src="js/video-template.js?v=20260610h"></script>
+  <script src="js/video-template.js?v=20260610_video_tus1"></script>
+  <script src="js/uc02-export.js?v=20260610_uc02"></script>
 </body>
 </html>
