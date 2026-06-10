@@ -1314,6 +1314,8 @@ const App = {
     if (page === 'uc01-docs' && typeof DocRules !== 'undefined') DocRules.initPage();
     // UC02 - Xuất template giải ngân
     if (page === 'uc02-export' && typeof UC02Module !== 'undefined') UC02Module.initPage();
+    // Lịch trả nợ & niên kim (BRD 3.5.1, 3.5.4)
+    if (page === 'repayment' && typeof RepaymentModule !== 'undefined') RepaymentModule.initPage();
     // Cảnh báo/chặn nghiệp vụ (BRD mục 8)
     if (page === 'validator' && typeof BusinessValidator !== 'undefined') BusinessValidator.initPage();
   },

@@ -131,6 +131,13 @@
         </svg>
         <span>Xuất template GN</span>
       </a>
+      <a href="#" class="nav-item" data-page="repayment" id="nav-repayment">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span>Lịch trả nợ</span>
+      </a>
       <a href="#" class="nav-item" data-page="validator" id="nav-validator">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -1079,6 +1086,17 @@
       <div id="uc02-container"></div>
     </section>
 
+    <!-- ========== LỊCH TRẢ NỢ & NIÊN KIM (BRD 3.5.1, 3.5.4) ========== -->
+    <section id="page-repayment" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Lịch trả nợ chi tiết</h2>
+          <p class="page-subtitle">BRD 3.5.1 + 3.5.4 — lịch trả nợ từng kỳ, niên kim/gốc đều, lãi suất 2 giai đoạn, ân hạn gốc</p>
+        </div>
+      </div>
+      <div id="repayment-container"></div>
+    </section>
+
     <!-- ========== CẢNH BÁO/CHẶN NGHIỆP VỤ (BRD MỤC 8) ========== -->
     <section id="page-validator" class="page">
       <div class="page-header">
@@ -1834,7 +1852,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js"></script>
   <!-- Local scripts: version hash updated on each deploy to bust browser cache -->
-  <script>window.APP_VERSION = '20260610_price_casefolder';</script>
+  <script>window.APP_VERSION = '20260610_repayment';</script>
   <script src="js/config.js"></script>
   <script src="js/number-to-words.js?v=20260527_bangchu"></script>
   <script src="js/uat-storage.js?v=20260610_video_tus1"></script>
@@ -1856,5 +1874,6 @@
   <script src="js/doc-rules.js?v=20260610_uc01"></script>
   <script src="js/business-validator.js?v=20260610_validator"></script>
   <script src="js/price-casefolder.js?v=20260610_price_cf"></script>
+  <script src="js/repayment-schedule.js?v=20260610_repayment"></script>
 </body>
 </html>
