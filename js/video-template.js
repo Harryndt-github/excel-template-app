@@ -234,6 +234,62 @@ const VideoTemplateModule = {
 
   // ── Render ────────────────────────────────────────────────────
 
+  // Chạy diagnostic từ thiết bị này — xem step nào fail
+  async runDiagnostic() {
+    if (typeof UatStorage === 'undefined' || !UatStorage.client) {
+      App.toast('Supabase chưa được kết nối', 'warning'); return;
+    }
+    const results = [];
+    const step = (name, ok, detail) => {
+      results.push(`${ok ? '✅' : '❌'} ${name}${detail ? ': ' + detail : ''}`);
+    };
+
+    App.toast('Đang chạy diagnostic...', 'info');
+
+    // 1. GET (select) — request đơn giản nhất
+    try {
+      const { data, error } = await UatStorage.client
+        .from('video_templates').select('scope').limit(1);
+      step('GET video_templates', !error, error ? error.message : `ok (${(data||[]).length} rows)`);
+    } catch(e) { step('GET video_templates', false, e.message); }
+
+    // 2. Raw fetch DELETE — bypass Supabase SDK
+    try {
+      const resp = await fetch(
+        `${UatStorage.url}/rest/v1/video_templates?scope=eq.__diag_test__`,
+        { method: 'DELETE', headers: {
+          'apikey': UatStorage.key,
+          'Authorization': 'Bearer ' + UatStorage.key,
+          'Content-Type': 'application/json',
+        }}
+      );
+      step('Raw fetch DELETE', resp.ok || resp.status === 204, `HTTP ${resp.status}`);
+    } catch(e) { step('Raw fetch DELETE', false, e.message); }
+
+    // 3. Supabase SDK DELETE
+    try {
+      const { error } = await UatStorage.client
+        .from('video_templates').delete().eq('scope', '__diag_test__');
+      step('SDK DELETE video_templates', !error, error ? error.message : 'ok');
+    } catch(e) { step('SDK DELETE video_templates', false, e.message); }
+
+    // 4. SDK INSERT test row
+    try {
+      const { error } = await UatStorage.client
+        .from('video_templates').insert([{
+          scope: '__diag_test__', video_id: 'diag_' + Date.now(),
+          video_name: 'Diagnostic Test', file_size: 1,
+        }]);
+      step('SDK INSERT video_templates', !error, error ? error.message : 'ok');
+      // Cleanup
+      await UatStorage.client.from('video_templates').delete().eq('scope', '__diag_test__');
+    } catch(e) { step('SDK INSERT video_templates', false, e.message); }
+
+    const msg = results.join('\n');
+    console.log('[VIDEO DIAGNOSTIC]\n' + msg);
+    alert('Kết quả chẩn đoán:\n\n' + msg + '\n\nCopy kết quả này gửi cho admin.');
+  },
+
   renderList() {
     const list  = document.getElementById('video-templates-list');
     const empty = document.getElementById('video-no-templates');
