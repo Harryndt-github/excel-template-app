@@ -636,12 +636,21 @@ const UatStorage = {
       created_at: tpl.createdAt || now,
       updated_at: now,
     }));
-    const del = await this.client.from('video_templates').delete().eq('scope', this.scope);
-    if (del.error) throw new Error(del.error.message);
-    if (rows.length) {
-      const ins = await this.client.from('video_templates').insert(rows);
-      if (ins.error) throw new Error(ins.error.message);
-    }
+    // Upsert thay DELETE+INSERT: tránh lỗi quyền SELECT sau DELETE
+    // onConflict theo primary key (scope, video_id)
+    const { error: upsertErr } = await this.client
+      .from('video_templates')
+      .upsert(rows, { onConflict: 'scope,video_id' });
+    if (upsertErr) throw new Error(upsertErr.message);
+    // Xóa các video đã bị xóa cục bộ (best-effort, không throw)
+    const activeIds = templates.map(t => t.id);
+    try {
+      await this.client
+        .from('video_templates')
+        .delete()
+        .eq('scope', this.scope)
+        .not('video_id', 'in', `(${activeIds.join(',')})`);
+    } catch (_) {} // non-fatal
   },
 
   // ── Pull ─────────────────────────────────────────────────────
