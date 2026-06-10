@@ -664,36 +664,48 @@ const UatStorage = {
   },
 
   async _pushVideoTemplatesMeta() {
+    // Retry tối đa 3 lần — browser có thể busy sau large IndexedDB write
+    const MAX = 3;
+    let lastErr;
+    for (let attempt = 1; attempt <= MAX; attempt++) {
+      try {
+        await this._doVideoMetaPush();
+        return; // success
+      } catch(e) {
+        lastErr = e;
+        if (attempt < MAX) {
+          console.warn(`[Video] metadata push attempt ${attempt} failed: ${e.message} — retry in ${attempt * 3}s`);
+          await new Promise(r => setTimeout(r, attempt * 3000)); // 3s, 6s
+        }
+      }
+    }
+    throw lastErr;
+  },
+
+  async _doVideoMetaPush() {
     if (typeof VideoTemplateState === 'undefined') return;
     const templates = VideoTemplateState.templates || [];
     const now = new Date().toISOString();
 
-    // DELETE toàn bộ scope trước — tránh upsert với onConflict header
-    // (onConflict kích hoạt CORS preflight riêng, có thể bị block trên một số browser)
     const { error: delErr } = await this.client
-      .from('video_templates')
-      .delete()
-      .eq('scope', this.scope);
+      .from('video_templates').delete().eq('scope', this.scope);
     if (delErr) throw new Error(delErr.message);
 
-    if (!templates.length) return; // list rỗng → xóa xong là đủ
+    if (!templates.length) return;
 
     const rows = templates.map(tpl => ({
-      scope: this.scope,
-      video_id: tpl.id,
+      scope: this.scope, video_id: tpl.id,
       video_name: tpl.name || 'Video',
       file_name: tpl.fileName || null,
-      file_size: tpl.size || 0,
+      file_size: typeof tpl.size === 'number' ? tpl.size : (parseInt(tpl.size, 10) || 0),
       storage_path: tpl.storagePath || null,
       description: tpl.description || '',
       created_at: tpl.createdAt || now,
       updated_at: now,
     }));
 
-    // INSERT đơn giản — không cần Prefer header đặc biệt
     const { error: insErr } = await this.client
-      .from('video_templates')
-      .insert(rows);
+      .from('video_templates').insert(rows);
     if (insErr) throw new Error(insErr.message);
   },
 

@@ -147,9 +147,12 @@ const VideoTemplateModule = {
         _inIDB: true,
       };
       VideoTemplateState.templates.unshift(tpl);
-      this.saveState();
       this.renderList();
       App.toast(`Đã upload "${this._esc(tpl.name)}"`, 'success');
+      // Delay sync: cho browser thời gian settle sau khi write file lớn vào IndexedDB
+      // (đặc biệt Windows Chrome cần ~5s sau 20MB+ write trước khi fetch khả dụng)
+      const delaySec = file.size > 5 * 1024 * 1024 ? 5000 : 1500;
+      setTimeout(() => this.saveState(), delaySec);
     } catch (err) {
       console.error('[VideoTemplate] Upload error:', err);
       App.toast('Lỗi khi upload video: ' + err.message, 'error');
