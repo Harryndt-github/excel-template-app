@@ -657,13 +657,15 @@ const UatStorage = {
     const templates = VideoTemplateState.templates || [];
     const now = new Date().toISOString();
 
-    // Nếu list rỗng → xóa tất cả records của scope này (đã xóa hết local)
-    if (!templates.length) {
-      const { error } = await this.client
-        .from('video_templates').delete().eq('scope', this.scope);
-      if (error) throw new Error(error.message);
-      return;
-    }
+    // DELETE toàn bộ scope trước — tránh upsert với onConflict header
+    // (onConflict kích hoạt CORS preflight riêng, có thể bị block trên một số browser)
+    const { error: delErr } = await this.client
+      .from('video_templates')
+      .delete()
+      .eq('scope', this.scope);
+    if (delErr) throw new Error(delErr.message);
+
+    if (!templates.length) return; // list rỗng → xóa xong là đủ
 
     const rows = templates.map(tpl => ({
       scope: this.scope,
@@ -677,21 +679,11 @@ const UatStorage = {
       updated_at: now,
     }));
 
-    // Upsert active records
-    const { error: upsertErr } = await this.client
+    // INSERT đơn giản — không cần Prefer header đặc biệt
+    const { error: insErr } = await this.client
       .from('video_templates')
-      .upsert(rows, { onConflict: 'scope,video_id' });
-    if (upsertErr) throw new Error(upsertErr.message);
-
-    // Xóa các video đã bị xóa cục bộ — dùng IN với array Supabase syntax
-    const activeIds = templates.map(t => t.id);
-    const { error: delErr } = await this.client
-      .from('video_templates')
-      .delete()
-      .eq('scope', this.scope)
-      .not('video_id', 'in', `(${activeIds.map(id => `"${id}"`).join(',')})`);
-    // non-fatal: ignore delErr (best-effort cleanup)
-    void delErr;
+      .insert(rows);
+    if (insErr) throw new Error(insErr.message);
   },
 
   // ── Pull ─────────────────────────────────────────────────────
